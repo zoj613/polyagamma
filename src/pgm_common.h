@@ -4,7 +4,6 @@
 #include <numpy/random/distributions.h>
 
 #define PGM_PI2 9.869604401089358  // pi^2
-#define PGM_1_SQRT2PI 0.3989422804014327  // 1 / sqrt(2 * pi)
 #define PGM_PI2_8 1.233700550136169  // pi^2 / 8
 
 

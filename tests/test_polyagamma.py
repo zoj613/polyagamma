@@ -12,7 +12,7 @@ def test_default_rng():
     assert (hasattr(rng, pg) and callable(getattr(rng, pg)))
 
 
-def test_polyagamma_devroye():
+def test_polyagamma():
     rng = default_rng(seed)
     assert len(rng.polyagamma(size=5)) == 5
     assert rng.polyagamma(size=(5, 2)).shape == (5, 2)
@@ -45,3 +45,10 @@ def test_polyagamma_devroye():
 
     # should work for negative values of z
     rng.polyagamma(z=rng.integers(-100000000, -0))
+
+    # raise error on unknown method names
+    with pytest.raises(ValueError):
+        rng.polyagamma(method="unknown method")
+    # raise error for values less than 1 with alternate method
+    with pytest.raises(ValueError):
+        rng.polyagamma(0.9, method="alternate")

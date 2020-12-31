@@ -1,0 +1,231 @@
+/* Copyright (c) 2020-2021, Zolisa Bleki
+ *
+ * SPDX-License-Identifier: BSD-3-Clause */
+#include "pgm_common.h"
+#include "pgm_igammaq.h"
+#include "pgm_alternate.h"
+#include "pgm_alternate_trunc_points.h"
+
+#define PGM_LOG2 0.6931471805599453  // log(2)
+#define PGM_LS2PI 0.9189385332046727  // log(sqrt(2 * pi))
+
+/* 
+ * Return the smallest optimal truncation point greater than the input.
+ * Values are retrieved from a lookup table for `h` in the range [1, 4].
+ */
+static NPY_INLINE double
+get_truncation_point(double h)
+{
+    if (h == 1)
+        return pgm_f[0];
+
+    if (h == 4)
+        return pgm_f[pgm_table_size - 1];
+
+    double h_current;
+    size_t counter = 0;
+    do {
+        h_current = pgm_h[counter];
+        counter++;
+    } while (h_current < h);
+    return pgm_f[counter - 1];
+}
+
+/*
+ * Compute a^L(x|h), the coefficient for the alternating sum S^L(x|h)
+ */
+static NPY_INLINE double
+piecewise_coef(uint64_t n, double x, double h)
+{
+    double h_plus_2n = 2 * n + h;
+
+    return exp(h * PGM_LOG2 + lgamma(n + h) + log(h_plus_2n) - lgamma(h) -
+        lgamma(n + 1) - PGM_LS2PI - 1.5 * log(x) - 0.5 * h_plus_2n * h_plus_2n / x);
+}
+
+
+// compute: k(x|h)
+static NPY_INLINE double
+bounding_kernel(double x, double h, double t)
+{
+    static const double lsp_2 = 0.22579135264472733;  // log(sqrt(pi / 2))
+
+    if (x > t) {
+        return exp(h * lsp_2 + (h - 1) * log(x) - PGM_PI2_8 * x - lgamma(h));
+    }
+    else if (x > 0) {
+        return exp(h * PGM_LOG2 + log(h) - PGM_LS2PI - 0.5 * h * h / x - 1.5 * log(x));
+    }
+    return 0;
+}
+
+/* 
+ * sample from X ~ Gamma(a, rate=b) truncated on the interval {x | x > t} for
+ * a > 1. This algorithm is described in Dagpunar (1978).
+ *
+ * TODO: There is a more efficient one described in Philippe (1997), which
+ * should replace this one in the future.
+ */
+static NPY_INLINE double
+random_left_bounded_gamma(bitgen_t* bitgen_state, double a, double b, double t)
+{
+    b = t * b;
+    double x, log_rho, log_m;
+
+    double a_minus_1 = a - 1;
+    double b_minus_a = b - a;
+    double c0 = 0.5 * (b_minus_a + sqrt(b_minus_a * b_minus_a + 4 * b)) / b; 
+    double one_minus_c0 = 1 - c0;
+
+    do {
+        x = b + random_standard_exponential(bitgen_state) / c0;
+        log_rho = a_minus_1 * log(x) - x * one_minus_c0;
+        log_m = a_minus_1 * log(a_minus_1 / one_minus_c0) - a_minus_1;
+    } while (log(next_double(bitgen_state)) > (log_rho - log_m));
+    return t * (x / b);
+}
+
+/*
+ * Compute an apporximation of the inverse of the error function.
+ *
+ * Reference
+ * ----------
+ * https://en.wikipedia.org/wiki/Error_function#Approximation_with_elementary_functions
+ */
+static NPY_INLINE double
+erfinv(double x)
+{
+    static const double a = 0.147;
+    static const double two_pia = 4.330746750799873;
+    // sign(x) is never zero since the function is used to evaluate (1 - u)
+    // where u is uniform value from an interval
+    double sgn_x = x > 0 ? 1 : -1;
+    double logx_2 = log(1 - x * x);
+    
+    x = two_pia + 0.5 * logx_2;
+    return sgn_x * sqrt(sqrt(x * x - logx_2 / a) - x);
+}
+
+/*
+ * Sample X ~ Levy(0, c) where X < t.
+ *
+ * A Levy(0, c) distribution is equivalent to an Inverse-Gamma(0.5, 0.5 * c)
+ * distribution. Thus sampling from an Inverse-Gamma(0.5, h^2 / 2) can be done
+ * by sampling from a Levy(0, h^2). Sampling from the Levy distribution is
+ * done using the Inverse-Transform method. For this problem, it is superior
+ * over standard rejection sampling because the truncated values (X < t) can
+ * be generated directly without throwing away samples. We can use the fact
+ * that to sample from an interval (a, b], we can generate a uniform variable
+ * from the unterval (F(a), F[b)], where F(x) is the CDF of the distribution.
+ * Then use inverse-transform to sample X such that a <= X <= b.
+ *
+ * Thus, to get X from an Inverse-Gamma(0.5, h^2 / 2) right truncated at t, we
+ * 1) Generate a uniform V from the interval (0, F(t)], where F is the cdf of a
+ *    Levy(0, h^2).
+ * 2) Generate X using inverse transform X = Finv(V)
+ * 3) return X
+ */
+static NPY_INLINE double
+random_bounded_levy(bitgen_t* bitgen_state, double c, double t)
+{
+    double x, u;
+    static const double one_sqrt2 = 0.7071067811865475;  // 1 / sqrt(2)
+
+    u = next_double(bitgen_state) * erfc(sqrt(c / t) * one_sqrt2);
+    // using the relation erfcinv(1 - z) = erfinv(z) where abs(z) < 1.
+    x = erfinv(1 - u);
+    x = c / (2 * x * x); 
+    return x;
+}
+
+/* 
+ * Generate from J*(h, z) where {h | 1 <= h <= 4} using the alternate method.
+ */
+static NPY_INLINE double
+random_jacobi_alternate_bounded(bitgen_t* bitgen_state, double h, double z)
+{
+    static const double logpi_2 = 0.4515827052894548;  // log(pi / 2)
+    uint64_t n;
+    double t, p, q, u, x, h_z, s, old_s, lambda_z, ratio;
+    double h2 = h * h;
+
+    lambda_z = PGM_PI2 / 8 + 0.5 * z * z;
+
+    t = get_truncation_point(h);
+
+    if (z > 0) {
+        h_z = h / z;
+        p = exp(h * (PGM_LOG2 - z)) * inverse_gaussian_cdf(t, h_z, h2);
+    }
+    else {
+        /* UpperIncompleteGamma(0.5, x) == sqrt(pi) * erfc(sqrt(x)), the
+         * regularized version of the function, which is what we want, can be
+         * written as erfc(sqrt(x)) since the denominator of the regularized
+         * version cancels with the sqrt(pi).*/
+        p = exp(h * PGM_LOG2) * erfc(h / sqrt(2 * t));
+    }
+    q = exp(h * (logpi_2 - log(lambda_z))) * kf_gammaq(h, lambda_z * t);
+    ratio = p / (p + q);
+
+    for (;;) {
+        if (next_double(bitgen_state) > ratio) {
+            x = random_left_bounded_gamma(bitgen_state, h, lambda_z, t);
+        }
+        else if (z > 0) {
+            h_z = h / z;
+            /* TODO: Polson et al. (2013) Recommends using an inverse-chi-square as
+             * proposal fro when h/z is greater than the truncation point to
+             * Get a slightly better bound for acceptance probability. We
+             * should maybe include that in the future. */
+            do {
+                x = random_wald(bitgen_state, h_z, h2);
+            } while (x > t);
+        }
+        else {
+            x = random_bounded_levy(bitgen_state, h2, t);
+        }
+        u = next_double(bitgen_state) * bounding_kernel(x, h, t);
+        s = piecewise_coef(0, x, h);
+        for (n = 1;; ++n) {
+            old_s = s;
+            if (n & 1) {
+                s -= piecewise_coef(n, x, h);
+                if ((old_s >= s) && (u < s))
+                    return x;
+            }
+            else {
+                s += piecewise_coef(n, x, h);
+                if ((old_s >= s) && (u > s)) {
+                    break;
+                }
+            }
+        }
+    }
+}
+
+/*
+ * Sample from PG(h, z) using the alternate method, for h >= 1.
+ *
+ * For values of h > 4, sample in chunks of size ``pgm_h_range``, which is
+ * the difference between the largest and smallest optimal h value that
+ * satisfies the alternating sum criterion for the sampler in the range We
+ * chose ([1, 4]). We sample and decrement the `h` param until the its value
+ * is less than or equal to 4. Then sample one more time if the remaining value
+ * is not zero. 
+ *
+ * See: Windle et al. (2014)
+ */
+double
+random_polyagamma_alternate(bitgen_t *bitgen_state, double h, double z)
+{
+    double out = 0;
+    // We want to sample from J*(h, z/2)
+    z = 0.5 * (z < 0 ? fabs(z) : z);
+
+    while (h > 4) {
+        out += random_jacobi_alternate_bounded(bitgen_state, pgm_h_range, z);
+        h -= pgm_h_range;
+    }
+    out += random_jacobi_alternate_bounded(bitgen_state, h, z);
+    return 0.25 * out;
+}

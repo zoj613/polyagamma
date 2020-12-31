@@ -3,6 +3,11 @@
 # cython: wraparound=False
 # cython: nonecheck=False
 # cython: cdivision=True
+"""
+Copyright (c) 2020-2021, Zolisa Bleki
+
+SPDX-License-Identifier: BSD-3-Clause
+"""
 from cpython.pycapsule cimport PyCapsule_GetPointer
 from numpy.random.bit_generator cimport bitgen_t
 
@@ -11,13 +16,15 @@ import numpy as np
 
 cdef extern from "../include/pgm_random.h":
     ctypedef enum sampler_t:
-        HYBRID
+        GAMMA
         DEVROYE
         ALTERNATE
         SADDLE
-    double pgm_random_polyagamma(bitgen_t* bg, double h, double z, sampler_t) nogil
+        HYBRID
+    double pgm_random_polyagamma(bitgen_t* bg, double h, double z,
+                                 sampler_t method) nogil
     void pgm_random_polyagamma_fill(bitgen_t* bg, double h, double z,
-                                    sampler_t, size_t n, double* out) nogil
+                                    sampler_t method, size_t n, double* out) nogil
 
 
 cdef bint is_sequence(object x):
@@ -30,8 +37,15 @@ cdef bint is_sequence(object x):
     return out
 
 
+cdef dict METHODS = {
+    "gamma": GAMMA,
+    "devroye": DEVROYE,
+    "alternate": ALTERNATE,
+}
+
+
 class Generator(np.random.Generator):
-    def polyagamma(self, h=1, z=0, size=None, double[:] out=None):
+    def polyagamma(self, h=1, z=0, size=None, double[:] out=None, method=None):
         """
         polyagamma(h=1, z=0, size=None, out=None)
 
@@ -58,6 +72,12 @@ class Generator(np.random.Generator):
             is returned. when `h` and/or `z` is a sequence, then `out` needs
             to have the same total size as the broadcasted result of the
             parameters.
+        method : str or None, optional
+            The method to use when sampling. If None (default) then a hybrid
+            sampler is used that picks a method based on the value of `h`.
+            A legal value must be one of {"gamma", "devroye", "alternate"}. If
+            the "alternate" method is used, then the value of `h` must be no
+            less than 1.
 
         Returns
         -------
@@ -83,6 +103,8 @@ class Generator(np.random.Generator):
         # broadcasting to generate 5 values from PG(1, 5), PG(2, 5),...,PG(5, 5)
         >>> a = [1, 2, 3, 4, 5]
         >>> rng.polyagamma(a, 5)
+        # using a specific method
+        >>> out = rng.polyagamma(method="devroye")
 
         """
         # define an ``h`` value small enough to be regarded as a zero
@@ -91,12 +113,20 @@ class Generator(np.random.Generator):
         cdef size_t n, idx
         cdef object bcast
         cdef double ch, cz
-        cdef sampler_t stype = DEVROYE
+        cdef sampler_t stype = HYBRID
         cdef object has_out = True if out is not None else False
 
         cdef bitgen_t* bitgen = <bitgen_t*>PyCapsule_GetPointer(
             self._bit_generator.capsule, "BitGenerator"
         )
+
+        if method is not None:
+            if method not in METHODS:
+                raise ValueError(f"`method` must be one of {set(METHODS)}")
+            elif method == "alternate" and h < 1:
+                raise ValueError("alternate method must have h >=1")
+            else:
+                stype = METHODS[method]
 
         if is_sequence(h) or is_sequence(z):
             # TODO: Maybe use numpy's C-API for the broadcasting and iteration?
@@ -110,7 +140,7 @@ class Generator(np.random.Generator):
             elif not has_out:
                 out = np.empty(bcast.size)
             hvals, _ = bcast.iters
-            if np.any([i <= zero for i in hvals]):
+            if np.min(hvals) <= zero:
                 raise ValueError("values of `h` must be positive")
             bcast.reset()
             for idx, iter_set in enumerate(bcast):
