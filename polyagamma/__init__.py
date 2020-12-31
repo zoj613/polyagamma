@@ -1,1 +1,1 @@
-from ._polyagamma import Generator, default_rng
+from _polyagamma import Generator, default_rng

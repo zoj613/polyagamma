@@ -4,7 +4,18 @@ version = "0.1.0"
 description = "Efficiently sample from the Polya-Gamma distribution using NumPy's Generator interface"
 authors = ["Zolisa Bleki"]
 license = "BSD-3-Clause"
-
+readme = "README.md"
+repository = "https://github.com/zoj613/polya-gamma/"
+keywords = ['polya-gamma distribution', 'polya-gamma random sampling']
+classifiers = [
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: C",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3 :: Only",
+    "Operating System :: Unix"
+]
 packages = [{include = "polyagamma/*.py"}]
 include = [
     {path = "polyagamma/*.c", format = "sdist"},
