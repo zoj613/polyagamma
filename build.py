@@ -7,6 +7,7 @@ import numpy as np
 source_files = [
     "polyagamma/_polyagamma.c",
     "src/pgm_random.c",
+    "src/pgm_devroye.c"
 ]
 
 # https://numpy.org/devdocs/reference/random/examples/cython/setup.py.html
