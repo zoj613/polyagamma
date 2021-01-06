@@ -8,7 +8,7 @@ Efficiently sample from the Polya-Gamma distribution using NumPy's Generator int
 
 ## Installation
 ```shell
-$ pip install polyagamma
+$ pip install -U polyagamma
 ```
 
 
@@ -20,12 +20,18 @@ import numpy as np
 from polyagamma import default_rng, Generator
 
 g = Generator(np.random.PCG64())  # or use default_rng()
-print(g.polyagamma(1, 2))
-print(g.polyagamma(1, 2, size=10))
+print(g.polyagamma())
 
-# one can pass an output array
+# Get a 5 by 10 array of PG(1, 2) variates.
+print(g.polyagamma(z=2, size=(5, 10)))
+
+# Pass sequences as input. Numpy's broadcasting semantics apply here.
+h = [[1, 2, 3, 4, 5], [9, 8, 7, 6, 5]]
+print(g.polyagamma(h, 1))
+
+# Pass an output array
 out = np.empty(5)
-g.polyagamma(1, 2, out=out)
+g.polyagamma(out=out)
 print(out)
 
 # other numpy distributions are still accessible
@@ -38,7 +44,7 @@ print(g.standard_gamma())
 - Add the "alternative" sampling method.
 - Add the "saddle point approximation" method.
 - Add the hybrid sampler based on all four methods.
-- Add array broadcasting support for paramater inputs.
+- ~~Add array broadcasting support for paramater inputs.~~
 
 ## References
 - Polson, Nicholas G., James G. Scott, and Jesse Windle. "Bayesian inference for logistic models using Pólya–Gamma latent variables." Journal of the American statistical Association 108.504 (2013): 1339-1349.
