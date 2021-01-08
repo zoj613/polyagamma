@@ -13,6 +13,9 @@ $ pip install -U polyagamma
 
 
 ## Example
+
+### Python
+
 `polyagamma` can act as a drop-in replacement for numpy's Generator class.
 ```python
 import numpy as np
@@ -43,6 +46,8 @@ out = g.polyagamma(method="devroye")
 print(g.standard_normal())
 print(g.standard_gamma())
 ```
+### C
+For an example of how to use `polyagamma` in a C program, see [here][1].
 
 ## TODO
 - ~~Add devroye and gamma convolution methods.~~
@@ -58,3 +63,6 @@ print(g.standard_gamma())
 - Polson, Nicholas G., James G. Scott, and Jesse Windle. "Bayesian inference for logistic models using Pólya–Gamma latent variables." Journal of the American statistical Association 108.504 (2013): 1339-1349.
 - J. Windle, N. G. Polson, and J. G. Scott. "Improved Polya-gamma sampling". Technical Report, University of Texas at Austin, 2013b.
 - Windle, Jesse, Nicholas G. Polson, and James G. Scott. "Sampling Polya-Gamma random variates: alternate and approximate techniques." arXiv preprint arXiv:1405.0506 (2014)
+
+
+[1]: https://github.com/zoj613/htnorm/blob/main/examples/c_polyagamma.c
