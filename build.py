@@ -7,6 +7,8 @@ import numpy as np
 source_files = [
     "polyagamma/_polyagamma.c",
     "src/pgm_random.c",
+    "src/pgm_alternate.c",
+    "src/pgm_igammaq.c",
     "src/pgm_devroye.c"
 ]
 
@@ -19,6 +21,7 @@ extensions = [
         library_dirs=[join(np.get_include(), '..', '..', 'random', 'lib')],
         libraries=['npyrandom'],
         define_macros=[('NPY_NO_DEPRECATED_API', 0)],
+        extra_compile_args=['-std=c99']
     ),
 ]
 
