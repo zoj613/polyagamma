@@ -1,3 +1,6 @@
+/* Copyright (c) 2020-2021, Zolisa Bleki
+ *
+ * SPDX-License-Identifier: BSD-3-Clause */
 #ifndef PGM_COMMON_H
 #define PGM_COMMON_H
 
