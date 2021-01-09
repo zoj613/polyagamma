@@ -12,6 +12,8 @@
 /* 
  * Return the smallest optimal truncation point greater than the input.
  * Values are retrieved from a lookup table for `h` in the range [1, 4].
+ *
+ * This function uses binary search for the lookup.
  */
 static NPY_INLINE double
 get_truncation_point(double h)
@@ -22,13 +24,24 @@ get_truncation_point(double h)
     if (h == 4)
         return pgm_f[pgm_table_size - 1];
 
-    double h_current;
-    size_t counter = 0;
-    do {
-        h_current = pgm_h[counter];
-        counter++;
-    } while (h_current < h);
-    return pgm_f[counter - 1];
+    // start binary search
+    size_t index, offset = 0, len = pgm_table_size;
+
+    while (len > 0) {
+        index = offset + len / 2;
+        if (pgm_h[index] < h) {
+            len = len - (index + 1 - offset);
+            offset = index + 1;
+            continue;
+        }
+        else if (offset < index && pgm_h[index - 1] >= h) {
+            len = index - offset;
+            continue;
+        }
+        return pgm_f[index];
+    }
+    // Getting  means something went wrong, but it should never happen.
+    return -1;
 }
 
 /*
