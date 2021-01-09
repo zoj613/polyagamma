@@ -9,7 +9,8 @@ source_files = [
     "src/pgm_random.c",
     "src/pgm_alternate.c",
     "src/pgm_igammaq.c",
-    "src/pgm_devroye.c"
+    "src/pgm_devroye.c",
+    "src/pgm_common.c",
 ]
 
 # https://numpy.org/devdocs/reference/random/examples/cython/setup.py.html

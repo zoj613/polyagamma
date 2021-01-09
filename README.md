@@ -65,4 +65,4 @@ For an example of how to use `polyagamma` in a C program, see [here][1].
 - Windle, Jesse, Nicholas G. Polson, and James G. Scott. "Sampling Polya-Gamma random variates: alternate and approximate techniques." arXiv preprint arXiv:1405.0506 (2014)
 
 
-[1]: https://github.com/zoj613/htnorm/blob/main/examples/c_polyagamma.c
+[1]: https://github.com/zoj613/polya-gamma/blob/main/examples/c_polyagamma.c

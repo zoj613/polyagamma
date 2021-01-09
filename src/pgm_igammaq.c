@@ -24,6 +24,7 @@
  * Modifications by zoj613 include:
  * - inlining the static functions and removing unwanted code.
  */
+#include <numpy/npy_common.h>
 #include "pgm_igammaq.h"
 
 

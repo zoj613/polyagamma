@@ -1,5 +1,10 @@
 /*
  * This module shows an examples of how to use polyagamma in a C program.
+ * Here we use a custom bitgenerator called Xoroshiro128plus. Numpy's
+ * bitgenerator struct requires defining function pointers for generating
+ * integers and standard uniform numbers. We define these functions alongside the
+ * bitgenerator.
+ *
  * This example can be compiled with:
  *
  * gcc c_polyagamma.c src/*.c -I./include -I$(python -c "import numpy; print(numpy.get_include())")
