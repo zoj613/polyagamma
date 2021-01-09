@@ -12,6 +12,8 @@
 /* 
  * Return the smallest optimal truncation point greater than the input.
  * Values are retrieved from a lookup table for `h` in the range [1, 4].
+ *
+ * This function uses binary search for the lookup.
  */
 static NPY_INLINE double
 get_truncation_point(double h)
@@ -22,13 +24,24 @@ get_truncation_point(double h)
     if (h == 4)
         return pgm_f[pgm_table_size - 1];
 
-    double h_current;
-    size_t counter = 0;
-    do {
-        h_current = pgm_h[counter];
-        counter++;
-    } while (h_current < h);
-    return pgm_f[counter - 1];
+    // start binary search
+    size_t index, offset = 0, len = pgm_table_size;
+
+    while (len > 0) {
+        index = offset + len / 2;
+        if (pgm_h[index] < h) {
+            len = len - (index + 1 - offset);
+            offset = index + 1;
+            continue;
+        }
+        else if (offset < index && pgm_h[index - 1] >= h) {
+            len = index - offset;
+            continue;
+        }
+        return pgm_f[index];
+    }
+    // Getting  means something went wrong, but it should never happen.
+    return -1;
 }
 
 /*
@@ -128,11 +141,10 @@ erfinv(double x)
 static NPY_INLINE double
 random_bounded_levy(bitgen_t* bitgen_state, double c, double t)
 {
-    double x, u;
-    static const double one_sqrt2 = 0.7071067811865475;  // 1 / sqrt(2)
+    double x, u, cdf_t;
 
-    u = next_double(bitgen_state) * erfc(sqrt(c / t) * one_sqrt2);
-    // using the relation erfcinv(1 - z) = erfinv(z) where abs(z) < 1.
+    cdf_t = erfc(sqrt(0.5 * c / t));  // F(t)
+    u = next_double(bitgen_state) * cdf_t;
     x = erfinv(1 - u);
     x = c / (2 * x * x); 
     return x;
@@ -173,10 +185,6 @@ random_jacobi_alternate_bounded(bitgen_t* bitgen_state, double h, double z)
         }
         else if (z > 0) {
             h_z = h / z;
-            /* TODO: Polson et al. (2013) Recommends using an inverse-chi-square as
-             * proposal fro when h/z is greater than the truncation point to
-             * Get a slightly better bound for acceptance probability. We
-             * should maybe include that in the future. */
             do {
                 x = random_wald(bitgen_state, h_z, h2);
             } while (x > t);
@@ -206,23 +214,26 @@ random_jacobi_alternate_bounded(bitgen_t* bitgen_state, double h, double z)
 /*
  * Sample from PG(h, z) using the alternate method, for h >= 1.
  *
- * For values of h > 4, sample in chunks of size ``pgm_h_range``, which is
+ * For values of h > 4, we sample J*(h, z/2) = sum(J*(b_i, z/2)) samples such
+ * that sum(b_i) = h. Then use the relation PG(h, z) = J(h,z/2) / 4, to get a
+ * sample from the Polya-Gamma distribution.
+ *
+ * We do this by sampling in chunks of size ``pgm_h_range``, which is
  * the difference between the largest and smallest optimal h value that
  * satisfies the alternating sum criterion for the sampler in the range We
  * chose ([1, 4]). We sample and decrement the `h` param until the its value
  * is less than or equal to 4. Then sample one more time if the remaining value
  * is not zero. 
  *
- * See: Windle et al. (2014)
+ * See: Section 4.3 of Windle et al. (2014)
  */
 double
 random_polyagamma_alternate(bitgen_t *bitgen_state, double h, double z)
 {
     double out = 0;
-    // We want to sample from J*(h, z/2)
     z = 0.5 * (z < 0 ? fabs(z) : z);
 
-    while (h > 4) {
+    while (h >= 4) {
         out += random_jacobi_alternate_bounded(bitgen_state, pgm_h_range, z);
         h -= pgm_h_range;
     }

@@ -1,6 +1,6 @@
 # polya-gamma
 Efficiently sample from the Polya-Gamma distribution using NumPy's Generator interface.
-
+![densities](./scripts/densities.svg)
 
 ## Dependencies
 - Numpy >= 1.17 
@@ -49,13 +49,13 @@ print(g.standard_gamma())
 ### C
 For an example of how to use `polyagamma` in a C program, see [here][1].
 
+
 ## TODO
 - ~~Add devroye and gamma convolution methods.~~
 - ~~Add the "alternate" sampling method.~~
 - ~~Add the hybrid sampler based on a combination of available methods.~~
-- Add the "saddle point approximation" method.
-- Add the hybrid sampler based on all four methods.
 - ~~Add array broadcasting support for paramater inputs.~~
+- Add the "saddle point approximation" method.
 
 
 ## References
@@ -65,4 +65,4 @@ For an example of how to use `polyagamma` in a C program, see [here][1].
 - Windle, Jesse, Nicholas G. Polson, and James G. Scott. "Sampling Polya-Gamma random variates: alternate and approximate techniques." arXiv preprint arXiv:1405.0506 (2014)
 
 
-[1]: https://github.com/zoj613/htnorm/blob/main/examples/c_polyagamma.c
+[1]: ./examples/c_polyagamma.c

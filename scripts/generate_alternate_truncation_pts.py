@@ -8,11 +8,11 @@ interval not present in the table are calculated using a linear interpolation.
 We find the roots the function f(x) =  l(x|h) - r(x|h) for a given value of h.
 """
 from datetime import datetime
-from math import log, sqrt, pi, exp, cosh
+from math import log, sqrt, pi, exp
 import numpy as np
 
 from scipy.optimize import root_scalar
-from scipy.special import gamma, loggamma
+from scipy.special import loggamma
 
 log2 = log(2)
 twopi = 2 * pi
