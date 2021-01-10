@@ -16,12 +16,26 @@ def test_polyagamma():
     rng = default_rng(seed)
     assert len(rng.polyagamma(size=5)) == 5
     assert rng.polyagamma(size=(5, 2)).shape == (5, 2)
+    # raise an error if shape tuple element is not an integer
+    with pytest.raises(TypeError):
+        rng.polyagamma(size=(5.0, 2))
+
     h = rng.random((4, 5, 1))
     z = rng.random(4)
     assert rng.polyagamma(h, z).shape == (4, 5, 4)
-    z = rng.random(5)
+    z = np.array([1, 2, 3, 4, 6])  # test if integer arrays dont crash things
     assert rng.polyagamma(h, z).shape == (4, 5, 5)
     assert rng.polyagamma(h, 0.12345).shape == (4, 5, 1)
+
+    # should work on list/tuple input
+    h = [[1, 2, 3], [3, 3, 1]]
+    out = rng.polyagamma(h)
+    assert out.shape == (2, 3)
+    assert not np.allclose(out, 0)
+    z = (1, 2, 10, 0)
+    out = rng.polyagamma(z=z)
+    assert out.shape == (4,)
+    assert not np.allclose(out, 0)
 
     out = np.zeros(5)
     rng.polyagamma(out=out)
@@ -30,7 +44,7 @@ def test_polyagamma():
     with pytest.raises(ValueError):
         rng.polyagamma(h, out=out)
 
-    # raise an error when nd-array is passed as an arg
+    # raise an error when array when dim > 1 is passed as an arg
     with pytest.raises(ValueError):
         rng.polyagamma(out=rng.random((2, 3)))
 
@@ -52,3 +66,10 @@ def test_polyagamma():
     # raise error for values less than 1 with alternate method
     with pytest.raises(ValueError):
         rng.polyagamma(0.9, method="alternate")
+
+    # raise error when passed a none-keyword args after the first 2
+    with pytest.raises(TypeError, match="takes at most 3 positional arguments"):
+        rng.polyagamma(1, 0, 5)
+
+    # don't raise error when passed non-positive h values if checks are disabled
+    rng.polyagamma(-1, disable_checks=True)
