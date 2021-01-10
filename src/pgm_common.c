@@ -7,8 +7,9 @@
 NPY_INLINE double
 inverse_gaussian_cdf(double x, double mu, double lambda)
 {
-    double w = sqrt(0.5 * lambda / x);
-    double y = w * x / mu;
+    double a = sqrt(0.5 * lambda / x);
+    double b = a * (x / mu);
+    double c = exp(2 * lambda / mu);
 
-    return 0.5 * (1 + erf(y - x) + exp(2 * lambda / mu) * (1 - erf(y + x)));
+    return 0.5 * (1 + erf(b - a) + c * (1 + erf(-(b + a))));
 }
