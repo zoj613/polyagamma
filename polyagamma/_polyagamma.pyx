@@ -9,9 +9,12 @@ Copyright (c) 2020-2021, Zolisa Bleki
 SPDX-License-Identifier: BSD-3-Clause
 """
 from cpython.pycapsule cimport PyCapsule_GetPointer
+from cpython.tuple cimport PyTuple_CheckExact, PyTuple_GET_SIZE, PyTuple_GET_ITEM
 from numpy.random.bit_generator cimport bitgen_t
-
+cimport numpy as np
 import numpy as np
+
+np.import_array()
 
 
 cdef extern from "../include/pgm_random.h":
@@ -37,6 +40,21 @@ cdef bint is_sequence(object x):
     return out
 
 
+cdef np.broadcast broadcast_params(object h, object z):
+    """
+    Broadcast the inputs into a multiIterator object.
+
+    the input can be a scalar, list, tuple or numpy array or array_like object.
+    """
+    cdef bint is_h_seq = is_sequence(h)
+    cdef bint is_z_seq = is_sequence(z)
+
+    h = <double>h if not is_h_seq else np.PyArray_FROM_OT(h, np.NPY_DOUBLE)
+    z = <double>z if not is_z_seq else np.PyArray_FROM_OT(z, np.NPY_DOUBLE)
+
+    return np.PyArray_MultiIterNew2(h, z)
+
+
 cdef dict METHODS = {
     "gamma": GAMMA,
     "devroye": DEVROYE,
@@ -45,9 +63,10 @@ cdef dict METHODS = {
 
 
 class Generator(np.random.Generator):
-    def polyagamma(self, h=1, z=0, size=None, double[:] out=None, method=None):
+    def polyagamma(self, h=1, z=0, *, size=None, double[:] out=None, method=None,
+                   bint disable_checks=False):
         """
-        polyagamma(h=1, z=0, size=None, out=None)
+        polyagamma(h=1, z=0, *, size=None, out=None, method=None, disable_checks=False)
 
         Draw samples from a Polya-Gamma distribution.
 
@@ -78,6 +97,11 @@ class Generator(np.random.Generator):
             A legal value must be one of {"gamma", "devroye", "alternate"}. If
             the "alternate" method is used, then the value of `h` must be no
             less than 1.
+        disable_checks : bool, optional
+            Whether to check that the `h` parameter contains only positive
+            values(s). Disabling may give a performance gain, but may result
+            in problems (crashes, non-termination, wrong return values)
+            if the inputs do contain non-positive values.
 
         Returns
         -------
@@ -111,8 +135,10 @@ class Generator(np.random.Generator):
         DEF zero = 1e-04
 
         cdef size_t n, idx
-        cdef object bcast
+        cdef np.broadcast bcast
         cdef double ch, cz
+        cdef bint is_tuple
+        cdef np.npy_intp dims
         cdef sampler_t stype = HYBRID
         cdef object has_out = True if out is not None else False
 
@@ -129,44 +155,55 @@ class Generator(np.random.Generator):
                 stype = METHODS[method]
 
         if is_sequence(h) or is_sequence(z):
-            # TODO: Maybe use numpy's C-API for the broadcasting and iteration?
-            # Would readability take a hit?
-            bcast = np.broadcast(h, z)
-            if has_out and out.size != bcast.size:
+            if not disable_checks and np.any(np.asarray(h) <= zero):
+                raise ValueError("values of `h` must be positive")
+            bcast = broadcast_params(h, z)
+            if has_out and out.shape[0] != bcast.size:
                 raise ValueError(
                     "`out` must have the same total size as the broadcasted "
                     "result of `h` and `z`"
                 )
             elif not has_out:
-                out = np.empty(bcast.size)
-            hvals, _ = bcast.iters
-            if np.min(hvals) <= zero:
-                raise ValueError("values of `h` must be positive")
-            bcast.reset()
-            for idx, iter_set in enumerate(bcast):
-                ch, cz = iter_set
-                with self._bit_generator.lock, nogil:
-                    out[idx] = pgm_random_polyagamma(bitgen, ch, cz, stype);
-            if not has_out:
-                return out.base.reshape(bcast.shape)
+                dims = <np.npy_intp>(bcast.size)
+                out = np.PyArray_EMPTY(1, &dims, np.NPY_DOUBLE, 0)
 
-        elif h <= zero:
+            n = out.shape[0]
+            with self._bit_generator.lock, nogil:
+                for idx in range(n):
+                    ch = (<double*>np.PyArray_MultiIter_DATA(bcast, 0))[0]
+                    cz = (<double*>np.PyArray_MultiIter_DATA(bcast, 1))[0]
+                    out[idx] = pgm_random_polyagamma(bitgen, ch, cz, stype);
+                    np.PyArray_MultiIter_NEXT(bcast)
+            if not has_out:
+                return np.PyArray_Reshape(out.base, bcast.shape)
+
+
+        elif not disable_checks and h <= zero:
             raise ValueError("`h` must positive")
 
         elif has_out:
-            n = out.size
+            n = out.shape[0]
             ch, cz = h, z
             with self._bit_generator.lock, nogil:
                 pgm_random_polyagamma_fill(bitgen, ch, cz, stype, n, &out[0])
 
         elif size:
-            npy_arr = np.empty(size)
-            out = npy_arr.ravel() if isinstance(size, tuple) else npy_arr
-            n = out.size
+            # dims = <np.npy_intp>(math.prod(size) if is_tuple else size)
+            is_tuple = PyTuple_CheckExact(size)
+            if is_tuple:
+                prod_size = 1
+                for idx in range(PyTuple_GET_SIZE(size)):
+                    prod_size *= <object>PyTuple_GET_ITEM(size, idx)
+                dims = <np.npy_intp>prod_size
+            else:
+                dims = <np.npy_intp>size
+            out = np.PyArray_EMPTY(1, &dims, np.NPY_DOUBLE, 0)
+
+            n = <size_t>dims
             ch, cz = h, z
             with self._bit_generator.lock, nogil:
                 pgm_random_polyagamma_fill(bitgen, ch, cz, stype, n, &out[0])
-            return out.base.reshape(size)
+            return np.PyArray_Reshape(out.base, size) if is_tuple else out.base
 
         else:
             ch, cz = h, z
