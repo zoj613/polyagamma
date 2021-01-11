@@ -177,7 +177,6 @@ class Generator(np.random.Generator):
             if not has_out:
                 return np.PyArray_Reshape(out.base, bcast.shape)
 
-
         elif not disable_checks and h <= zero:
             raise ValueError("`h` must positive")
 
