@@ -1,8 +1,20 @@
-.PHONY: clean cythonize install test sdist
+.PHONY: clean cythonize install test sdist wheels
+
+DOCKER_IMAGES=quay.io/pypa/manylinux1_x86_64 \
+	      quay.io/pypa/manylinux2010_x86_64 \
+	      quay.io/pypa/manylinux2014_x86_64
+
+define make_wheels
+	docker pull $(1)
+	docker container run -t --rm -e PLAT=$(strip $(subst quay.io/pypa/,,$(1))) \
+		-v $(shell pwd):/io $(1) /io/build_wheels.sh
+endef
+
 
 clean:
 	rm -Rf build/* dist/* polyagamma/*.c polyagamma/*.so polyagamma/*.html \
-		polyagamma.egg-info **/*__pycache__ __pycache__ .coverage*
+		polyagamma.egg-info **/*__pycache__ __pycache__ .coverage* \
+		wheelhouse/*
 
 cythonize:
 	cythonize polyagamma/*.pyx
@@ -15,3 +27,6 @@ sdist: clean cythonize
 
 test:
 	pytest tests/ -vvv
+
+wheels: clean cythonize
+	$(foreach img, $(DOCKER_IMAGES), $(call make_wheels, $(img));)
