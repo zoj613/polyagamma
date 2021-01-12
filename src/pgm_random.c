@@ -48,3 +48,13 @@ pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
     for (size_t i = n; i--; )
         out[i] = pgm_random_polyagamma(bitgen_state, h, z, method);
 }
+
+
+NPY_INLINE void
+pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h,
+                            const double* z, sampler_t method, size_t n,
+                            double* restrict out)
+{
+    for (size_t i = n; i--; )
+        out[i] = pgm_random_polyagamma(bitgen_state, h[i], z[i], method);
+}
