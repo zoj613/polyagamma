@@ -40,21 +40,6 @@ cdef bint is_sequence(object x):
     return out
 
 
-cdef np.broadcast broadcast_params(object h, object z):
-    """
-    Broadcast the inputs into a multiIterator object.
-
-    the input can be a scalar, list, tuple or numpy array or array_like object.
-    """
-    cdef bint is_h_seq = is_sequence(h)
-    cdef bint is_z_seq = is_sequence(z)
-
-    h = <double>h if not is_h_seq else np.PyArray_FROM_OT(h, np.NPY_DOUBLE)
-    z = <double>z if not is_z_seq else np.PyArray_FROM_OT(z, np.NPY_DOUBLE)
-
-    return np.PyArray_MultiIterNew2(h, z)
-
-
 cdef dict METHODS = {
     "gamma": GAMMA,
     "devroye": DEVROYE,
@@ -76,8 +61,8 @@ class Generator(np.random.Generator):
         Parameters
         ----------
         h : scalar or sequence, optional
-            The `h` parameter as described in [1]_. The value(s) must be
-            positive. Defaults to 1.
+            The shape parameter of the distribution as described in [1]_.
+            The value(s) must be positive. Defaults to 1.
         z : scalar or sequence, optional
             The exponential tilting parameter as described in [1]_.
             Defaults to 0.
@@ -96,7 +81,8 @@ class Generator(np.random.Generator):
             sampler is used that picks a method based on the value of `h`.
             A legal value must be one of {"gamma", "devroye", "alternate"}. If
             the "alternate" method is used, then the value of `h` must be no
-            less than 1.
+            less than 1. If the "devroye" method is used, the `h` must be a
+            positive integer.
         disable_checks : bool, optional
             Whether to check that the `h` parameter contains only positive
             values(s). Disabling may give a performance gain, but may result
@@ -151,13 +137,18 @@ class Generator(np.random.Generator):
                 raise ValueError(f"`method` must be one of {set(METHODS)}")
             elif method == "alternate" and h < 1:
                 raise ValueError("alternate method must have h >=1")
+            elif method == "devroye" and not float(h).is_integer():
+                raise ValueError("devroye method must have integer values for h")
             else:
                 stype = METHODS[method]
 
         if is_sequence(h) or is_sequence(z):
-            if not disable_checks and np.any(np.asarray(h) <= zero):
+            h = np.PyArray_FROM_OT(h, np.NPY_DOUBLE)
+            z = np.PyArray_FROM_OT(z, np.NPY_DOUBLE)
+            if not disable_checks and np.any(h <= zero):
                 raise ValueError("values of `h` must be positive")
-            bcast = broadcast_params(h, z)
+
+            bcast = np.PyArray_MultiIterNew2(h, z)
             if has_out and out.shape[0] != bcast.size:
                 raise ValueError(
                     "`out` must have the same total size as the broadcasted "

@@ -13,13 +13,15 @@ source_files = [
     "src/pgm_common.c",
 ]
 
+
 # https://numpy.org/devdocs/reference/random/examples/cython/setup.py.html
+include_path = np.get_include()
 extensions = [
     Extension(
         "_polyagamma",
         source_files,
-        include_dirs=[np.get_include(), "./include"],
-        library_dirs=[join(np.get_include(), '..', '..', 'random', 'lib')],
+        include_dirs=[include_path, "./include"],
+        library_dirs=[join(include_path, '..', '..', 'random', 'lib')],
         libraries=['npyrandom'],
         define_macros=[('NPY_NO_DEPRECATED_API', 0)],
         extra_compile_args=['-std=c99']
