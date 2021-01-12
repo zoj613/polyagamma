@@ -66,6 +66,11 @@ def test_polyagamma():
     # raise error for values less than 1 with alternate method
     with pytest.raises(ValueError):
         rng.polyagamma(0.9, method="alternate")
+    # raise an error when using devroye with non-integer values of h
+    with pytest.raises(ValueError):
+        rng.polyagamma(2.0000000001, method="devroye")
+    # should work for whole numbers is 2.000000 == 2
+    rng.polyagamma(2.0000000000, method="devroye")
 
     # raise error when passed a none-keyword args after the first 2
     with pytest.raises(TypeError, match="takes at most 3 positional arguments"):

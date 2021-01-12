@@ -22,7 +22,10 @@ typedef enum {GAMMA, DEVROYE, ALTERNATE, SADDLE, HYBRID} sampler_t;
  *  method : sampler_t
  *      The type of method to use when sampling. Must be one of {GAMMA,
  *      DEVROYE, ALTERNATE, HYBRID}. The HYBRID sampler automatically chooses
- *      the appropriate method using the parameter values.
+ *      the appropriate method using the parameter values. The DEVROYE method
+ *      can only be used with positive integer values of h. If h is a not a
+ *      positive whole number, then it will be truncated to an integer before
+ *      sampling.
  *
  *  References
  *  ----------

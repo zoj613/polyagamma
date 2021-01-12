@@ -61,8 +61,8 @@ class Generator(np.random.Generator):
         Parameters
         ----------
         h : scalar or sequence, optional
-            The `h` parameter as described in [1]_. The value(s) must be
-            positive. Defaults to 1.
+            The shape parameter of the distribution as described in [1]_.
+            The value(s) must be positive. Defaults to 1.
         z : scalar or sequence, optional
             The exponential tilting parameter as described in [1]_.
             Defaults to 0.
@@ -81,7 +81,8 @@ class Generator(np.random.Generator):
             sampler is used that picks a method based on the value of `h`.
             A legal value must be one of {"gamma", "devroye", "alternate"}. If
             the "alternate" method is used, then the value of `h` must be no
-            less than 1.
+            less than 1. If the "devroye" method is used, the `h` must be a
+            positive integer.
         disable_checks : bool, optional
             Whether to check that the `h` parameter contains only positive
             values(s). Disabling may give a performance gain, but may result
@@ -136,6 +137,8 @@ class Generator(np.random.Generator):
                 raise ValueError(f"`method` must be one of {set(METHODS)}")
             elif method == "alternate" and h < 1:
                 raise ValueError("alternate method must have h >=1")
+            elif method == "devroye" and not float(h).is_integer():
+                raise ValueError("devroye method must have integer values for h")
             else:
                 stype = METHODS[method]
 

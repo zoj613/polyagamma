@@ -124,7 +124,7 @@ random_jacobi(bitgen_t* bitgen_state, double z)
  * sample from J*(n, z), where n is a positive integer greater than 1
  */
 static NPY_INLINE double
-random_jacobi_n(bitgen_t *bitgen_state, size_t n, double z)
+random_jacobi_n(bitgen_t *bitgen_state, uint64_t n, double z)
 {
     double out = 0;
     for (size_t i = n; i--; )
@@ -164,21 +164,14 @@ random_polyagamma_gamma_conv(bitgen_t* bitgen_state, double h, double z)
 }
 
 /*
- * Sample from Polya-Gamma PG(h, z) using the Devroye method
+ * Sample from Polya-Gamma PG(n, z) using the Devroye method, where n is a
+ * positive integer.
  */
 double
-random_polyagamma_devroye(bitgen_t *bitgen_state, double h, double z)
+random_polyagamma_devroye(bitgen_t *bitgen_state, uint64_t n, double z)
 {
     z = 0.5 * (z < 0 ? fabs(z) : z);
-
-    if (h < 1)
-        return 0.25 * gamma_convolution_approx(bitgen_state, h, z);
-
-    double out, fract_part, int_part;
-    // split h into its integer and fractional parts
-    fract_part = modf(h, &int_part);
-    out = random_jacobi_n(bitgen_state, (size_t)int_part, z);
-    if (fract_part > 0)
-        out += gamma_convolution_approx(bitgen_state, fract_part, z);
-    return 0.25 * out;
+    if (n > 1)
+        return 0.25 * random_jacobi_n(bitgen_state, n, z);
+    return 0.25 * random_jacobi(bitgen_state, z);
 }
