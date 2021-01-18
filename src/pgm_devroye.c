@@ -28,6 +28,47 @@ piecewise_coef(size_t n, double x, double t, double z, double coshz)
 }
 
 /*
+ * Sample from an Inverse-Gaussian(mu, 1) truncated on the set {x | x < t}.
+ *
+ * We sample using two algorithms depending on whether mu > t or mu < t.
+ */
+static NPY_INLINE double
+random_right_bounded_inverse_gaussian(bitgen_t* bitgen_state, double mu)
+{
+    static const double t = NPY_2_PI;  // 0.64
+    double e1, e2, x, half_lambda_mu2;
+
+    if (mu > t) {
+        half_lambda_mu2 = -0.5 / (mu * mu);
+        for (;;) {
+            /* Below is an algorithm to sample from the tail of a normal
+             * distribution such that the value is greater than 1/sqrt(t).
+             * Once we obtain the sample, we square and invert it to
+             * obtain a sample from an Inverse-Chi-Square distribution(df=1)
+             * that is less than t, as shown in Devroye (1986) [page 382] &
+             * Devroye (2009) [page 7]. This sample becomes our proposal.
+             * We accept the sample only if we sample a uniform less than the
+             * acceptance porbability. The probability is exp(-0.5 * lamda * x / mu^2).
+             * Refer to Appendix S1 of Polson et al. (2013). */
+            do {
+                e1 = random_standard_exponential(bitgen_state);
+                e2 = random_standard_exponential(bitgen_state);
+            } while ((e1 * e1) > (NPY_PI * e2));
+            x = (1 + t * e1);
+            x = t / (x * x);
+            if (log(next_double(bitgen_state)) < half_lambda_mu2 * x)
+                return x;
+        }
+    }
+    /* If the truncation point t is greater than the mean (mu), the use
+     * rejection sampling by sampling until x < t. */
+    do {
+        x = random_wald(bitgen_state, mu, 1);
+    } while(x > t);
+    return x;
+}
+
+/*
  * Generate a random sample from J*(1, 0) using algorithm described in
  * Devroye(2009), page 7.
  */
@@ -71,8 +112,8 @@ random_jacobi_0(bitgen_t* bitgen_state)
 }
 
 /*
- * Generate a random sample J*(1, z) using method inspired by Devroye(2009),
- * where z > 0.
+ * Generate a random sample J*(1, z) using method described in Polson et al
+ * (2013). Note that for z = 0, we use the one described in Devroye (2009).
  */
 static NPY_INLINE double
 random_jacobi(bitgen_t* bitgen_state, double z)
@@ -93,9 +134,7 @@ random_jacobi(bitgen_t* bitgen_state, double z)
 
     for (;;) {
         if (next_double(bitgen_state) < ratio) {
-            do {
-                x = random_wald(bitgen_state, mu, 1);
-            } while(x > t);
+            x = random_right_bounded_inverse_gaussian(bitgen_state, mu);
         }
         else {
             x = t + random_standard_exponential(bitgen_state) / k;

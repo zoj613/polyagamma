@@ -28,7 +28,7 @@ print(g.polyagamma())
 # Get a 5 by 10 array of PG(1, 2) variates.
 print(g.polyagamma(z=2, size=(5, 10)))
 
-# Pass sequences as input. Numpy's broadcasting semantics apply here.
+# Pass sequences as input. Numpy's broadcasting rules apply here.
 h = [[1, 2, 3, 4, 5], [9, 8, 7, 6, 5]]
 print(g.polyagamma(h, 1))
 
