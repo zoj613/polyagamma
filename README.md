@@ -2,6 +2,18 @@
 Efficiently sample from the Polya-Gamma distribution using NumPy's Generator interface.
 ![densities](./scripts/densities.svg)
 
+As expected, the `saddle` method improves as `h` tends to `infinity`.
+
+## Features
+- `polyagamma` is written in C and optimized for performance.
+- It is flexible and allows the user to sample using one 4 available methods.
+- Input parameters can be scalars, arrays or both; allowing for easy generation
+of multi-dimensional samples without specifying the size.
+- Random number generation is thread safe.
+- The API resembles that of numpy/scipy, therefore making it easy to plugin to
+existing libraries.
+
+
 ## Dependencies
 - Numpy >= 1.17 
 
@@ -48,14 +60,6 @@ print(g.standard_gamma())
 ```
 ### C
 For an example of how to use `polyagamma` in a C program, see [here][1].
-
-
-## TODO
-- ~~Add devroye and gamma convolution methods.~~
-- ~~Add the "alternate" sampling method.~~
-- ~~Add the hybrid sampler based on a combination of available methods.~~
-- ~~Add array broadcasting support for paramater inputs.~~
-- Add the "saddle point approximation" method.
 
 
 ## References

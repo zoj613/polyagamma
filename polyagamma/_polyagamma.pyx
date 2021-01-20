@@ -30,7 +30,7 @@ cdef extern from "../include/pgm_random.h":
                                     sampler_t method, size_t n, double* out) nogil
 
 
-cdef bint is_sequence(object x):
+cdef inline bint is_sequence(object x):
     cdef bint out
     try:
         iter(x)
@@ -42,6 +42,7 @@ cdef bint is_sequence(object x):
 
 cdef dict METHODS = {
     "gamma": GAMMA,
+    "saddle": SADDLE,
     "devroye": DEVROYE,
     "alternate": ALTERNATE,
 }
@@ -126,7 +127,7 @@ class Generator(np.random.Generator):
         cdef bint is_tuple
         cdef np.npy_intp dims
         cdef sampler_t stype = HYBRID
-        cdef object has_out = True if out is not None else False
+        cdef bint has_out = True if out is not None else False
 
         cdef bitgen_t* bitgen = <bitgen_t*>PyCapsule_GetPointer(
             self._bit_generator.capsule, "BitGenerator"
@@ -177,7 +178,7 @@ class Generator(np.random.Generator):
             with self._bit_generator.lock, nogil:
                 pgm_random_polyagamma_fill(bitgen, ch, cz, stype, n, &out[0])
 
-        elif size:
+        elif size is not None:
             # dims = <np.npy_intp>(math.prod(size) if is_tuple else size)
             is_tuple = PyTuple_CheckExact(size)
             if is_tuple:

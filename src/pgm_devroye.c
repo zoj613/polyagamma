@@ -2,7 +2,6 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause */
 #include "pgm_devroye.h"
-#include "pgm_common.h"
 
 /* 
  * Compute a_n(x|t,z), the nth term of the alternating sum S_n(x|t,z)

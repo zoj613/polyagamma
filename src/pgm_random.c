@@ -4,6 +4,7 @@
 #include "../include/pgm_random.h"
 #include "pgm_devroye.h"
 #include "pgm_alternate.h"
+#include "pgm_saddle.h"
 
 
 static NPY_INLINE double
@@ -33,6 +34,8 @@ pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z, sampler_t meth
             return random_polyagamma_devroye(bitgen_state, (uint64_t)h, z);
         case ALTERNATE:
             return random_polyagamma_alternate(bitgen_state, h, z);
+        case SADDLE:
+            return random_polyagamma_saddle(bitgen_state, h, z);
         default:
             return random_polyagamma_hybrid(bitgen_state, h, z);
     }

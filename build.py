@@ -11,6 +11,7 @@ source_files = [
     "src/pgm_igammaq.c",
     "src/pgm_devroye.c",
     "src/pgm_common.c",
+    "src/pgm_saddle.c",
 ]
 
 

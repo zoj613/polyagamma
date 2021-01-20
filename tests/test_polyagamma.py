@@ -63,6 +63,12 @@ def test_polyagamma():
     # raise error on unknown method names
     with pytest.raises(ValueError):
         rng.polyagamma(method="unknown method")
+    # should work for all supported methods
+    rng.polyagamma(method="gamma")
+    rng.polyagamma(method="devroye")
+    rng.polyagamma(method="alternate")
+    rng.polyagamma(method="saddle")
+
     # raise error for values less than 1 with alternate method
     with pytest.raises(ValueError):
         rng.polyagamma(0.9, method="alternate")
