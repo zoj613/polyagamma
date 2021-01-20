@@ -6,11 +6,11 @@ As expected, the `saddle` method improves as `h` tends to `infinity`.
 
 ## Features
 - `polyagamma` is written in C and optimized for performance.
-- It is flexible and allows the user to sample using one 4 available methods.
+- It is flexible and allows the user to sample using one of 4 available methods.
 - Input parameters can be scalars, arrays or both; allowing for easy generation
 of multi-dimensional samples without specifying the size.
 - Random number generation is thread safe.
-- The API resembles that of numpy/scipy, therefore making it easy to plugin to
+- The functional API resembles that of common numpy/scipy functions, therefore making it easy to plugin to
 existing libraries.
 
 
@@ -28,35 +28,33 @@ $ pip install -U polyagamma
 
 ### Python
 
-`polyagamma` can act as a drop-in replacement for numpy's Generator class.
 ```python
 import numpy as np
+from polyagamma import polyagamma
 
-from polyagamma import default_rng, Generator
-
-g = Generator(np.random.PCG64())  # or use default_rng()
-print(g.polyagamma())
+o = polyagamma()
 
 # Get a 5 by 10 array of PG(1, 2) variates.
-print(g.polyagamma(z=2, size=(5, 10)))
+o = polyagamma(z=2, size=(5, 10))
 
 # Pass sequences as input. Numpy's broadcasting rules apply here.
 h = [[1, 2, 3, 4, 5], [9, 8, 7, 6, 5]]
-print(g.polyagamma(h, 1))
+o = polyagamma(h, 1)
 
 # Pass an output array
 out = np.empty(5)
-g.polyagamma(out=out)
+polyagamma(out=out)
 print(out)
 
-# one can choose a sampling method from {devroye, alternate, gamma}.
-# If not given, the default behaviour is a hybrid sampler that picks
-# the best method based on the parameter values
-out = g.polyagamma(method="devroye")
+# one can choose a sampling method from {devroye, alternate, gamma, saddle}.
+# If not given, the default behaviour is a hybrid sampler that picks a method
+# based on the parameter values.
+o = polyagamma(method="devroye")
 
-# other numpy distributions are still accessible
-print(g.standard_normal())
-print(g.standard_gamma())
+# We can also use an existing instance of `numpy.random.Generator` as a parameter.
+# This is useful to reproduce samples generated via a given seed.
+rng = np.random.default_rng(12345)
+o = polyagamma(random_state=rng)
 ```
 ### C
 For an example of how to use `polyagamma` in a C program, see [here][1].

@@ -1,18 +1,19 @@
 import argparse
 
 import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
 
-from polyagamma import default_rng
+from polyagamma import polyagamma
 
 sns.set_style("darkgrid")
-rng = default_rng(1)
+rng = np.random.default_rng(1)
 
 data = {"devroye": None, "alternate": None, "gamma": None, "saddle": None}
 
 def plot_densities(h=1, z=0, size=1000):
     for method in data:
-        data[method] = rng.polyagamma(h=h, z=z, method=method, size=size)
+        data[method] = polyagamma(h=h, z=z, method=method, size=size, random_state=rng)
     sns.kdeplot(data=data)
 
 if __name__ == "__main__":
