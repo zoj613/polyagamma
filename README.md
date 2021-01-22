@@ -1,5 +1,5 @@
 # polya-gamma
-Efficiently sample from the Polya-Gamma distribution using NumPy's Generator interface.
+Efficiently generate samples from the Polya-Gamma distribution using a NumPy/SciPy compatible interface.
 ![densities](./scripts/densities.svg)
 
 
