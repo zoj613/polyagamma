@@ -70,6 +70,18 @@ o = polyagamma(random_state=rng)
 For an example of how to use `polyagamma` in a C program, see [here][1].
 
 
+## Contributing
+All contributions, bug reports, bug fixes, documentation improvements, enhancements, and ideas are welcome.
+
+To submit a PR, follow the steps below:
+1) Fork the repo.
+2) Setup the dev environment with `poetry install`. All dependencies will be installed.
+3) Start writing your changes, including unittests.
+3) Once finished, run `make install` to build the project with the new changes.
+4) Once build is successful, run tests to make sure they all pass with `make test`.
+5) Once finished, you can submit a PR for review.
+
+
 ## References
 - Luc Devroye. "On exact simulation algorithms for some distributions related to Jacobi theta functions." Statistics & Probability Letters, Volume 79, Issue 21, (2009): 2251-2259.
 - Polson, Nicholas G., James G. Scott, and Jesse Windle. "Bayesian inference for logistic models using Pólya–Gamma latent variables." Journal of the American statistical Association 108.504 (2013): 1339-1349.
