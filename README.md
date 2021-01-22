@@ -19,10 +19,21 @@ existing libraries.
 
 
 ## Installation
+To get the latest version of the package, one can install it by downloading the wheel/source distribution 
+from the [releases][3] page, or using `pip` with the following shell command:
 ```shell
-$ pip install -U polyagamma
+$ pip install --pre -U polyagamma
 ```
 
+Alternatively, once can install from source by cloning the repo. This requires an installation of [poetry][2]
+and the following shell commands:
+```shell
+$ git clone https://github.com/zoj613/polya-gamma.git
+$ cd polya-gamma/
+$ poetry install
+# add package to python's path
+$ export PYTHONPATH=$PWD:$PYTHONPATH 
+```
 
 ## Example
 
@@ -68,3 +79,5 @@ For an example of how to use `polyagamma` in a C program, see [here][1].
 
 
 [1]: ./examples/c_polyagamma.c
+[2]: https://python-poetry.org/docs/pyproject/
+[3]: https://github.com/zoj613/polya-gamma/releases
