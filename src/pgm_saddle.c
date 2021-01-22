@@ -3,7 +3,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 #include "pgm_igammaq.h"
 #include "pgm_saddle.h"
-#include "pgm_saddle_tangent_points.h"
 
 
 typedef enum {LEFT, RIGHT} SIDE_t;
@@ -174,46 +173,6 @@ cgf(double u, double z)
 }
 
 /*
- * Get pre-computed optimal values of xl, xc and xr from a lookup table,
- * for a given value of the tilting parameter z.
- */
-static NPY_INLINE void
-lookup_tangent_points(double z, double* xl, double* xc, double* xr)
-{
-    size_t index, offset = 0, len = pgm_saddle_tabsize;
-
-    if (z == 0) {
-        *xl = 1;
-        *xc = 1.5;
-        *xr = 1.65;
-    }
-    else if (z >= pgm_saddle_max_z) {
-        *xl = tanh(z) / z;
-        *xc = pgm_xc[len - 1];
-        *xr = pgm_xr[len - 1];
-    }
-    else {
-        // start binary search
-        while (len > 0) {
-            index = offset + len / 2;
-            if (pgm_z[index] < z) {
-                len = len - (index + 1 - offset);
-                offset = index + 1;
-                continue;
-            }
-            else if (offset < index && pgm_z[index - 1] >= z) {
-                len = index - offset;
-                continue;
-            }
-            break;
-        }
-        *xl = pgm_xl[index - 1];
-        *xc = pgm_xc[index - 1];
-        *xr = pgm_xr[index - 1];
-    }
-}
-
-/*
  * Configure some constants and variables to be used during sampling.
  */
 static NPY_INLINE void
@@ -223,7 +182,9 @@ initialize_config(struct config* cfg, double h, double z)
     double xl, xc, xr, ul, uc, ur, tr, alpha_l, alpha_r, one_xl, one_xc, half_z2;
     bool is_zero = z == 0 ? true : false;
 
-    lookup_tangent_points(z, &xl, &xc, &xr);
+    xl = is_zero ? 1 : tanh(z) / z;
+    xr = 3 * xl;
+    xc = 0.75 * xr;
 
     one_xl = 1 / xl;
     one_xc = 1 / xc;

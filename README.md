@@ -2,7 +2,6 @@
 Efficiently sample from the Polya-Gamma distribution using NumPy's Generator interface.
 ![densities](./scripts/densities.svg)
 
-As expected, the `saddle` method improves as `h` tends to `infinity`.
 
 ## Features
 - `polyagamma` is written in C and optimized for performance.
