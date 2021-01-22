@@ -33,14 +33,13 @@ get_truncation_point(double h)
             offset = index + 1;
             continue;
         }
-        else if (offset < index && pgm_h[index - 1] >= h) {
+        else if (offset < index && pgm_h[index] > h) {
             len = index - offset;
             continue;
         }
-        return pgm_f[index];
+        break;
     }
-    // Getting  means something went wrong, but it should never happen.
-    return -1;
+    return pgm_f[index - 1];
 }
 
 /*
@@ -71,58 +70,6 @@ bounding_kernel(double x, double h, double t)
     return 0;
 }
 
-/*
- * Compute an apporximation of the inverse of the error function.
- *
- * Reference
- * ----------
- * https://en.wikipedia.org/wiki/Error_function#Approximation_with_elementary_functions
- */
-static NPY_INLINE double
-erfinv(double x)
-{
-    static const double a = 0.147;
-    static const double two_pia = 4.330746750799873;
-    // sign(x) is never zero since the function is used to evaluate (1 - u)
-    // where u is uniform value from an interval
-    double sgn_x = x > 0 ? 1 : -1;
-    double logx_2 = log(1 - x * x);
-    
-    x = two_pia + 0.5 * logx_2;
-    return sgn_x * sqrt(sqrt(x * x - logx_2 / a) - x);
-}
-
-/*
- * Sample X ~ Levy(0, c) where X < t.
- *
- * A Levy(0, c) distribution is equivalent to an Inverse-Gamma(0.5, 0.5 * c)
- * distribution. Thus sampling from an Inverse-Gamma(0.5, h^2 / 2) can be done
- * by sampling from a Levy(0, h^2). Sampling from the Levy distribution is
- * done using the Inverse-Transform method. For this problem, it is superior
- * over standard rejection sampling because the truncated values (X < t) can
- * be generated directly without throwing away samples. We can use the fact
- * that to sample from an interval (a, b], we can generate a uniform variable
- * from the unterval (F(a), F[b)], where F(x) is the CDF of the distribution.
- * Then use inverse-transform to sample X such that a <= X <= b.
- *
- * Thus, to get X from an Inverse-Gamma(0.5, h^2 / 2) right truncated at t, we
- * 1) Generate a uniform V from the interval (0, F(t)], where F is the cdf of a
- *    Levy(0, h^2).
- * 2) Generate X using inverse transform X = Finv(V)
- * 3) return X
- */
-static NPY_INLINE double
-random_bounded_levy(bitgen_t* bitgen_state, double c, double t)
-{
-    double x, u, cdf_t;
-
-    cdf_t = erfc(sqrt(0.5 * c / t));  // F(t)
-    u = next_double(bitgen_state) * cdf_t;
-    x = erfinv(1 - u);
-    x = c / (2 * x * x); 
-    return x;
-}
-
 /* 
  * Generate from J*(h, z) where {h | 1 <= h <= 4} using the alternate method.
  */
@@ -131,15 +78,14 @@ random_jacobi_alternate_bounded(bitgen_t* bitgen_state, double h, double z)
 {
     static const double logpi_2 = 0.4515827052894548;  // log(pi / 2)
     uint64_t n;
-    double t, p, q, u, x, h_z, s, old_s, lambda_z, ratio;
-    double h2 = h * h;
-
-    lambda_z = PGM_PI2 / 8 + 0.5 * z * z;
+    double t, p, q, u, x, s, old_s, ratio, one_t;
+    double h2 = h * h, half_h2 = 0.5 * h2, h_z = h / z;
+    double lambda_z = PGM_PI2 / 8 + 0.5 * z * z;
 
     t = get_truncation_point(h);
+    one_t = 1 / t;
 
     if (z > 0) {
-        h_z = h / z;
         p = exp(h * (PGM_LOG2 - z)) * inverse_gaussian_cdf(t, h_z, h2);
     }
     else {
@@ -157,13 +103,17 @@ random_jacobi_alternate_bounded(bitgen_t* bitgen_state, double h, double z)
             x = random_left_bounded_gamma(bitgen_state, h, lambda_z, t);
         }
         else if (z > 0) {
-            h_z = h / z;
             do {
                 x = random_wald(bitgen_state, h_z, h2);
             } while (x > t);
         }
         else {
-            x = random_bounded_levy(bitgen_state, h2, t);
+            /* To sample from an inverse-gamma we can use the relation:
+             * InvGamma(a, b) == 1 / Gamma(a, rate=b). To make sure our samples
+             * remain less than t, we sample from a Gamma distribution left-
+             * truncated at 1/t (i.e X > 1/t). Then 1/X < t is an Inverse-
+             * Gamma right truncated at t. Which is what we want. */
+            x = 1 / random_left_bounded_gamma(bitgen_state, 0.5, half_h2, one_t);
         }
         u = next_double(bitgen_state) * bounding_kernel(x, h, t);
         s = piecewise_coef(0, x, h);
@@ -187,12 +137,12 @@ random_jacobi_alternate_bounded(bitgen_t* bitgen_state, double h, double z)
 /*
  * Sample from PG(h, z) using the alternate method, for h >= 1.
  *
- * For values of h > 4, we sample J*(h, z/2) = sum(J*(b_i, z/2)) samples such
+ * For values of h >= 4, we sample J*(h, z/2) = sum(J*(b_i, z/2)) samples such
  * that sum(b_i) = h. Then use the relation PG(h, z) = J(h,z/2) / 4, to get a
  * sample from the Polya-Gamma distribution.
  *
- * We do this by sampling in chunks of size ``pgm_h_range``, which is
- * the difference between the largest and smallest optimal h value that
+ * We do this by sampling in chunks of size ``pgm_h_range / 2``, which is
+ * half the difference between the largest and smallest optimal h value that
  * satisfies the alternating sum criterion for the sampler in the range We
  * chose ([1, 4]). We sample and decrement the `h` param until the its value
  * is less than or equal to 4. Then sample one more time if the remaining value
@@ -203,12 +153,12 @@ random_jacobi_alternate_bounded(bitgen_t* bitgen_state, double h, double z)
 double
 random_polyagamma_alternate(bitgen_t *bitgen_state, double h, double z)
 {
-    double out = 0;
-    z = 0.5 * (z < 0 ? fabs(z) : z);
+    double out = 0, chunk_size = 0.5 * pgm_h_range;
+    z = z == 0 ? 0 : 0.5 * (z < 0 ? -z : z);
 
     while (h >= 4) {
-        out += random_jacobi_alternate_bounded(bitgen_state, pgm_h_range, z);
-        h -= pgm_h_range;
+        out += random_jacobi_alternate_bounded(bitgen_state, chunk_size, z);
+        h -= chunk_size;
     }
     out += random_jacobi_alternate_bounded(bitgen_state, h, z);
     return 0.25 * out;
