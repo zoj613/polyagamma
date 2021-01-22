@@ -2,7 +2,6 @@
 Efficiently sample from the Polya-Gamma distribution using NumPy's Generator interface.
 ![densities](./scripts/densities.svg)
 
-As expected, the `saddle` method improves as `h` tends to `infinity`.
 
 ## Features
 - `polyagamma` is written in C and optimized for performance.
@@ -69,6 +68,18 @@ o = polyagamma(random_state=rng)
 ```
 ### C
 For an example of how to use `polyagamma` in a C program, see [here][1].
+
+
+## Contributing
+All contributions, bug reports, bug fixes, documentation improvements, enhancements, and ideas are welcome.
+
+To submit a PR, follow the steps below:
+1) Fork the repo.
+2) Setup the dev environment with `poetry install`. All dependencies will be installed.
+3) Start writing your changes, including unittests.
+3) Once finished, run `make install` to build the project with the new changes.
+4) Once build is successful, run tests to make sure they all pass with `make test`.
+5) Once finished, you can submit a PR for review.
 
 
 ## References
