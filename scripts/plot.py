@@ -18,7 +18,7 @@ def plot_densities(h=1, z=0, size=1000):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--z', default=0, type=float)
+    parser.add_argument('--z', default=0, type=int)
     args = parser.parse_args()
 
     for i in [1, 4, 7, 10, 15]:
