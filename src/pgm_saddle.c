@@ -40,15 +40,26 @@ struct config {
 
 /*
  * Compute K'(u), the derivatie of the Cumulant Generating Function of x.
+ *
+ * For values in the neighborhood of zero, we use a faster Taylor series
+ * expansion of the trigonometric and hyperbolic functions.
  */
 static NPY_INLINE double
 cgf_prime(double u)
 {
     double s;
-    double tolerance = 5e-5;
 
-    if (u == 0 || fabs(u) < tolerance)
+    if (u == 0) {
         return 1;
+    }
+    else if (u > 0 && u < 0.5) {
+        s = 2 * u;
+        return 1 + s / 3 + 2 * s * s / 15;
+    }
+    else if (u < 0 && u > -0.5) {
+        s = -2 * u;
+        return 1 - s / 3 + 2 * s * s / 15;
+    }
     else if (u > 0) {
         s = 2 * u;
         s = sqrt(s);
@@ -92,11 +103,11 @@ select_bracket(double x, double* lower, double* upper)
         *upper = 0.1;
     }
     else if (x < 1) {
-        *lower = -500;
-        *upper = -0.001;
+        *lower = -10;
+        *upper = 0.01;
     }
     else {
-        *lower = 0.01;
+        *lower = -0.01;
         *upper = 1.2;
     } 
 }
@@ -153,13 +164,38 @@ regula_falsi(double arg)
 
 /*
  * K(t), the cumulant generating function of X
+ *
+ * For values of u and z in the neighborhood of zero, we use a faster Taylor series
+ * expansion of log(cosh(x)) and log(cos(x)).
  */
 static NPY_INLINE double
 cgf(double u, double z)
 {
     double s, out;
-    out = z == 0 ? 0 : log(cosh(z));
-    if (u >= 0) {
+
+    if (z == 0) {
+        out = 0;
+    }
+    else if (z > 0 && z < 0.5) {
+        z = z * z;
+        out = 0.5 * z - z * z / 12 + z * z * z / 45;
+    }
+    else {
+        out = log(cosh(z));
+    }
+
+    if (u == 0) {
+        return out;
+    }
+    else if (u > 0 && u < 0.5) {
+        s = 2 * u;
+        out -= -0.5 * s - s * s / 12 - s * s * s / 45;
+    }
+    else if (u < 0 && u > -0.5) {
+        s = -2 * u;
+        out -= 0.5 * s - s * s / 12 + s * s * s / 45;
+    }
+    else if (u > 0) {
         s = 2 * u;
         s = sqrt(s);
         out -= log(cos(s));
@@ -263,14 +299,6 @@ bounding_kernel(double x, double h, struct config* cfg)
 
 /*
  * Sample from PG(h, z) using the Saddle approximation method.
- *
- * NOTE: The accuracy and speed of this implementation seems to be heavily
- * dependant on the value of the tilting parameter ``z`` and the points xl, xc
- * and xr. The wrong choice of xl and xr for a given z can lead to a poor
- * saddle point approximation. To prevent this issue, we precompute all the
- * best values for xl, xc and xr for a given value of z. This ensures quality
- * samples and fast runtime since the envelope will be as close as possible to
- * the true density of the distribution.
  */
 double
 random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
