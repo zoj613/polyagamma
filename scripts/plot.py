@@ -39,7 +39,7 @@ if __name__ == "__main__":
         plot_densities(h=i, z=args.z)
 
     plt.title(
-        f'Density plots of PG(h, {args.z})' +
+        f'Density plot of PG(h, {args.z})' +
         ' using each method for h $\in$ {1,4,7,10,15}. \nThe package ' +
         '$pypolyagamma$ is used as a reference.'
     )
