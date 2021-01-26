@@ -125,10 +125,9 @@ random_jacobi(bitgen_t* bitgen_state, double z)
     size_t n;
 
     double mu = 1 / z;
-    double coshz = cosh(z);
     double k = PGM_PI2_8 + 0.5 * z * z;
-    double q = coshz * (NPY_PI_2 / k) * exp(-k * t);
-    double p = (1 + exp(-2 * z)) * inverse_gaussian_cdf(t, mu, 1);
+    double q = NPY_PI_2 * exp(-k * t) / k;
+    double p = 2 * exp(-z) * inverse_gaussian_cdf(t, mu, 1);
     double ratio = p / (p + q);
 
     for (;;) {
