@@ -101,13 +101,13 @@ _kf_gammaq(double s, double z)
 	return exp(s * log(z) - z - kf_lgamma(s) - log(f));
 }
 
-
-double
+/*
+static double
 kf_gammap(double s, double z)
 {
 	return z <= 1. || z < s? _kf_gammap(s, z) : 1. - _kf_gammaq(s, z);
 }
-
+*/
 double
 kf_gammaq(double s, double z)
 {

@@ -4,6 +4,7 @@
 
 #define PGM_PI2 9.869604401089358  // pi^2
 #define PGM_PI2_8 1.233700550136169  // pi^2 / 8
+#define PGM_LOGPI_2 0.4515827052894548  // log(pi / 2)
 
 
 double inverse_gaussian_cdf(double x, double mu, double lambda);

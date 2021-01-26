@@ -7,11 +7,11 @@
 typedef enum {GAMMA, DEVROYE, ALTERNATE, SADDLE, HYBRID} sampler_t;
 
 /*
- * generate a sample from a Polya-Gamma distribution PG(h, zh
+ * generate a sample from a Polya-Gamma distribution PG(h, z)
  *
  * Samples are draw from a Polya-Gamma distribution with specified para-
  *  meters `h` and `z`.
-
+ *
  *  Parameters
  *  ----------
  *  h : double 
@@ -21,10 +21,10 @@ typedef enum {GAMMA, DEVROYE, ALTERNATE, SADDLE, HYBRID} sampler_t;
  *      The exponential tilting parameter as described in [1].
  *  method : sampler_t
  *      The type of method to use when sampling. Must be one of {GAMMA,
- *      DEVROYE, ALTERNATE, HYBRID}. The HYBRID sampler automatically chooses
- *      the appropriate method using the parameter values. The DEVROYE method
- *      can only be used with positive integer values of h. If h is a not a
- *      positive whole number, then it will be truncated to an integer before
+ *      DEVROYE, ALTERNATE, SADDLE, HYBRID}. The HYBRID sampler automatically
+ *      chooses the appropriate method using the parameter values. The DEVROYE
+ *      metthod can only be used with positive integer values of h. If h is not
+ *      a positive whole number, then it will be truncated to an integer before
  *      sampling.
  *
  *  References
@@ -60,6 +60,9 @@ void pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
  *
  * h, z and out must be at least `n` in length. Only the first n elements of
  * `out` will be filled.
+ *
+ * WARNING: The `out` array must NOT overlap with any of the h and z arrays, else
+ * the behaviour is undefined and the returned samples will likely be incorrect.
  */
 void pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h,
                                  const double* z, sampler_t method, size_t n,

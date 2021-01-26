@@ -26,9 +26,9 @@ struct config {
     double sqrt_alpha_l;
     // sqrt(1 / alpha_r) constant
     double sqrt_alpha_r;
-    // y intercept of tangent line to xl. ta_l = phi(t) - 0.5 * (1/xc - 1/xl)
+    // y intercept of tangent line to xl.
     double intercept_l;
-    // y intercept of tangent line to xr. eta_l = phi(t) - log(xr) + log(xc)
+    // y intercept of tangent line to xr.
     double intercept_r;
     // the constant sqrt(h / (2 * pi))
     double sqrt_h_2pi;
@@ -39,7 +39,7 @@ struct config {
 };
 
 /*
- * Compute K'(u), the derivatie of the Cumulant Generating Function of x.
+ * Compute K'(u), the derivative of the Cumulant Generating Function (CGF) of x.
  *
  * For values in the neighborhood of zero, we use a faster Taylor series
  * expansion of the trigonometric and hyperbolic functions.
@@ -114,14 +114,16 @@ select_starting_guess(double x)
     else return -5;
 }
 
-
+/*
+ * A struct to store a function's value and derivative at a point.
+ */
 struct objective_return {
     double f;
     double fprime;
 };
 
 /*
- * The function f(u|x) = K'(t) - x. We find solve for u in order to obtain t.
+ * The function f(u|x) = K'(t) - x. We solve for u in order to obtain t.
  */
 static NPY_INLINE void
 objective(double u, double x, struct objective_return* value)
@@ -132,7 +134,7 @@ objective(double u, double x, struct objective_return* value)
 }
 
 #ifndef PGM_MAX_ITER
-#define PGM_MAX_ITER 50
+#define PGM_MAX_ITER 25
 #endif
 
 /*
@@ -316,8 +318,8 @@ random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
     hrho_r = -(h * cfg.Lprime_r);
     kappa_r = cfg.coef_r * exp(h * (br - log(hrho_r)) + lgamma(h));
     q = kappa_r * kf_gammaq(h, hrho_r * cfg.xc);
-    ratio = p / (p + q);
 
+    ratio = p / (p + q);
     do {
         if (next_double(bitgen_state) < ratio) {
             do {

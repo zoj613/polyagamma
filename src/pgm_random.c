@@ -9,12 +9,13 @@
 /*
  * Sample from a PG(h. z) using a Normal Approximation. For sufficiently large
  * h, the density of a Polya-Gamma resembles that of a Normal distribution.
- * (See this plot for h=12: https://user-images.githubusercontent.com/44142765/105776797-e736bf00-5f71-11eb-9b45-1a366562df4d.png).
+ * See the following plot for h=12:
+ *  https://user-images.githubusercontent.com/44142765/105776797-e736bf00-5f71-11eb-9b45-1a366562df4d.png).
  *
  * - For z > 0, the mean and variance can be directly calculated using the
  *   distribution's moment generating function (MGF).
- * - For z = 0, we use calculate the limit of the derivative of the MGF as t
- *   approaches 0. The formular can be easily generated using any online math
+ * - For z = 0, we calculate the limit of the derivative of the MGF as t
+ *   approaches 0. The formula can be easily generated using any online math
  *   equation calculator.
  */
 static NPY_INLINE double
@@ -39,15 +40,15 @@ random_polyagamma_normal_approx(bitgen_t* bitgen_state, double h, double z)
  * to the value of the shape parameter.
  *
  * - If h is less than 1 (where DEVROYE and ALTERNATE do not apply), then
- *   the SADDLE method is used since it i much faster than the GAMMA method.
+ *   the SADDLE method is used since it is much faster than the GAMMA method.
  * - if h is a whole number that is less than 20, DEVROYE is the most efficient
- *   method of choice. For values greater than 20, SADDLE method seems the fastest.
+ *   method of choice. Otherwise, the SADDLE method seems the fastest.
  * - If h is non-integer (where the DEVROYE method does not apply) less than
- *   or equal to 10, ALTERNATE method is the quickest. For values greater than
- *   10, SADDLE method is.
- * - If h > 50, we use a Normal approximation the Polya-Gamma distribution.
+ *   or equal to 10, ALTERNATE method is the quickest on average. For values
+ *   greater than 10, the SADDLE method is.
+ * - If h > 50, we use a Normal approximation to the Polya-Gamma distribution.
  *   Tests have shown this approximation is very accurate even for smaller
- *   values of h.
+ *   values of h greater than 30.
  */
 static NPY_INLINE double
 random_polyagamma_hybrid(bitgen_t* bitgen_state, double h, double z)
@@ -103,8 +104,8 @@ NPY_INLINE void
 pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
                            sampler_t method, size_t n, double* out)
 {
-    for (size_t i = n; i--; )
-        out[i] = pgm_random_polyagamma(bitgen_state, h, z, method);
+    for (; n--;)
+        out[n] = pgm_random_polyagamma(bitgen_state, h, z, method);
 }
 
 
@@ -113,6 +114,6 @@ pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h,
                             const double* z, sampler_t method, size_t n,
                             double* restrict out)
 {
-    for (size_t i = n; i--; )
-        out[i] = pgm_random_polyagamma(bitgen_state, h[i], z[i], method);
+    for (; n--;)
+        out[n] = pgm_random_polyagamma(bitgen_state, h[n], z[n], method);
 }
