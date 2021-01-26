@@ -21,7 +21,7 @@ existing libraries.
 To get the latest version of the package, one can install it by downloading the wheel/source distribution 
 from the [releases][3] page, or using `pip` with the following shell command:
 ```shell
-$ pip install --pre -U polyagamma
+$ pip install -U polyagamma
 ```
 
 Alternatively, once can install from source by cloning the repo. This requires an installation of [poetry][2]
