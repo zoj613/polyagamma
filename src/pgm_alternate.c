@@ -39,7 +39,12 @@ get_truncation_point(double h)
         }
         break;
     }
-    return pgm_f[index - 1];
+    double x0, x1, f0, f1;
+    x0 = pgm_h[index - 1];
+    f0 = pgm_f[index - 1];
+    x1 = pgm_h[index + 1];
+    f1 = pgm_f[index + 1];
+    return f0 + (f1 - f0) * (pgm_h[index] - x0) / (x1 - x0);
 }
 
 /*

@@ -73,93 +73,90 @@ cgf_prime(double u)
 }
 
 /*
- * The function f(u|x) = K'(t) - x. We find solve for u in order to obtain t.
- */
-static NPY_INLINE double
-objective(double u, double x)
-{
-    return cgf_prime(u) - x;
-}
-
-/*
- * Select the solver bracket interval [lower, upper] for the solution `u`,
- * given a value of x.
+ * Select the starting guess for the solution `u` of Newton's method given a
+ * value of x.
  *
  * - When x = 1, then u = 0.
  * - When x < 1, then u < 0.
  * - When x > 1, then u > 0.
  *
- * Page 16 of Windle et al. (2014) shows that the upper bound of `u` is pi^2/8,
- * therefore we choose the bracketing interval accoding to the above, as
- * outlined in Page 19 of Windle et al. (2014).
+ * Page 16 of Windle et al. (2014) shows that the upper bound of `u` is pi^2/8.
  */
-static NPY_INLINE void
-select_bracket(double x, double* lower, double* upper)
+static NPY_INLINE double
+select_starting_guess(double x)
 {
-    double tolerance = 5e-05;
-
-    if (x == 1 || fabs(x) < tolerance) {
-        *lower = -0.1;
-        *upper = 0.1;
-    }
-    else if (x < 1) {
-        *lower = -10;
-        *upper = 0.01;
-    }
-    else {
-        *lower = -0.01;
-        *upper = 1.2;
-    } 
+    if (x >= 7.5)
+        return 1.1;
+    else if (x >= 5.5)
+        return 1.05;
+    else if (x >= 5)
+        return 1.02;
+    else if (x >= 4.5)
+        return 1;
+    else if (x >= 4)
+        return 0.98;
+    else if (x >= 3.5)
+        return 0.95;
+    else if (x >= 3)
+        return 0.92;
+    else if (x >= 2.5)
+        return 0.81;
+    else if (x >= 2)
+        return 0.72;
+    else if (x >= 1.5)
+        return 0.58;
+    else if (x >= 1)
+        return 0.345;
+    else if (x > 0.5)
+        return -0.147;
+    else if (x > 0.25)
+        return -1.78;
+    else return -5;
 }
 
 
+struct objective_return {
+    double f;
+    double fprime;
+};
+
+/*
+ * The function f(u|x) = K'(t) - x. We find solve for u in order to obtain t.
+ */
+static NPY_INLINE void
+objective(double u, double x, struct objective_return* value)
+{
+    double prime = cgf_prime(u);
+    value->f = prime - x;
+    value->fprime = prime * prime - 0.5 * (1 - prime) / u;
+}
+
 #ifndef PGM_MAX_ITER
-#define PGM_MAX_ITER 100
+#define PGM_MAX_ITER 50
 #endif
-/* 
- * Apply the method of False Position to solve for the root f(u) = K'(u) - x.
- *
- * Adapted from: https://en.wikipedia.org/wiki/Regula_falsi#Example_code
+
+/*
+ * Solve for the root of f(u) = K'(t) - x using Newton's method.
  */
 static NPY_INLINE double
-regula_falsi(double arg)
+newton_raphson(double arg, double x0)
 {
-    double r, s, t, fr;
-    double e = 5e-5, m = PGM_MAX_ITER;
-    int side = 0;
+    static const double tolerance = 5e-5;
+    struct objective_return value;
+    double x = 0;
 
-    /* starting values at endpoints of interval */
-    select_bracket(arg, &s, &t);
-    double fs = objective(s, arg);
-    double ft = objective(t, arg);
-
-    for (size_t n = 0; n < m; n++) {
-        r = (fs * t - ft * s) / (fs - ft);
-        if (fabs(t - s) < e * fabs(t + s)) {
+    for (size_t i = 0; i < PGM_MAX_ITER; i++) {
+        objective(x0, arg, &value);
+        if (fabs(value.fprime) < tolerance) {
+            puts("WARNING: Newton-Raphson objective's derivative is zero");
             break;
         }
-        
-        fr = objective(r, arg);
-
-        if (fr * ft > 0) {
-            /* fr and ft have same sign, copy r to t */
-            t = r; ft = fr;
-            if (side==-1)
-                fs /= 2;
-            side = -1;
-        }
-        else if (fs * fr > 0) {
-            /* fr and fs have same sign, copy r to s */
-            s = r; fs = fr;
-            if (side==+1)
-                ft /= 2;
-            side = +1;
-        }
-        else {
-             break; /* fr * f_ very small (looks like zero) */
-        }
+        x = x0 - value.f / value.fprime;
+        if (fabs(x - x0) <= tolerance)
+            return x;
+        x0 = x;
     }
-    return r;
+    return x;
 }
 
 /*
@@ -219,15 +216,15 @@ initialize_config(struct config* cfg, double h, double z)
     bool is_zero = z == 0 ? true : false;
 
     xl = is_zero ? 1 : tanh(z) / z;
+    xc = 2.75 * xl;
     xr = 3 * xl;
-    xc = 0.75 * xr;
 
     one_xl = 1 / xl;
     one_xc = 1 / xc;
     half_z2 = is_zero ? 0 : 0.5 * z * z;
     ul = is_zero ? 0 : -half_z2;
-    uc = regula_falsi(xc);
-    ur = regula_falsi(xr);
+    uc = newton_raphson(xc, select_starting_guess(xc));
+    ur = newton_raphson(xr, select_starting_guess(xr));
     tr = (ur + half_z2);
 
     // t = 0 at x = m, since K'(0) = m when t(x) = 0
@@ -274,7 +271,7 @@ tangent_at_x(double x, struct config* cfg, SIDE_t side)
 static NPY_INLINE double
 saddle_point(double x, double h, double z, double coef)
 {
-    double u = regula_falsi(x);
+    double u = newton_raphson(x, select_starting_guess(x));
     double t = u + 0.5 * z * z; 
     double kprime2 = cgf_prime(u);
 

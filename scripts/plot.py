@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     plt.title(
         f'Density plots of PG(h, {args.z})' +
-        ' using each method for h $\in$ {1,4,7,10,15}. \nThe package ' +
-        '$pypolyagamma$ is used as a reference.'
+        ' using each method for h $\in$ {1,4,7,10,15}. \nA plot from the ' +
+        '$pypolyagamma$ package is used as a reference.'
     )
     plt.savefig("./densities.svg")
