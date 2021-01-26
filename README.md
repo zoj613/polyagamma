@@ -21,7 +21,7 @@ existing libraries.
 To get the latest version of the package, one can install it by downloading the wheel/source distribution 
 from the [releases][3] page, or using `pip` with the following shell command:
 ```shell
-$ pip install --pre -U polyagamma
+$ pip install -U polyagamma
 ```
 
 Alternatively, once can install from source by cloning the repo. This requires an installation of [poetry][2]
@@ -59,7 +59,7 @@ print(out)
 # one can choose a sampling method from {devroye, alternate, gamma, saddle}.
 # If not given, the default behaviour is a hybrid sampler that picks a method
 # based on the parameter values.
-o = polyagamma(method="devroye")
+o = polyagamma(method="saddle")
 
 # We can also use an existing instance of `numpy.random.Generator` as a parameter.
 # This is useful to reproduce samples generated via a given seed.

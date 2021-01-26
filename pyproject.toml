@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "polyagamma"
-version = "0.1.0"
+version = "1.0.0"
 description = "Efficiently sample from the Polya-Gamma distribution using NumPy's Generator interface"
 authors = ["Zolisa Bleki"]
 license = "BSD-3-Clause"

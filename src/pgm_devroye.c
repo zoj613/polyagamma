@@ -4,24 +4,20 @@
 #include "pgm_devroye.h"
 
 /* 
- * Compute a_n(x|t,z), the nth term of the alternating sum S_n(x|t,z)
+ * Compute a_n(x|t), the nth term of the alternating sum S_n(x|t)
  */
 static NPY_INLINE double
-piecewise_coef(size_t n, double x, double t, double z, double coshz)
+piecewise_coef(size_t n, double x, double t)
 {
-    static const double l2_pi = -0.4515827052894548;  // log(2 / pi) 
     double n_plus_half = n + 0.5;
     double n_plus_half2 = n_plus_half * n_plus_half;
     double n_plus_halfpi = NPY_PI * n_plus_half;
-    double z2 = z * z;
 
     if (x > t) {
-        return exp(-0.5 * x * (z2 + n_plus_halfpi * n_plus_halfpi)) *
-            coshz * n_plus_halfpi;
+        return n_plus_halfpi * exp(-0.5 * x * n_plus_halfpi * n_plus_halfpi); 
     }
     else if (x > 0) {
-        return coshz * n_plus_halfpi * exp(1.5 * (l2_pi - log(x)) -
-            0.5 * z2 * x - 2 * n_plus_half2 / x);
+        return n_plus_halfpi * exp(-1.5 * (PGM_LOGPI_2 + log(x)) - 2 * n_plus_half2 / x);
     }
     return 0;
 }
@@ -93,16 +89,16 @@ random_jacobi_0(bitgen_t* bitgen_state)
         else {
             x = t + 8 * random_standard_exponential(bitgen_state) / PGM_PI2;
         }
-        s = piecewise_coef(0, x, t, 0, 1);
+        s = piecewise_coef(0, x, t);
         u = next_double(bitgen_state) * s;
         for (n = 1;; ++n) {
             if (n & 1) {
-                s -= piecewise_coef(n, x, t, 0, 1);
+                s -= piecewise_coef(n, x, t);
                 if (u < s)
                     return x;
             }
             else {
-                s += piecewise_coef(n, x, t, 0, 1);
+                s += piecewise_coef(n, x, t);
                 if (u > s)
                     break;
             }
@@ -140,16 +136,16 @@ random_jacobi(bitgen_t* bitgen_state, double z)
         /* Here we use S_n(x|t) instead of S_n(x|z,t) as explained in page 13 of
          * Polson et al.(2013) and page 14 of Windle et al. (2014). This
          * convenience avoids issues with S_n blowing up when z is very large.*/
-        s = piecewise_coef(0, x, t, 0, 1);
+        s = piecewise_coef(0, x, t);
         u = next_double(bitgen_state) * s;
         for (n = 1;; ++n) {
             if (n & 1) {
-                s -= piecewise_coef(n, x, t, 0, 1);
+                s -= piecewise_coef(n, x, t);
                 if (u < s)
                     return x;
             }
             else {
-                s += piecewise_coef(n, x, t, 0, 1);
+                s += piecewise_coef(n, x, t);
                 if (u > s)
                     break;
             }
@@ -164,7 +160,7 @@ static NPY_INLINE double
 random_jacobi_n(bitgen_t *bitgen_state, uint64_t n, double z)
 {
     double out = 0;
-    for (size_t i = n; i--; )
+    for (; n--;)
         out += random_jacobi(bitgen_state, z);
     return out;
 }
@@ -196,7 +192,7 @@ gamma_convolution_approx(bitgen_t* bitgen_state, double b, double z)
 double
 random_polyagamma_gamma_conv(bitgen_t* bitgen_state, double h, double z)
 {
-    z = 0.5 * (z < 0 ? fabs(z) : z);
+    z = z == 0 ? 0 : 0.5 * (z < 0 ? -z : z);
     return 0.25 * gamma_convolution_approx(bitgen_state, h, z);
 }
 
@@ -207,7 +203,7 @@ random_polyagamma_gamma_conv(bitgen_t* bitgen_state, double h, double z)
 double
 random_polyagamma_devroye(bitgen_t *bitgen_state, uint64_t n, double z)
 {
-    z = 0.5 * (z < 0 ? fabs(z) : z);
+    z = z == 0 ? 0 : 0.5 * (z < 0 ? -z : z);
     if (n > 1)
         return 0.25 * random_jacobi_n(bitgen_state, n, z);
     return 0.25 * random_jacobi(bitgen_state, z);

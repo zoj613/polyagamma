@@ -9,10 +9,9 @@
 #define PGM_LS2PI 0.9189385332046727  // log(sqrt(2 * pi))
 
 /* 
- * Return the smallest optimal truncation point greater than the input.
- * Values are retrieved from a lookup table for `h` in the range [1, 4].
- *
- * This function uses binary search for the lookup.
+ * Return the optimal truncation point for a given value of h in the range
+ * [1, 4]. Values are retrieved from a lookup table using binary search, then
+ * the final value is calculated using linear interpolation.
  */
 static NPY_INLINE double
 get_truncation_point(double h)
@@ -81,7 +80,6 @@ bounding_kernel(double x, double h, double t)
 static NPY_INLINE double
 random_jacobi_alternate_bounded(bitgen_t* bitgen_state, double h, double z)
 {
-    static const double logpi_2 = 0.4515827052894548;  // log(pi / 2)
     uint64_t n;
     double t, p, q, u, x, s, old_s, ratio, one_t;
     double h2 = h * h, half_h2 = 0.5 * h2, h_z = h / z;
@@ -100,7 +98,7 @@ random_jacobi_alternate_bounded(bitgen_t* bitgen_state, double h, double z)
          * version cancels with the sqrt(pi).*/
         p = exp(h * PGM_LOG2) * erfc(h / sqrt(2 * t));
     }
-    q = exp(h * (logpi_2 - log(lambda_z))) * kf_gammaq(h, lambda_z * t);
+    q = exp(h * (PGM_LOGPI_2 - log(lambda_z))) * kf_gammaq(h, lambda_z * t);
     ratio = p / (p + q);
 
     for (;;) {
