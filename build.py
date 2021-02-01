@@ -1,4 +1,5 @@
 from distutils.core import Extension
+import os
 from os.path import join
 
 import numpy as np
@@ -15,6 +16,10 @@ source_files = [
 ]
 
 
+macros = [('NPY_NO_DEPRECATED_API', 0)]
+if os.getenv("BUILD_WITH_COVERAGE", None):
+    macros.append(('CYTHON_TRACE_NOGIL', 1))
+
 # https://numpy.org/devdocs/reference/random/examples/cython/setup.py.html
 include_path = np.get_include()
 extensions = [
@@ -24,7 +29,7 @@ extensions = [
         include_dirs=[include_path, "./include"],
         library_dirs=[join(include_path, '..', '..', 'random', 'lib')],
         libraries=['npyrandom'],
-        define_macros=[('NPY_NO_DEPRECATED_API', 0)],
+        define_macros=macros,
         extra_compile_args=['-std=c99']
     ),
 ]

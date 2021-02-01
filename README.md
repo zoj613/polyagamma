@@ -1,4 +1,11 @@
 # polya-gamma
+[![PyPI - Wheel][4]](https://pypi.org/project/polyagamma/#files)
+[![PyPI][5]](https://pypi.org/project/polyagamma/)
+[![PyPI - License][6]](https://github.com/zoj613/polya-gamma/blob/main/LICENSE)
+[![CircleCI][7]](https://circleci.com/gh/zoj613/polya-gamma/)
+[![Codecov][8]](https://codecov.io/gh/zoj613/polya-gamma/)
+
+
 Efficiently generate samples from the Polya-Gamma distribution using a NumPy/SciPy compatible interface.
 ![densities](./scripts/densities.svg)
 
@@ -92,3 +99,8 @@ To submit a PR, follow the steps below:
 [1]: ./examples/c_polyagamma.c
 [2]: https://python-poetry.org/docs/pyproject/
 [3]: https://github.com/zoj613/polya-gamma/releases
+[4]: https://img.shields.io/pypi/wheel/polyagamma?style=flat-square
+[5]: https://img.shields.io/pypi/v/polyagamma?style=flat-square
+[6]: https://img.shields.io/pypi/l/polyagamma?style=flat-square
+[7]: https://img.shields.io/circleci/build/github/zoj613/polya-gamma/main?style=flat-square
+[8]: https://img.shields.io/codecov/c/github/zoj613/polya-gamma?style=flat-square
