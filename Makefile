@@ -28,5 +28,10 @@ sdist: clean cythonize
 test:
 	pytest tests/ -vvv
 
+test-cov: clean
+	poetry run cythonize polyagamma/*.pyx -X linetrace=True
+	BUILD_WITH_COVERAGE=1 poetry install
+	poetry run pytest -v --cov-branch --cov=polyagamma tests/ --cov-report=html
+	
 wheels: clean cythonize
 	$(foreach img, $(DOCKER_IMAGES), $(call make_wheels, $(img));)
