@@ -33,14 +33,16 @@ def plot_densities(h=1, z=0, size=1000):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--z', default=0, type=int)
+    parser.add_argument('--size', default=20000, type=int)
     args = parser.parse_args()
 
     for i in [1, 4, 7, 10, 15]:
-        plot_densities(h=i, z=args.z)
+        plot_densities(h=i, z=args.z, size=args.size)
 
     plt.title(
-        f'Density plots of PG(h, {args.z})' +
+        f'Density plots of {args.size} PG(h, {args.z}) samples' +
         ' using each method for h $\in$ {1,4,7,10,15}. \nA plot from the ' +
-        '$pypolyagamma$ package is used as a reference.'
+        '$pypolyagamma$ package is used as a reference.',
+        fontdict = {'fontsize': 9},
     )
     plt.savefig("./densities.svg")
