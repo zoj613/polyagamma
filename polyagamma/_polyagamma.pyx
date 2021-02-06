@@ -99,9 +99,10 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
         ``None`` (default) then a single value is returned. If a tuple of
         integers is passed, the returned array will have the same shape.
         This parameter only applies if `h` and `z` are scalars.
-    out : numpy.ndarray, optional
-        1d output array in which to store samples. If given, then no value
-        is returned. when `h` and/or `z` is a sequence, then `out` needs
+    out : array_like, optional
+        1d array_like object in which to store samples. This object must
+        implement the buffer protocol as described in [4]_. If given, then no
+        value is returned. when `h` and/or `z` is a sequence, then `out` needs
         to have the same total size as the broadcasted result of the
         parameters.
     method : str or None, optional
@@ -150,6 +151,7 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
     .. [3] Luc Devroye. "On exact simulation algorithms for some distributions
            related to Jacobi theta functions." Statistics & Probability Letters,
            Volume 79, Issue 21, (2009): 2251-2259.
+    .. [4] https://www.python.org/dev/peps/pep-3118/
 
     Examples
     --------
