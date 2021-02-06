@@ -48,6 +48,33 @@ cdef dict METHODS = {
 }
 
 
+cdef inline int check_method(object h, str method, bint disable_checks) except -1:
+    cdef bint raise_error
+
+    if method not in METHODS:
+        raise ValueError(f"`method` must be one of {set(METHODS)}")
+
+    elif not disable_checks and method == "alternate":
+        if np.PyArray_IsPythonNumber(h):
+            raise_error = h < 1
+        else:
+            h = np.PyArray_FROM_O(h)
+            raise_error = np.PyArray_Any(h < 1, np.NPY_MAXDIMS, <np.ndarray>NULL)
+        if raise_error:
+            raise ValueError("alternate method must have h >=1")
+
+    elif not disable_checks and method == "devroye":
+        if np.PyArray_IsPythonNumber(h):
+            raise_error = not float(h).is_integer()
+        else:
+            o = np.modf(np.PyArray_FROM_O(h))[0]
+            raise_error = np.PyArray_Any(o, np.NPY_MAXDIMS, <np.ndarray>NULL)
+        if raise_error:
+            raise ValueError("devroye method must have integer values for h")
+    else:
+        return METHODS[method]
+
+
 def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
                bint disable_checks=False, random_state=None):
     """
@@ -72,9 +99,10 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
         ``None`` (default) then a single value is returned. If a tuple of
         integers is passed, the returned array will have the same shape.
         This parameter only applies if `h` and `z` are scalars.
-    out : numpy.ndarray, optional
-        1d output array in which to store samples. If given, then no value
-        is returned. when `h` and/or `z` is a sequence, then `out` needs
+    out : array_like, optional
+        1d array_like object in which to store samples. This object must
+        implement the buffer protocol as described in [4]_. If given, then no
+        value is returned. when `h` and/or `z` is a sequence, then `out` needs
         to have the same total size as the broadcasted result of the
         parameters.
     method : str or None, optional
@@ -123,6 +151,7 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
     .. [3] Luc Devroye. "On exact simulation algorithms for some distributions
            related to Jacobi theta functions." Statistics & Probability Letters,
            Volume 79, Issue 21, (2009): 2251-2259.
+    .. [4] https://www.python.org/dev/peps/pep-3118/
 
     Examples
     --------
@@ -159,14 +188,7 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
     bitgen = <bitgen_t*>PyCapsule_GetPointer(bitgenerator.capsule, "BitGenerator")
 
     if method is not None:
-        if method not in METHODS:
-            raise ValueError(f"`method` must be one of {set(METHODS)}")
-        elif method == "alternate" and h < 1:
-            raise ValueError("alternate method must have h >=1")
-        elif method == "devroye" and not float(h).is_integer():
-            raise ValueError("devroye method must have integer values for h")
-        else:
-            stype = METHODS[method]
+        stype = <sampler_t>check_method(h, method, disable_checks)
 
     if is_sequence(h) or is_sequence(z):
         h = np.PyArray_FROM_OT(h, np.NPY_DOUBLE)

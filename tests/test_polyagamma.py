@@ -68,6 +68,11 @@ def test_polyagamma():
     rng_polyagamma(method="devroye")
     rng_polyagamma(method="alternate")
     rng_polyagamma(method="saddle")
+    # test if sampling works for sequence input when devroye and alternate
+    # methods are specified. See Issue #32
+    h = (1, 2, 3)
+    rng_polyagamma(h, method="devroye")
+    rng_polyagamma(h, method="alternate")
 
     # raise error for values less than 1 with alternate method
     with pytest.raises(ValueError):
