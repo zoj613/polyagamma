@@ -51,14 +51,16 @@ $ export PYTHONPATH=$PWD:$PYTHONPATH
 import numpy as np
 from polyagamma import polyagamma
 
+# generate a PG(1, 0) sample
 o = polyagamma()
 
 # Get a 5 by 10 array of PG(1, 2) variates.
 o = polyagamma(z=2, size=(5, 10))
 
 # Pass sequences as input. Numpy's broadcasting rules apply here.
-h = [[1, 2, 3, 4, 5], [9, 8, 7, 6, 5]]
-o = polyagamma(h, 1)
+h = [[1.5, 2, 0.75, 4, 5],
+     [9.5, 8, 7, 6, 0.9]]
+o = polyagamma(h, -2.5)
 
 # Pass an output array
 out = np.empty(5)
@@ -70,10 +72,20 @@ print(out)
 # based on the parameter values.
 o = polyagamma(method="saddle")
 
-# We can also use an existing instance of `numpy.random.Generator` as a parameter.
+# one can also use an existing instance of `numpy.random.Generator` as a parameter.
 # This is useful to reproduce samples generated via a given seed.
 rng = np.random.default_rng(12345)
 o = polyagamma(random_state=rng)
+
+# If one is using a `numpy.random.RandomState` instance instead of the `Generator`
+# class, the object's underlying bitgenerator can be passed as the value of random_state
+bit_gen = np.random.RandomState(12345)._bit_generator
+o = polyagamma(random_state=bit_gen)
+
+# When passing a large input array for the shape parameter `h`, parameter value
+# validation checks can be disabled to avoid some overhead, which may boost performance.
+large_h = np.ones(1000000)
+o = polyagamma(large_h, disable_checks=True)
 ```
 ### C
 For an example of how to use `polyagamma` in a C program, see [here][1].
