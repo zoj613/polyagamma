@@ -90,7 +90,7 @@ _kf_gammap(double s, double z)
 		sum += (x *= z / (s + k));
 		if (x / sum < KF_GAMMA_EPS) break;
 	}
-	return exp(s * log(z) - z - lgamma(s + 1.) + log(sum));
+	return exp(s * log(z) - z - pgm_lgamma(s + 1.) + log(sum));
 }
 
 // regularized upper incomplete gamma function, by continued fraction
@@ -113,7 +113,7 @@ _kf_gammaq(double s, double z)
 		f *= d;
 		if (fabs(d - 1.) < KF_GAMMA_EPS) break;
 	}
-	return exp(s * log(z) - z - lgamma(s) - log(f));
+	return exp(s * log(z) - z - pgm_lgamma(s) - log(f));
 }
 
 
