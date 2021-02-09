@@ -91,10 +91,10 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
     ----------
     h : scalar or sequence, optional
         The shape parameter of the distribution as described in [1]_.
-        The value(s) must be positive. Defaults to 1.
+        The value(s) must be positive and finite. Defaults to 1.
     z : scalar or sequence, optional
-        The exponential tilting parameter as described in [1]_.
-        Defaults to 0.
+        The exponential tilting parameter as described in [1]_. The value(s)
+        must be finite. Defaults to 0.
     size : int or tuple of ints, optional
         The number of elements to draw from the distribution. If size is
         ``None`` (default) then a single value is returned. If a tuple of
