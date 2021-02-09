@@ -50,6 +50,7 @@ cdef dict METHODS = {
 
 cdef inline int check_method(object h, str method, bint disable_checks) except -1:
     cdef bint raise_error
+    cdef object o
 
     if method not in METHODS:
         raise ValueError(f"`method` must be one of {set(METHODS)}")
@@ -58,16 +59,16 @@ cdef inline int check_method(object h, str method, bint disable_checks) except -
         if np.PyArray_IsPythonNumber(h):
             raise_error = h < 1
         else:
-            h = np.PyArray_FROM_O(h)
-            raise_error = np.PyArray_Any(h < 1, np.NPY_MAXDIMS, <np.ndarray>NULL)
+            o = np.PyArray_FROM_O(h) < 1
+            raise_error = np.PyArray_Any(o, np.NPY_MAXDIMS, <np.ndarray>NULL)
         if raise_error:
             raise ValueError("alternate method must have h >=1")
 
     elif not disable_checks and method == "devroye":
         if np.PyArray_IsPythonNumber(h):
-            raise_error = not float(h).is_integer()
+            raise_error = <int>h != h
         else:
-            o = np.modf(np.PyArray_FROM_O(h))[0]
+            o = np.PyArray_FROM_OT(h, np.NPY_INT) != np.PyArray_FROM_O(h)
             raise_error = np.PyArray_Any(o, np.NPY_MAXDIMS, <np.ndarray>NULL)
         if raise_error:
             raise ValueError("devroye method must have integer values for h")
