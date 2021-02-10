@@ -28,11 +28,11 @@ def test_polyagamma():
     assert rng_polyagamma(h, 0.12345).shape == (4, 5, 1)
 
     # should work on list/tuple input
-    h = [[np.inf, 2, 3], [3, 3, 1]]
+    h = [[1000, 2, 3], [3, 3, 1]]
     out = rng_polyagamma(h)
     assert out.shape == (2, 3)
     assert not np.allclose(out, 0)
-    z = (np.inf, 2, -10, 0)
+    z = (1000, 2, -10, 0)
     out = rng_polyagamma(z=z)
     assert out.shape == (4,)
     assert not np.allclose(out, 0)

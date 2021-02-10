@@ -8,7 +8,7 @@ interval not present in the table are calculated using a linear interpolation.
 We find the roots the function f(x) =  l(x|h) - r(x|h) for a given value of h.
 """
 from datetime import datetime
-from math import log, sqrt, pi, exp
+from math import log, pi, exp
 import numpy as np
 
 from scipy.optimize import root_scalar
@@ -24,27 +24,12 @@ def l(x, h):
     return exp(h * log2 + log(h) - 0.5 * log(twopi * x * x * x) - 0.5 * (h ** 2) / x)
 
 
-def l_prime(x, h):
-    h2 = h * h
-    return (2 ** h) * h / sqrt(twopi) * exp(-0.5 * h2 / x) * (-1.5 * (x ** (-2.5))
-            + 0.5 * h2 * (x ** (-3.5)))
-
-
 def r(x, h):
     return exp(0.5 * h * logpi_2 + (h - 1) * log(x) - pi2_8 * x - loggamma(h))
 
 
-def r_prime(x, h):
-    return exp(h * logpi_2 - loggamma(h) - pi2_8 * x) * ((h - 1) * (x ** (h -
-        2)) - pi2_8 * (x ** (h - 1)))
-
-
 def f(x, h=1):
     return l(x, h) - r(x, h)
-
-
-def f_prime(x, h):
-    return l_prime(x, h) - r_prime(x, h)
 
 
 def chunk(arr, size=3):

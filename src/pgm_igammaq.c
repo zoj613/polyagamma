@@ -23,31 +23,46 @@
  *
  * Modifications by zoj613 include:
  * - inlining the static functions and removing unwanted code.
+ *
+ * Original code at: https://github.com/lh3/samtools/blob/master/bcftools/kfunc.c
  */
 #include <numpy/npy_common.h>
+#include "pgm_common.h"
 #include "pgm_igammaq.h"
 
 
-/* Log gamma function
- * \log{\Gamma(z)}
- * AS245, 2nd algorithm, http://lib.stat.cmu.edu/apstat/245
+/* complementary error function
+ * \frac{2}{\sqrt{\pi}} \int_x^{\infty} e^{-t^2} dt
+ * AS66, 2nd algorithm, http://lib.stat.cmu.edu/apstat/66
  */
-static NPY_INLINE double
-kf_lgamma(double z)
+NPY_INLINE double
+kf_erfc(double x)
 {
-	double x = 0;
-	x += 0.1659470187408462e-06 / (z+7);
-	x += 0.9934937113930748e-05 / (z+6);
-	x -= 0.1385710331296526     / (z+5);
-	x += 12.50734324009056      / (z+4);
-	x -= 176.6150291498386      / (z+3);
-	x += 771.3234287757674      / (z+2);
-	x -= 1259.139216722289      / (z+1);
-	x += 676.5203681218835      / z;
-	x += 0.9999999999995183;
-	return log(x) - 5.58106146679532777 - z + (z-0.5) * log(z+6.5);
+	static const double p0 = 220.2068679123761;
+	static const double p1 = 221.2135961699311;
+	static const double p2 = 112.0792914978709;
+	static const double p3 = 33.912866078383;
+	static const double p4 = 6.37396220353165;
+	static const double p5 = .7003830644436881;
+	static const double p6 = .03526249659989109;
+	static const double q0 = 440.4137358247522;
+	static const double q1 = 793.8265125199484;
+	static const double q2 = 637.3336333788311;
+	static const double q3 = 296.5642487796737;
+	static const double q4 = 86.78073220294608;
+	static const double q5 = 16.06417757920695;
+	static const double q6 = 1.755667163182642;
+	static const double q7 = .08838834764831844;
+	double expntl, z, p;
+	z = fabs(x) * M_SQRT2;
+	if (z > 37.) return x > 0.? 0. : 2.;
+	expntl = exp(z * z * - .5);
+	if (z < 10. / M_SQRT2) // for small z
+	    p = expntl * ((((((p6 * z + p5) * z + p4) * z + p3) * z + p2) * z + p1) * z + p0)
+			/ (((((((q7 * z + q6) * z + q5) * z + q4) * z + q3) * z + q2) * z + q1) * z + q0);
+	else p = expntl / 2.506628274631001 / (z + 1. / (z + 2. / (z + 3. / (z + 4. / (z + .65)))));
+	return x > 0.? 2. * p : 2. * (1. - p);
 }
-
 
 /* The following computes regularized incomplete gamma functions.
  * Formulas are taken from Wiki, with additional input from Numerical
@@ -75,7 +90,7 @@ _kf_gammap(double s, double z)
 		sum += (x *= z / (s + k));
 		if (x / sum < KF_GAMMA_EPS) break;
 	}
-	return exp(s * log(z) - z - kf_lgamma(s + 1.) + log(sum));
+	return exp(s * log(z) - z - pgm_lgamma(s + 1.) + log(sum));
 }
 
 // regularized upper incomplete gamma function, by continued fraction
@@ -98,16 +113,10 @@ _kf_gammaq(double s, double z)
 		f *= d;
 		if (fabs(d - 1.) < KF_GAMMA_EPS) break;
 	}
-	return exp(s * log(z) - z - kf_lgamma(s) - log(f));
+	return exp(s * log(z) - z - pgm_lgamma(s) - log(f));
 }
 
-/*
-static double
-kf_gammap(double s, double z)
-{
-	return z <= 1. || z < s? _kf_gammap(s, z) : 1. - _kf_gammaq(s, z);
-}
-*/
+
 double
 kf_gammaq(double s, double z)
 {

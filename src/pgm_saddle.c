@@ -36,6 +36,40 @@ struct config {
     double coef_l;
     // config->sqrt_h_2pi * config->sqrt_alpha_r
     double coef_r;
+    // h / 2
+    double half_h;
+    // 0.5 * h / xc
+    double hh_xc;
+};
+
+
+/*
+ * A tuned implementation of the hyperbolic tangent function based on a
+ * continued fraction approximation.
+ *
+ * References
+ * ---------
+ *  - https://math.stackexchange.com/questions/107292/rapid-approximation-of-tanhx
+ *  - https://varietyofsound.wordpress.com/2011/02/14/efficient-tanh-computation-using-lamberts-continued-fraction/
+ */
+static NPY_INLINE double
+fast_tanh(double x) {
+    double a, b, x2;
+
+    if (x > 4.97)
+        return 1;
+    x2 = x * x;
+    a = x * (135135.0 + x2 * (17325.0 + x2 * (378.0 + x2)));
+    b = 135135.0 + x2 * (62370.0 + x2 * (3150.0 + x2 * 28.0));
+    return a / b;
+}
+
+/*
+ * A struct to store a function's value and derivative at a point.
+ */
+struct func_return {
+    double f;
+    double fprime;
 };
 
 /*
@@ -44,32 +78,24 @@ struct config {
  * For values in the neighborhood of zero, we use a faster Taylor series
  * expansion of the trigonometric and hyperbolic functions.
  */
-static NPY_INLINE double
-cgf_prime(double u)
+static NPY_INLINE void
+cgf_prime(double u, struct func_return* ret)
 {
-    double s;
+    double ss;
+    double s = 2 * u;
 
-    if (u == 0) {
-        return 1;
+    if (s == 0) {
+        ret->f = 1;
     }
-    else if (u > 0 && u < 0.5) {
-        s = 2 * u;
-        return 1 + s / 3 + 2 * s * s / 15;
-    }
-    else if (u < 0 && u > -0.5) {
-        s = -2 * u;
-        return 1 - s / 3 + 2 * s * s / 15;
-    }
-    else if (u > 0) {
-        s = 2 * u;
-        s = sqrt(s);
-        return tan(s) / s;
+    else if (s < 0) {
+        ss = sqrt(-s);
+        ret->f = fast_tanh(ss) / ss;
     }
     else {
-        s = -2 * u;
-        s = sqrt(s);
-        return tanh(s) / s;
+        ss = sqrt(s);
+        ret->f = tan(ss) / ss;
     }
+    ret->fprime = ret->f * ret->f + (1 - ret->f) / s;
 }
 
 /*
@@ -111,49 +137,28 @@ select_starting_guess(double x)
         return -0.147;
     else if (x > 0.25)
         return -1.78;
-    else return -5;
+    else return -2;
 }
 
-/*
- * A struct to store a function's value and derivative at a point.
- */
-struct objective_return {
-    double f;
-    double fprime;
-};
-
-/*
- * The function f(u|x) = K'(t) - x. We solve for u in order to obtain t.
- */
-static NPY_INLINE void
-objective(double u, double x, struct objective_return* value)
-{
-    double prime = cgf_prime(u);
-    value->f = prime - x;
-    value->fprime = prime * prime - 0.5 * (1 - prime) / u;
-}
 
 #ifndef PGM_MAX_ITER
 #define PGM_MAX_ITER 25
 #endif
-
 /*
  * Solve for the root of f(u) = K'(t) - x using Newton's method.
  */
 static NPY_INLINE double
-newton_raphson(double arg, double x0)
+newton_raphson(double arg, double x0, struct func_return* value)
 {
-    static const double tolerance = 5e-5;
-    struct objective_return value;
+    static const double tolerance = 1e-10;
     double x = 0;
 
     for (size_t i = 0; i < PGM_MAX_ITER; i++) {
-        objective(x0, arg, &value);
-        if (fabs(value.fprime) < tolerance) {
-            puts("WARNING: Newton-Raphson objective's derivative is zero");
+        cgf_prime(x0, value);
+        if (fabs(value->fprime) < tolerance) {
             break;
         }
-        x = x0 - value.f / value.fprime;
+        x = x0 - (value->f - arg) / value->fprime;
         if (fabs(x - x0) <= tolerance)
             return x;
         x0 = x;
@@ -175,24 +180,12 @@ cgf(double u, double z)
     if (z == 0) {
         out = 0;
     }
-    else if (z > 0 && z < 0.5) {
-        z = z * z;
-        out = 0.5 * z - z * z / 12 + z * z * z / 45;
-    }
     else {
         out = log(cosh(z));
     }
 
     if (u == 0) {
         return out;
-    }
-    else if (u > 0 && u < 0.5) {
-        s = 2 * u;
-        out -= -0.5 * s - s * s / 12 - s * s * s / 45;
-    }
-    else if (u < 0 && u > -0.5) {
-        s = -2 * u;
-        out -= 0.5 * s - s * s / 12 + s * s * s / 45;
     }
     else if (u > 0) {
         s = 2 * u;
@@ -214,6 +207,7 @@ static NPY_INLINE void
 initialize_config(struct config* cfg, double h, double z)
 {
     const static double twopi = 6.283185307179586;
+    struct func_return f;
     double xl, xc, xr, ul, uc, ur, tr, alpha_l, alpha_r, one_xl, one_xc, half_z2;
     bool is_zero = z == 0 ? true : false;
 
@@ -225,8 +219,8 @@ initialize_config(struct config* cfg, double h, double z)
     one_xc = 1 / xc;
     half_z2 = is_zero ? 0 : 0.5 * z * z;
     ul = is_zero ? 0 : -half_z2;
-    uc = newton_raphson(xc, select_starting_guess(xc));
-    ur = newton_raphson(xr, select_starting_guess(xr));
+    uc = newton_raphson(xc, select_starting_guess(xc), &f);
+    ur = newton_raphson(xr, select_starting_guess(xr), &f);
     tr = (ur + half_z2);
 
     // t = 0 at x = m, since K'(0) = m when t(x) = 0
@@ -239,8 +233,8 @@ initialize_config(struct config* cfg, double h, double z)
     cfg->one_xc = one_xc;
     cfg->logxc = log(xc);
 
-    cfg->intercept_l = cgf(ul, z) - 0.5 * (one_xc - one_xl) - cfg->Lprime_l * xl;
-    cfg->intercept_r = cgf(ur, z) - tr * xr - log(xr) + cfg->logxc - cfg->Lprime_r * xr; 
+    cfg->intercept_l = cgf(ul, z) - 0.5 * one_xc + one_xl;
+    cfg->intercept_r = cgf(ur, z) + 1 - log(xr) + cfg->logxc;
 
     alpha_r = 1 + 0.5 * one_xc * one_xc * (1 - xc) / uc;
     alpha_l = one_xc * alpha_r;
@@ -264,6 +258,7 @@ tangent_at_x(double x, struct config* cfg, SIDE_t side)
     switch(side) {
         case LEFT: return cfg->Lprime_l * x + cfg->intercept_l;
         case RIGHT: return cfg->Lprime_r * x + cfg->intercept_r;
+        default:;
     }
 }
 
@@ -273,12 +268,11 @@ tangent_at_x(double x, struct config* cfg, SIDE_t side)
 static NPY_INLINE double
 saddle_point(double x, double h, double z, double coef)
 {
-    double u = newton_raphson(x, select_starting_guess(x));
+    struct func_return f;
+    double u = newton_raphson(x, select_starting_guess(x), &f);
     double t = u + 0.5 * z * z; 
-    double kprime2 = cgf_prime(u);
 
-    kprime2 = kprime2 * kprime2 + 0.5 * (1 - kprime2) / u;
-    return coef * exp(h * (cgf(u, z) - t * x)) / sqrt(kprime2);
+    return coef * exp(h * (cgf(u, z) - t * x)) / sqrt(f.fprime);
 }
 
 /*
@@ -291,9 +285,8 @@ bounding_kernel(double x, double h, struct config* cfg)
         return cfg->coef_r * exp(h * (cfg->logxc + tangent_at_x(x, cfg, RIGHT)) +
                 (h - 1) * log(x));
     }
-    double half_h = 0.5 * h;
-    return cfg->coef_l * exp(half_h * cfg->one_xc - 1.5 * log(x) -
-            half_h / x + h * tangent_at_x(x, cfg, LEFT));
+    return cfg->coef_l * exp(cfg->hh_xc - 1.5 * log(x) - cfg->half_h / x +
+                             h * tangent_at_x(x, cfg, LEFT));
 }
 
 /*
@@ -305,18 +298,19 @@ random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
     struct config cfg;
     double p, q, ratio, kappa_l, kappa_r, bl, br, sqrt_rho_l, one_srho_l, hrho_r, x, v;
 
-    z = z == 0 ? 0 : 0.5 * (z < 0 ? -z : z);
     initialize_config(&cfg, h, z);
+    cfg.half_h = 0.5 * h;
+    cfg.hh_xc = cfg.half_h * cfg.one_xc;
 
     bl = tangent_at_x(0, &cfg, LEFT);
     sqrt_rho_l = sqrt(-2 * cfg.Lprime_l);
     one_srho_l = 1 / sqrt_rho_l;
-    kappa_l = cfg.sqrt_alpha_l * exp(h * (0.5 / cfg.xc + bl - sqrt_rho_l));
+    kappa_l = cfg.sqrt_alpha_l * exp(h * (0.5 * cfg.one_xc + bl - sqrt_rho_l));
     p = kappa_l * inverse_gaussian_cdf(cfg.xc, one_srho_l, h);
 
     br = tangent_at_x(0, &cfg, RIGHT);
     hrho_r = -(h * cfg.Lprime_r);
-    kappa_r = cfg.coef_r * exp(h * (br - log(hrho_r)) + lgamma(h));
+    kappa_r = cfg.coef_r * exp(h * (br - log(hrho_r)) + pgm_lgamma(h));
     q = kappa_r * kf_gammaq(h, hrho_r * cfg.xc);
 
     ratio = p / (p + q);

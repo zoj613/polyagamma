@@ -91,6 +91,56 @@ o = polyagamma(large_h, disable_checks=True)
 For an example of how to use `polyagamma` in a C program, see [here][1].
 
 
+## Benchmarks
+
+Below are runtime plots of 20000 samples generated for various values of `h` 
+and `z`, using each method. We restrict `h` to integer values to accomodate the 
+`devroye` method, which cannot be used for non-integer `h`.
+
+![](./scripts/perf_methods_0.0.svg) | ![](./scripts/perf_methods_2.5.svg)
+| --- | --- |
+
+![](./scripts/perf_methods_5.0.svg) | ![](./scripts/perf_methods_10.0.svg)
+| --- | --- |
+
+Generally:
+- The `gamma` method is slowest and should be avoided in cases where speed is paramount.
+- For `h > 20`, the `saddle` method is the fastest for any value of `z`.
+- For `z < 2` and integer `h < 20`, the `devroye` method is the most efficient.
+- For `z > 2` and integer/non-integer `h < 20`, the `alternate` method is the most efficient.
+- For `h > 50` (or any value large enough), the normal approximation to the distribution is 
+fastest (not reported in the above plot but it is around 10 times faster than the `saddle` 
+method and also equally accurate).
+
+Therefore, we devise a "hybrid/default" sampler that picks a sampler based on the above guidelines.
+
+We also benchmark the hybrid sampler runtime with the sampler found in the `pypolyagamma` 
+package (version `1.2.3`). The version of NumPy we use is `1.19.4`. We use the `pgdrawv` 
+function which takes arrays as input. Below are runtime plots of 20000 samples for each 
+value of `h` and `z`. Values of `h` range from 0.1 to 60, while `z` is set to 0, 2.5, 5, and 10.
+![](./scripts/perf_samplers_0.0.svg) | ![](./scripts/perf_samplers_2.5.svg)
+| --- | --- |
+
+![](./scripts/perf_samplers_5.0.svg) | ![](./scripts/perf_samplers_10.0.svg)
+| --- | --- |
+
+It can be seen that when generating many samples at once for any given combination of 
+parameters, `polyagamma` outperforms the `pypolyagamma` package. The exception is when 
+`h < 1`. We rely on the `saddle` method to generate samples when the shape parameter is 
+very small, which is not very efficient for such values. For values of `h` larger than 50, 
+we use the normal approximation, which explains the large dip in runtime past `h=50`. 
+It is also worth noting that the `pypolygamma` package is on average faster than ours at 
+generating exactly one sample from the distribution. This is mainly due to the 
+overhead introduced by creating the bitgenerator + acquiring/releasing the thread lock + 
+doing parameter validation checks at every call to the function. This overhead can 
+somewhat be mitigated by passing in a random generator instance at every call to 
+the `polyagamma` function.
+
+To generate the above plots locally, run `python scripts/benchmark.py --size=<some size>> --z=<z value>`. 
+Note that the runtimes may differ  than the ones reported here, depending on the machine this script 
+is ran on.
+
+
 ## Contributing
 All contributions, bug reports, bug fixes, documentation improvements, enhancements, and ideas are welcome.
 
