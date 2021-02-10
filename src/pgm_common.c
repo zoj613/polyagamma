@@ -87,23 +87,25 @@ pgm_lgamma(double z)
  * Calculate the Error function for x >= 0.
  *
  * This is an implementation based on Abramowitz and Stegun (1964), equation
- * 7.1.25, using a polynomial of order 4. It has a maximum error of 5×10−4.
+ * 7.1.28, using a polynomial of order 4. It has a maximum error of 1.5×10−7.
  */
 static NPY_INLINE double
 pgm_erf(double x)
 {
-    static const double a1 = 0.278393;
-    static const double a2 = 0.230389;
-    static const double a3 = 0.000972;
-    static const double a4 = 0.078108;
+    static const double p = 0.3275911;
+    static const double a1 = 0.254829592;
+    static const double a2 = -0.284496736;
+    static const double a3 = 1.421413741;
+    static const double a4 = -1.453152027;
+    static const double a5 = 1.061405429;
     double out;
-    double x2 = x * x;
 
-    out = 1 + a1 * x + a2 * x2 + a3 * x2 * x + a4 * x2 * x2;
-    out *= out;
-    out *= out;
+    if (x == 0)
+        return 0;
 
-    return 1 - 1 / out;
+    double t = 1 / (1 + p * x), t2 = t * t, t3 = t2 * t;
+    out = a1 * t + a2 * t2 + a3 * t3 + a4 * t2 * t2 + a5 * t3 * t2;
+    return 1 - out * exp(-x * x);
 }
 
 /*
@@ -115,8 +117,10 @@ inverse_gaussian_cdf(double x, double mu, double lambda)
     double a = sqrt(0.5 * lambda / x);
     double b = a * (x / mu);
     double c = exp(lambda / mu);
+    double d = b - a;
 
-    return 0.5 * (1 + pgm_erf(b - a) + c * (1 - pgm_erf(b + a)) * c);
+    d = d < 0 ? -pgm_erf(-d) : pgm_erf(d);
+    return 0.5 * (1 + d + c * (1 - pgm_erf(b + a)) * c);
 }
 
 /*
