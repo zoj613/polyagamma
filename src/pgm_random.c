@@ -77,6 +77,7 @@ random_polyagamma_hybrid(bitgen_t* bitgen_state, double h, double z)
 double
 pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z, sampler_t method)
 {
+    z = z == 0 ? 0 : 0.5 * (z < 0 ? -z : z);
     switch(method) {
         case GAMMA:
             return random_polyagamma_gamma_conv(bitgen_state, h, z);

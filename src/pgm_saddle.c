@@ -298,7 +298,6 @@ random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
     struct config cfg;
     double p, q, ratio, kappa_l, kappa_r, bl, br, sqrt_rho_l, one_srho_l, hrho_r, x, v;
 
-    z = z == 0 ? 0 : 0.5 * (z < 0 ? -z : z);
     initialize_config(&cfg, h, z);
     cfg.half_h = 0.5 * h;
     cfg.hh_xc = cfg.half_h * cfg.one_xc;

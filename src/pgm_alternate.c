@@ -233,8 +233,6 @@ random_jacobi_alternate_bounded(bitgen_t* bitgen_state, struct config* cfg)
 double
 random_polyagamma_alternate(bitgen_t *bitgen_state, double h, double z)
 {
-    z = z == 0 ? 0 : 0.5 * (z < 0 ? -z : z);
-
     struct config cfg;
     double out = 0, chunk_size = pgm_h_range;
 

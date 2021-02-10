@@ -30,7 +30,6 @@ gamma_convolution_approx(bitgen_t* bitgen_state, double b, double z)
 double
 random_polyagamma_gamma_conv(bitgen_t* bitgen_state, double h, double z)
 {
-    z = z == 0 ? 0 : 0.5 * (z < 0 ? -z : z);
     return 0.25 * gamma_convolution_approx(bitgen_state, h, z);
 }
 
@@ -219,7 +218,6 @@ random_polyagamma_devroye(bitgen_t *bitgen_state, uint64_t n, double z)
         return 0.25 * out; 
     }
 
-    z = 0.5 * (z < 0 ? -z : z);
     initialize_config(&cfg, z);
 
     q = NPY_PI_2 * exp(-cfg.k * T) / cfg.k;
