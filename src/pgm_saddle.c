@@ -309,7 +309,7 @@ random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
     br = tangent_at_x(0, &cfg, RIGHT);
     hrho_r = -(h * cfg.Lprime_r);
     kappa_r = cfg.coef_r * exp(h * (br - log(hrho_r)) + pgm_lgamma(h));
-    q = kappa_r * kf_gammaq(h, hrho_r * cfg.xc);
+    q = kappa_r * pgm_gammaq(h, hrho_r * cfg.xc);
 
     ratio = p / (p + q);
     do {
