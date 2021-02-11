@@ -175,7 +175,7 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
     # define an ``h`` value small enough to be regarded as a zero
     DEF zero = 1e-04
 
-    cdef size_t n, idx
+    cdef Py_ssize_t n, idx
     cdef np.broadcast bcast
     cdef double ch, cz
     cdef bint is_tuple
