@@ -255,11 +255,9 @@ initialize_config(struct config* cfg, double h, double z)
 static NPY_INLINE double
 tangent_at_x(double x, struct config* cfg, SIDE_t side)
 {
-    switch(side) {
-        case LEFT: return cfg->Lprime_l * x + cfg->intercept_l;
-        case RIGHT: return cfg->Lprime_r * x + cfg->intercept_r;
-        default:;
-    }
+    if (side == LEFT)
+        return cfg->Lprime_l * x + cfg->intercept_l;
+    return cfg->Lprime_r * x + cfg->intercept_r;
 }
 
 /*
