@@ -4,7 +4,6 @@
 #include "pgm_common.h"
 #include "pgm_igammaq.h"
 
-#define SQRT1_PI 0.5641895835477563  // sqrt(1/pi)
 
 /* compute the upper incomplete gamma function.
  *
@@ -23,6 +22,8 @@
 NPY_INLINE double
 pgm_gammaq(double s, double x)
 {
+    // 1 / sqrt(pi)
+    static const double one_sqrtpi = 0.5641895835477563;
     size_t ss, k;
     double sum, a, sqrt_x;
 
@@ -38,11 +39,10 @@ pgm_gammaq(double s, double x)
         for (k = a = 1, sum = 0; k < ss + 1; k++) {
             sum += (a *= x / (k - 0.5));
         }
-        return kf_erfc(sqrt_x) + exp(-x) * SQRT1_PI * sum / sqrt_x;
+        return kf_erfc(sqrt_x) + exp(-x) * one_sqrtpi * sum / sqrt_x;
     }
     return kf_gammaq(s, x);
 }
-#undef SQRT1_PI
 
 /*
  * Calculate logarithm of the gamma function of z.
@@ -102,15 +102,32 @@ pgm_lgamma(double z)
         457.81238798127816, 462.60817852687489, 467.4121995716082,
         472.22438392698058, 477.04466549258564, 481.87297922988796
     };
-
+    // Coefficients from Pugh (2004)
+    static const double d[11] = {
+        2.48574089138753565546E-5, 1.05142378581721974210E+0,
+        -3.45687097222016235469E+0, 4.51227709466894823700E+0,
+        -2.98285225323576655721E+0, 1.05639711577126713077E+0,
+        -1.95428773191645869583E-1, 1.70970543404441224307E-2,
+        -5.71926117404305781283E-4, 4.63399473359905636708E-6,
+        -2.71994908488607703910E-9
+    };
     static const double a1 = 0.08333333333333333;  // 1 / 12
     static const double a2 = 0.002777777777777778;  // 1/360
     static const double a3 = 0.0007936507936507937;  // 1/1260
-    double out, z2;
-    size_t zz;
+    static const double log2sepi = 0.6207822376352452;  // log(2 * sqrt(e/pi))
 
-    if (z < 1)
-        return lgamma(z);
+    double out, z2, sum, a, b;
+    size_t zz, k;
+
+    if (z < 1) {
+        // use Pugh(2004)'s algorithm for small z.
+         a = z - 1;
+         for (k = 1, sum = d[0] + d[0] / a; k < 11; k++) {
+             sum += d[k] / (a + k);
+         }
+         b = z - 0.5;
+         return log(sum) + log2sepi - b + b * log(b + 10.900511);
+    }
 
     zz = (size_t)z;
     if (z < 127 && z == zz) 
@@ -156,10 +173,8 @@ inverse_gaussian_cdf(double x, double mu, double lambda)
     double a = sqrt(0.5 * lambda / x);
     double b = a * (x / mu);
     double c = exp(lambda / mu);
-    double d = b - a;
 
-    d = d < 0 ? -pgm_erf(-d) : pgm_erf(d);
-    return 0.5 * (1 + d + c * (1 - pgm_erf(b + a)) * c);
+    return 0.5 * (kf_erfc(a - b) + c * kf_erfc(b + a) * c);
 }
 
 /*
