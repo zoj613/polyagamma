@@ -117,7 +117,7 @@ _kf_gammaq(double s, double z)
 }
 
 
-double
+NPY_INLINE double
 kf_gammaq(double s, double z)
 {
 	return z <= 1. || z < s? 1. - _kf_gammap(s, z) : _kf_gammaq(s, z);

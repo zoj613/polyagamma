@@ -230,7 +230,7 @@ random_jacobi_alternate_bounded(bitgen_t* bitgen_state, struct config* cfg)
  *
  * See: Section 4.3 of Windle et al. (2014)
  */
-double
+NPY_INLINE double
 random_polyagamma_alternate(bitgen_t *bitgen_state, double h, double z)
 {
     struct config cfg;

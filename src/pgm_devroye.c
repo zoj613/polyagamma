@@ -203,7 +203,7 @@ random_jacobi(bitgen_t* bitgen_state, struct config* cfg)
  * Sample from Polya-Gamma PG(n, z) using the Devroye method, where n is a
  * positive integer.
  */
-double
+NPY_INLINE double
 random_polyagamma_devroye(bitgen_t *bitgen_state, uint64_t n, double z)
 {
     struct config cfg;

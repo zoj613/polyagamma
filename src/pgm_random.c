@@ -58,7 +58,7 @@ random_polyagamma_hybrid(bitgen_t* bitgen_state, double h, double z)
     }
 
     if (h > 50) {
-        return random_polyagamma_normal_approx(bitgen_state, h, z);
+        return random_polyagamma_normal_approx(bitgen_state, h, 2 * z);
     }
 
     is_integer = h == (size_t)h;
@@ -74,7 +74,7 @@ random_polyagamma_hybrid(bitgen_t* bitgen_state, double h, double z)
 }
 
 
-double
+NPY_INLINE double
 pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z, sampler_t method)
 {
     z = z == 0 ? 0 : 0.5 * (z < 0 ? -z : z);
