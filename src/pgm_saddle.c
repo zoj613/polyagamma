@@ -290,7 +290,7 @@ bounding_kernel(double x, double h, struct config* cfg)
 /*
  * Sample from PG(h, z) using the Saddle approximation method.
  */
-double
+NPY_INLINE double
 random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
 {
     struct config cfg;

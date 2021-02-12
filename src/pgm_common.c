@@ -167,7 +167,7 @@ pgm_erf(double x)
 /*
  * Calculate the cumulative distribution function of an Inverse-Gaussian.
  */
-double
+NPY_INLINE double
 inverse_gaussian_cdf(double x, double mu, double lambda)
 {
     double a = sqrt(0.5 * lambda / x);
@@ -203,7 +203,7 @@ random_left_bounded_gamma(bitgen_t* bitgen_state, double a, double b, double t)
             x = b + random_standard_exponential(bitgen_state) / c0;
             log_rho = a_minus_1 * log(x) - x * one_minus_c0;
             log_m = a_minus_1 * log(a_minus_1 / one_minus_c0) - a_minus_1;
-        } while (log(random_standard_uniform(bitgen_state)) > (log_rho - log_m));
+        } while (log(next_double(bitgen_state)) > (log_rho - log_m));
         return t * (x / b);
     }
     else if (a == 1) {
@@ -212,7 +212,7 @@ random_left_bounded_gamma(bitgen_t* bitgen_state, double a, double b, double t)
     else {
         do {
             x = 1 + random_standard_exponential(bitgen_state) / (t * b);
-        } while (log(random_standard_uniform(bitgen_state)) > (a - 1) * log(x));
+        } while (log(next_double(bitgen_state)) > (a - 1) * log(x));
         return t * x;
     }
 }
