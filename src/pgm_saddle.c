@@ -145,22 +145,41 @@ select_starting_guess(double x)
 #define PGM_MAX_ITER 25
 #endif
 /*
+ * Test if two numbers equal within the given absolute and relative tolerences
+ *
+ * `rtol` is the relative tolerance – it is the maximum allowed difference
+ * between a and b, relative to the larger absolute value of a or b.
+ *
+ * `atol` is the minimum absolute tolerance – useful for comparisons near zero.
+ */
+static NPY_INLINE bool
+is_close(double a, double b, double atol, double rtol)
+{
+    return fabs(a - b) <= MAX(rtol * MAX(fabs(a), fabs(b)), atol);
+}
+
+/*
  * Solve for the root of f(u) = K'(t) - x using Newton's method.
  */
 static NPY_INLINE double
 newton_raphson(double arg, double x0, struct func_return* value)
 {
-    static const double tolerance = 1e-10;
-    double x = 0;
+    static const double atol = 1e-20, rtol = 1e-05;
+    double fval, x = 0;
 
     for (size_t i = 0; i < PGM_MAX_ITER; i++) {
         cgf_prime(x0, value);
-        if (fabs(value->fprime) < tolerance) {
+        fval = value->f - arg;
+        if (fabs(fval) <= rtol) {
+            return x0;
+        }
+        if (value->fprime <= atol) {
             break;
         }
-        x = x0 - (value->f - arg) / value->fprime;
-        if (fabs(x - x0) <= tolerance)
+        x = x0 - fval / value->fprime;
+        if (is_close(x, x0, atol, rtol)) {
             return x;
+        }
         x0 = x;
     }
     return x;
@@ -168,9 +187,6 @@ newton_raphson(double arg, double x0, struct func_return* value)
 
 /*
  * K(t), the cumulant generating function of X
- *
- * For values of u and z in the neighborhood of zero, we use a faster Taylor series
- * expansion of log(cosh(x)) and log(cos(x)).
  */
 static NPY_INLINE double
 cgf(double u, double z)
@@ -208,7 +224,7 @@ initialize_config(struct config* cfg, double h, double z)
 {
     const static double twopi = 6.283185307179586;
     struct func_return f;
-    double xl, xc, xr, ul, uc, ur, tr, alpha_l, alpha_r, one_xl, one_xc, half_z2;
+    double xl, xc, xr, ul, ur, tr, alpha_l, alpha_r, one_xl, one_xc, half_z2;
     bool is_zero = z == 0 ? true : false;
 
     xl = is_zero ? 1 : tanh(z) / z;
@@ -219,8 +235,8 @@ initialize_config(struct config* cfg, double h, double z)
     one_xc = 1 / xc;
     half_z2 = is_zero ? 0 : 0.5 * z * z;
     ul = is_zero ? 0 : -half_z2;
-    uc = newton_raphson(xc, select_starting_guess(xc), &f);
     ur = newton_raphson(xr, select_starting_guess(xr), &f);
+    newton_raphson(xc, select_starting_guess(xc), &f);
     tr = (ur + half_z2);
 
     // t = 0 at x = m, since K'(0) = m when t(x) = 0
@@ -236,8 +252,9 @@ initialize_config(struct config* cfg, double h, double z)
     cfg->intercept_l = cgf(ul, z) - 0.5 * one_xc + one_xl;
     cfg->intercept_r = cgf(ur, z) + 1 - log(xr) + cfg->logxc;
 
-    alpha_r = 1 + 0.5 * one_xc * one_xc * (1 - xc) / uc;
-    alpha_l = one_xc * alpha_r;
+    alpha_r = f.fprime * one_xc * one_xc;  // K''(t(xc)) / xc^2
+    alpha_l = one_xc * alpha_r;  // K''(t(xc)) / xc^3
+
     cfg->sqrt_alpha_l = 1 / sqrt(alpha_l);
     cfg->sqrt_alpha_r = 1 / sqrt(alpha_r);
 
