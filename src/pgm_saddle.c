@@ -331,9 +331,7 @@ random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
     ratio = p / (p + q);
     do {
         if (next_double(bitgen_state) < ratio) {
-            do {
-                x = random_wald(bitgen_state, one_srho_l, h);
-            } while (x > cfg.xc);
+            x = random_right_bounded_inverse_gaussian(bitgen_state, one_srho_l, h, cfg.xc);
         }
         else {
             x = random_left_bounded_gamma(bitgen_state, h, hrho_r, cfg.xc);

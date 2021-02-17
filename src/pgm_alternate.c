@@ -179,9 +179,8 @@ random_jacobi_alternate_bounded(bitgen_t* bitgen_state, struct config* cfg)
                                                cfg->lambda_z, cfg->t);
         }
         else if (cfg->z > 0) {
-            do {
-                cfg->x = random_wald(bitgen_state, cfg->h_z, cfg->h2);
-            } while (cfg->x > cfg->t);
+            cfg->x = random_right_bounded_inverse_gaussian(bitgen_state, cfg->h_z,
+                                                           cfg->h2, cfg->t);
         }
         else {
             /* To sample from an inverse-gamma we can use the relation:

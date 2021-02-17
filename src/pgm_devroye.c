@@ -69,45 +69,6 @@ piecewise_coef(size_t n, struct config* cfg)
 }
 
 /*
- * Sample from an Inverse-Gaussian(mu, 1) truncated on the set {x | x < t}.
- *
- * We sample using two algorithms depending on whether mu > t or mu < t.
- */
-static NPY_INLINE double
-random_right_bounded_inverse_gaussian(bitgen_t* bitgen_state, struct config* cfg)
-{
-    double e1, e2, x; 
-
-    if (cfg->mu > T) {
-        for (;;) {
-            /* Below is an algorithm to sample from the tail of a normal
-             * distribution such that the value is greater than 1/sqrt(t).
-             * Once we obtain the sample, we square and invert it to
-             * obtain a sample from an Inverse-Chi-Square distribution(df=1)
-             * that is less than t, as shown in Devroye (1986) [page 382] &
-             * Devroye (2009) [page 7]. This sample becomes our proposal.
-             * We accept the sample only if we sample a uniform less than the
-             * acceptance porbability. The probability is exp(-0.5 * x / mu^2).
-             * Refer to Appendix S1 of Polson et al. (2013). */
-            do {
-                e1 = random_standard_exponential(bitgen_state);
-                e2 = random_standard_exponential(bitgen_state);
-            } while ((e1 * e1) > (NPY_PI * e2));
-            x = (1 + T * e1);
-            x = T / (x * x);
-            if (log(next_double(bitgen_state)) < cfg->half_mu2 * x)
-                return x;
-        }
-    }
-    /* If the truncation point t is greater than the mean (mu), the use
-     * rejection sampling by sampling until x < t. */
-    do {
-        x = random_wald(bitgen_state, cfg->mu, 1);
-    } while(x > T);
-    return x;
-}
-
-/*
  * Generate a random sample from J*(1, 0) using algorithm described in
  * Devroye(2009), page 7.
  */
@@ -173,7 +134,7 @@ random_jacobi(bitgen_t* bitgen_state, struct config* cfg)
 
     for (;;) {
         if (next_double(bitgen_state) < cfg->ratio) {
-            cfg->x = random_right_bounded_inverse_gaussian(bitgen_state, cfg);
+            cfg->x = random_right_bounded_inverse_gaussian(bitgen_state, cfg->mu, 1, T);
         }
         else {
             cfg->x = T + random_standard_exponential(bitgen_state) / cfg->k;
