@@ -8,29 +8,21 @@
 #define PGM_GAMMA_LIMIT 200
 #endif
 /*
- * Sample from J*(b, z) using a convolution of Gamma(b, 1) variates.
+ * Sample from PG(h, z) using the Gamma convolution approximation method.
+ *
+ * The infinite sum is truncated to 200 terms.
  */
-static NPY_INLINE double
-gamma_convolution_approx(bitgen_t* bitgen_state, double b, double z)
-{
-    const double z2 = z * z;
-    double n_plus_half, out = 0;
-
-    for (size_t n = PGM_GAMMA_LIMIT; n--; ) {
-        n_plus_half = n + 0.5;
-        out += random_standard_gamma(bitgen_state, b) /
-            (PGM_PI2 * n_plus_half * n_plus_half + z2);
-    }
-    return 2 * out;
-}
-
-/*
- * Sample from PG(h, z) using the Gamma convolution approximation method
- */
-double
+NPY_INLINE double
 random_polyagamma_gamma_conv(bitgen_t* bitgen_state, double h, double z)
 {
-    return 0.25 * gamma_convolution_approx(bitgen_state, h, z);
+    const double z2 = z * z;
+    double c, out = 0;
+
+    for (size_t n = PGM_GAMMA_LIMIT; n--; ) {
+        c = n + 0.5;
+        out += random_standard_gamma(bitgen_state, h) / (PGM_PI2 * c * c + z2);
+    }
+    return 0.5 * out;
 }
 
 // 0.64, the truncation point
