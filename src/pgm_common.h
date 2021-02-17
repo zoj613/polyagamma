@@ -13,5 +13,7 @@ double pgm_gammaq(double s, double x);
 double inverse_gaussian_cdf(double x, double mu, double lambda);
 double random_left_bounded_gamma(bitgen_t* bitgen_state, double a,
                                  double b, double t);
+double random_right_bounded_inverse_gaussian(bitgen_t* bitgen_state, double mu,
+                                             double lambda, double t);
 
 #endif

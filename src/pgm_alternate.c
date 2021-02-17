@@ -94,14 +94,18 @@ bounding_kernel(struct config* cfg)
         return exp(h * lsp_2 + (h - 1) * logx - PGM_PI2_8 * x - cfg->lgammah);
     }
     else if (x > 0) {
-        return exp(cfg->hlog2 + cfg->logh - PGM_LS2PI - 0.5 *
-                   cfg->h2 / x - 1.5 * logx);
+        return exp(cfg->hlog2 + cfg->logh - PGM_LS2PI - 0.5 * cfg->h2 / x - 1.5 * logx);
     }
     return 0;
 }
 
 /*
  * Calculate the probability of sampling on either side of the truncation point
+ *
+ * UpperIncompleteGamma(0.5, x) == sqrt(pi) * erfc(sqrt(x)), the
+ * regularized version of the function, which is what we want, can be
+ * written as erfc(sqrt(x)) since the denominator of the regularized
+ * version cancels with the sqrt(pi). This simplifies the calculation of `p`.
  */
 static NPY_INLINE void
 calculate_ratio(struct config* cfg)
@@ -113,10 +117,6 @@ calculate_ratio(struct config* cfg)
         p = exp(cfg->hlog2 - h * z) * inverse_gaussian_cdf(t, cfg->h_z, cfg->h2);
     }
     else {
-        /* UpperIncompleteGamma(0.5, x) == sqrt(pi) * erfc(sqrt(x)), the
-         * regularized version of the function, which is what we want, can be
-         * written as erfc(sqrt(x)) since the denominator of the regularized
-         * version cancels with the sqrt(pi).*/
         p = exp(cfg->hlog2) * kf_erfc(h / sqrt(2 * t));
     }
     q = exp(h * (PGM_LOGPI_2 - cfg->log_lambda_z)) * pgm_gammaq(h, cfg->lambda_z * t);
@@ -166,6 +166,12 @@ update_config(struct config* cfg, double h)
 
 /* 
  * Generate from J*(h, z) where {h | 1 <= h <= 4} using the alternate method.
+ *
+ * To sample from an inverse-gamma we can use the relation:
+ * InvGamma(a, b) == 1 / Gamma(a, rate=b). To make sure our samples
+ * remain less than t, we sample from a Gamma distribution left-
+ * truncated at 1/t (i.e X > 1/t). Then 1/X < t is an Inverse-
+ * Gamma right truncated at t. Which is what we want.
  */
 static NPY_INLINE double
 random_jacobi_alternate_bounded(bitgen_t* bitgen_state, struct config* cfg)
@@ -179,16 +185,10 @@ random_jacobi_alternate_bounded(bitgen_t* bitgen_state, struct config* cfg)
                                                cfg->lambda_z, cfg->t);
         }
         else if (cfg->z > 0) {
-            do {
-                cfg->x = random_wald(bitgen_state, cfg->h_z, cfg->h2);
-            } while (cfg->x > cfg->t);
+            cfg->x = random_right_bounded_inverse_gaussian(bitgen_state, cfg->h_z,
+                                                           cfg->h2, cfg->t);
         }
         else {
-            /* To sample from an inverse-gamma we can use the relation:
-             * InvGamma(a, b) == 1 / Gamma(a, rate=b). To make sure our samples
-             * remain less than t, we sample from a Gamma distribution left-
-             * truncated at 1/t (i.e X > 1/t). Then 1/X < t is an Inverse-
-             * Gamma right truncated at t. Which is what we want. */
             cfg->x = 1 / random_left_bounded_gamma(bitgen_state, 0.5,
                                                    cfg->half_h2, cfg->one_t);
         }
@@ -229,6 +229,11 @@ random_jacobi_alternate_bounded(bitgen_t* bitgen_state, struct config* cfg)
  * is not zero. 
  *
  * See: Section 4.3 of Windle et al. (2014)
+ *
+ * We pre-calculate all values dependant on h once and avoid
+ * unnecessary recalculation as long as h remains larger than 4. This is
+ * because the value of ``chunk_size`` is constant and thus caching the
+ * constants during repeated calls avoids unecessary overhead.
  */
 NPY_INLINE double
 random_polyagamma_alternate(bitgen_t *bitgen_state, double h, double z)
@@ -236,10 +241,6 @@ random_polyagamma_alternate(bitgen_t *bitgen_state, double h, double z)
     struct config cfg;
     double out = 0, chunk_size = pgm_h_range;
 
-    /* Pre-calculate all values depeendent on h once and avoid
-     * unecessesary recalculation as long as h remains bigger than 4. This is
-     * because the value of ``chunk_size`` is constant and thus caching the
-     * constants during repeated calls avoids unecessary overhead.*/
     if (h > 4) {
         initialize_config(&cfg, chunk_size, z);
         while (h > 4) {
