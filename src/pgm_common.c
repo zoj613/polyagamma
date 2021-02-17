@@ -262,7 +262,7 @@ random_right_bounded_inverse_gaussian(bitgen_t* bitgen_state, double mu,
             } while ((e1 * e1) > (2 * e2 / t));
             x = (1 + t * e1);
             x = t / (x * x);
-        } while (log(1 - next_double(bitgen_state)) >= half_lambda * a * x);
+        } while (a > 0 && log(1 - next_double(bitgen_state)) >= half_lambda * a * x);
         return x;
     }
     do {
