@@ -131,7 +131,7 @@ static NPY_INLINE void
 initialize_config(struct config* cfg, double h, double z)
 {
     cfg->z = z;
-    cfg->lambda_z = z ? (PGM_PI2 / 8 + 0.5 * z * z) : PGM_PI2 / 8;
+    cfg->lambda_z = z ? (PGM_PI2_8 + 0.5 * z * z) : PGM_PI2_8;
     cfg->log_lambda_z = log(cfg->lambda_z);
 
     cfg->h = h;
