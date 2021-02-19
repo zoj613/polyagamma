@@ -42,26 +42,43 @@ struct config {
     double hh_xc;
 };
 
-
 /*
- * A tuned implementation of the hyperbolic tangent function based on a
- * continued fraction approximation.
+ * Compute f(x) = tanh(x) / x in the range [0, infinity).
+ *
+ * This implementation is based off the analysis presented by Beebe [1].
+ * For x <= 5, we use a rational polynomial approximation of Cody and Waite [2].
+ * For x > 5, we use g(x) = 1 / x to approximate the function.
+ *
+ * Tests show that the absolute maximum relative error compared to output
+ * produced by the standard library tanh(x) / x is 9.080398e-05.
  *
  * References
  * ---------
- *  - https://math.stackexchange.com/questions/107292/rapid-approximation-of-tanhx
- *  - https://varietyofsound.wordpress.com/2011/02/14/efficient-tanh-computation-using-lamberts-continued-fraction/
+ * [1] Beebe, Nelson H. F.. (1993). Accurate hyperbolic tangent computation.
+ *     Technical report, Center for Scientific Computing, Department of
+ *     Mathematics, University ofUtah, Salt Lake City, UT 84112, USA, April 20
+ *    1993.
+ * [2] William J. Cody, Jr. and William Waite. Software Manual for the Elementary
+ *     Functions. Prentice-Hall, Upper Saddle River, NJ 07458, USA, 1980.
+ *     ISBN 0-13-822064-6. x + 269 pp. LCCN QA331 .C635 1980.
  */
 static NPY_INLINE double
-fast_tanh(double x) {
-    double a, b, x2;
+tanh_x(double x)
+{
+    static const double p0 = -0.16134119023996228053e+04;
+    static const double p1 = -0.99225929672236083313e+02;
+    static const double p2 = -0.96437492777225469787e+00;
+    static const double q0 = 0.48402357071988688686e+04;
+    static const double q1 = 0.22337720718962312926e+04;
+    static const double q2 = 0.11274474380534949335e+03;
+    double x2, r;
 
-    if (x > 4.97)
-        return 1;
+    if (x > 4.95) {
+        return 1 / x;
+    }
     x2 = x * x;
-    a = x * (135135.0 + x2 * (17325.0 + x2 * (378.0 + x2)));
-    b = 135135.0 + x2 * (62370.0 + x2 * (3150.0 + x2 * 28.0));
-    return a / b;
+    r = x2 * ((p2 * x2 + p1) * x2 + p0) / (((x2 + q2) * x2 + q1) * x2 + q0);
+    return 1 + r;
 }
 
 /*
@@ -89,7 +106,7 @@ cgf_prime(double u, struct func_return* ret)
     }
     else if (s < 0) {
         ss = sqrt(-s);
-        ret->f = fast_tanh(ss) / ss;
+        ret->f = tanh_x(ss);
     }
     else {
         ss = sqrt(s);
