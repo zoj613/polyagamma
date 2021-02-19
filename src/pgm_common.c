@@ -3,6 +3,9 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 #include "pgm_common.h"
 #include "pgm_igammaq.h"
+#include <float.h>
+
+#include <math.h>
 
 
 /* compute the upper incomplete gamma function.
@@ -20,27 +23,27 @@
  *      Softw. 46, 1, Article 10 (April 2020), 24 pages. DOI:doi.org/10.1145/3365983
  */
 NPY_INLINE double
-pgm_gammaq(double s, double x)
+ppgm_gammaq(double s, double x)
 {
     // 1 / sqrt(pi)
     static const double one_sqrtpi = 0.5641895835477563;
     size_t ss, k;
     double sum, a, sqrt_x;
 
-    ss = (size_t)s;
-    if (s == ss && s < 30) {
-        for (k = sum = a = 1; k < ss; k++) {
-            sum += (a *= x / k);
-        }
-        return exp(-x) * sum;
-    }
-    else if (s == (ss + 0.5) && s < 30) {
-        sqrt_x = sqrt(x);
-        for (k = a = 1, sum = 0; k < ss + 1; k++) {
-            sum += (a *= x / (k - 0.5));
-        }
-        return kf_erfc(sqrt_x) + exp(-x) * one_sqrtpi * sum / sqrt_x;
-    }
+    //ss = (size_t)s;
+    //if (s == ss && s < 30) {
+    //    for (k = sum = a = 1; k < ss; k++) {
+    //        sum += (a *= x / k);
+    //    }
+    //    return exp(-x) * sum;
+    //}
+    //else if (s == (ss + 0.5) && s < 30) {
+    //    sqrt_x = sqrt(x);
+    //    for (k = a = 1, sum = 0; k < ss + 1; k++) {
+    //        sum += (a *= x / (k - 0.5));
+    //    }
+    //    return kf_erfc(sqrt_x) + exp(-x) * one_sqrtpi * sum / sqrt_x;
+    //}
     return kf_gammaq(s, x);
 }
 
@@ -174,7 +177,7 @@ inverse_gaussian_cdf(double x, double mu, double lambda)
     double b = a * (x / mu);
     double c = exp(lambda / mu);
 
-    return 0.5 * (kf_erfc(a - b) + c * kf_erfc(b + a) * c);
+    return 0.5 * (erfc(a - b) + c * erfc(b + a) * c);
 }
 
 /*
@@ -269,4 +272,300 @@ random_right_bounded_inverse_gaussian(bitgen_t* bitgen_state, double mu,
         x = random_wald(bitgen_state, mu, lambda);
     } while (x >= t);
     return x;
+}
+
+
+#define SQRT_MAX sqrt(DBL_MAX)
+#define SQRT_MIN sqrt(DBL_MIN)
+#define LOG_MAX log(DBL_MAX)
+#define LOG_MIN log(DBL_MIN)
+#define LOG_EPS log(DBL_EPSILON)
+#define SQRT_MIN_LOG_EPS log(-LOG_EPS)
+#define ONE_SQRT2EPS 1 / sqrt(2 * DBL_EPSILON)
+#define EXP_LOW LOG_MIN
+#define SQRT_MIN_EXPLOW sqrt(-EXPLOW)
+#define EXP_HIGH LOG_MAX
+#define SQRT_2PI sqrt(2 * NPY_PI)
+#define LOG_SQRT_2PI log(SQRT_2PI)
+#define SQRT_PI sqrt(NPY_PI)
+#define ONE_SQRTPI 1 / SQRT_PI
+
+// function to perform a rational approximation
+static NPY_INLINE double
+ratfun(double x, size_t n, size_t m, const double* arr1, const double* arr2)
+{
+    double num, den;
+    size_t i, k;
+
+    for (i = n - 1, num = arr1[n]; -1 < i; i--) {
+        num = num * x + arr1[i]; 
+    }
+    for (k = m - 1, den = arr2[m]; -1 < k; k--) {
+        den = den * x + arr2[k]; 
+    }
+    return num / den;
+}
+
+// exp(x) - 1
+static NPY_INLINE double
+exmin1(double x)
+{
+    static double a[] = {
+        9.999999998390e-01, 6.652950247674e-2,
+        2.331217139081e-2, 1.107965764952e-3
+    };
+    static double b[] = {
+        1.000000000000e+0, -4.334704979491e-1,
+        7.338073943202e-2, -5.003986850699e-3
+    };
+    double y;
+
+    if (x < LOG_EPS) y = -1;
+    else if (x > EXP_HIGH) y = DBL_MAX;
+    else if (x < -0.69 || x > 0.41) y = exp(x) - 1;
+    //else return expm1(x);
+    else y = ratfun(x, 3, 3, a, b) * x;
+    return y;
+}
+
+
+// log(1 + x) - x
+static NPY_INLINE double
+auxln(double x)
+{
+    static double a[] = {
+         -4.999999994526e-1, -5.717084236157e-1, -1.423751838241e-1,
+         -8.310525299547e-4, 3.899341537646e-5
+    };
+    static double b[] = {
+        1.000000000000e+0, 1.810083408290e+0, 
+        9.914744762863e-1, 1.575899184525e-1
+    };
+    double y, z;
+
+    if (x <= -1) y = -DBL_MAX;
+    else if (x < -0.7 || x > 1.36) y = log(1 + x) - x;
+    else if (fabs(x) < DBL_EPSILON) y = -0.5 * sqrt(x);
+    else if (x > 0) y = sqrt(x) * ratfun(x, 4, 3, a, b);
+    else {
+        z = -x / (1 + x);
+        if (z > 1.36) y = -(log(1 + z) - z) + x * z;
+        else y = -sqrt(z) * ratfun(z, 4, 3, a, b);
+    }
+    return y;
+}
+
+// Gamma*(x)
+static NPY_INLINE double
+gammastar(double x)
+{
+    double a, g;
+
+    if (x > 1e10) {
+        if (x > 1 / (12 * DBL_EPSILON)) g = 1;
+        else g = 1 + 1 / (12 * x);
+    }
+    else if (x >= 12) {
+        const double arr1[] = {1.000000000949e+0, 9.781658613041e-1, 7.806359425652e-2};
+        const double arr2[] = {1.000000000000e+0, 9.781658613041e-1, 8.948328926305e-1};
+        a = 1 / x;
+        g = (arr1[0] + a * (arr1[1] + a * arr1[2])) / (arr2[0] + a * arr2[1]);
+    }
+    else if (x >= 1) {
+        static double arr1[] = {
+            5.115471897484e-2, 4.990196893575e-1,
+            9.404953102900e-1, 9.999999625957e-1
+        };
+        static double arr2[] = {
+            1.544892866413e-2, 4.241288251916e-1,
+            8.571609363101e-1, 1.000000000000e+0,
+        };
+        g = ratfun(x, 3, 3, arr1, arr2);
+    }
+    else if (x > DBL_MIN) {
+        a = 1 +  1 / x;
+        g = gammastar(x + 1) * sqrt(a) * exp(-1 + x * log(a));
+    }
+    else {
+        g = 1 / (SQRT_2PI * SQRT_MIN);
+    }
+    return g;
+}
+
+//g(x) in 1/Gamma(1 + x) = 1 + x * (x - 1) * g(x) for 0<=x<=1
+static NPY_INLINE double
+auxgam(double x)
+{
+    static double arr1[] = {
+        -5.772156647338e-1, -1.087824060619e-1,
+        4.369287357367e-2, -6.127046810372e-3,
+    };
+    static double arr2[] = {
+        1.000000000000e+0, 3.247396119172e-1, 1.776068284106e-1,
+        2.322361333467e-2, 8.148654046054e-3,
+    };
+    double g;
+
+    if (x <= -1) g = -0.5;
+    else if (x < 0) g = -(1 + sqrt(x + 1) * ratfun(x + 1, 3, 4, arr1, arr2)) / (1 - x);
+    else if (x <= 1) g = ratfun(x, 3, 4, arr1, arr2);
+    else if (x <= 2) g = ((x - 2) * ratfun(x - 1, 3, 4, arr1, arr2) - 1) / sqrt(x);
+    else g = (1 / tgamma(x + 1) - 1) / (x * (x - 1));
+    return g;
+}
+
+// D(a, x) = x^a * e^-x / Gamma(a + 1)
+static NPY_INLINE double
+compute_dax(double a, double x)
+{
+    double mu, auxlnmu, dp;
+
+    mu = (x - a) / a;
+    auxlnmu = auxln(mu);
+    dp = a * auxlnmu - 0.5 * log(2 * NPY_PI * a);
+    if (dp < EXP_LOW) {
+        dp = 0;
+    }
+    else {
+        dp = exp(dp) / gammastar(a);
+    }
+    return dp;
+}
+
+// compute Q(a, x) using the taylor series expansion for P(a, x);
+#define PGM_EPS 1e-15
+static NPY_INLINE double
+igamma_taylor_p(double a, double x)
+{
+	double sum, r, dax;
+	size_t n;
+	for (n = 1, sum = r = 1; n < 100; n++) {
+		sum += (r *= x / (a + n));
+		if (r / sum < PGM_EPS) {
+            break;
+        }
+	}
+    dax = compute_dax(a, x);
+    if (dax == 0) { 
+        return (x - a) / a < 0 ? 1 : 0;
+    }
+    else {
+        return 1 - dax * sum;
+    }
+}
+
+
+// compute Q(a, x) using a specialized Taylor expansion when x is small.
+static NPY_INLINE double
+igamma_taylor_q(double a, double x)
+{
+    double p, q, r, s, t, u, v, xpowa;
+    size_t i;
+
+    r = a * log(x);
+    if (r < -0.69 || r > 0.41) {
+        xpowa = exp(r);
+        q = xpowa - 1;
+    }
+    else {
+        q = exmin1(r);
+        xpowa = q + 1;
+    }
+    s = -a * (a - 1) * auxgam(a);
+    u = s - q * (1 - s);
+
+    for (i = 0, p = a * x, q = a + 1, r = a + 3, t = v = 1; i < 100; i++) {
+        p += x; q += r; r += 2; t = -p * t / q; v = v + t;
+        if (fabs(t / v) < PGM_EPS) {
+            break;
+        }
+    }
+    v = a * (1 - s) * exp((a + 1) * log(x)) * v / (a + 1);
+    return u + v;
+}
+
+static NPY_INLINE double
+igamma_continued_fraction(double a, double x)
+{
+    double g, r, s, t, tau, ro, p, q; 
+    double c = x + 1 - a;
+    size_t i;
+
+    for (i = p = ro = 0, t = g = 1, q = (x - 1 - a) * c, r = 4 * c, s = 1 - a; i < 100; i++) {
+        p += s; q += r; r += 8; s += 2; tau = p * (ro + 1); ro = tau / (q - tau); t *= ro; g += t;
+        if (fabs(t / g) < PGM_EPS) break;
+    }
+    double dax = compute_dax(a, x);
+    if (dax == 0) { 
+        return (x - a) / a < 0 ? 1 : 0;
+    }
+    else {
+        return (a / c) * g * dax;
+    }
+}
+
+static NPY_INLINE double
+igamma_asymp(double a, double x)
+{
+    static const double fm[] = {
+        1.0000000000e+0, -3.3333333333e-1, 8.3333333333e-2, -1.4814814815e-2,
+        1.1574074074e-3, 3.5273368607e-4, -1.7875514403e-4, 3.9192631785e-5,
+        -2.1854485107e-6, -1.8540622107e-6, 8.2967113410e-7, -1.7665952737e-7,
+        6.7078535434e-9, 1.0261809784e-8, -4.3820360185e-9, 9.1476995822e-10,
+    };
+    double bm[16] = {0};
+    double mu = (x - a) / a;
+    double y = - auxln(mu); 
+    double eta = sqrt(2 * y);
+    double v = 0.5 * erfc(sqrt(a * y)) * gammastar(a) * sqrt(2 * NPY_PI * a);
+    double s = 1;
+    if (mu < 0) {
+        s = -1;
+        eta *= s;
+    }
+    bm[14] = fm[15], bm[13] = fm[14];
+    double u = 0, t; 
+    for (size_t i = 13; i > 0; i--) {
+        t = fm[i] + (i + 1) * bm[i + 1] / a;
+        u = eta * u + t;
+        bm[i - 1] = t;
+    }
+    u *= s;
+    double dax = compute_dax(a, x);
+    double q, p = (u + v) * dax;
+    if (s == 1) {
+        q = p;
+    }
+    else {
+        q = 1 - p;
+    }
+    return q;
+}
+
+
+NPY_INLINE double
+pgm_gammaq(double a, double x)
+{
+    static const double loghalf = -0.6931471805599453;
+    double alpha;
+
+    alpha = x >= 0.5 ? x : loghalf / log(x); 
+
+    if (a > alpha) {
+        if ((x < 0.3 * a) || a < 12) {
+            return igamma_taylor_p(a, x);
+        }
+        else {
+            return igamma_asymp(a, x);
+        }
+    }
+    else if (x < 1.5) {
+        return igamma_taylor_q(a, x);
+    }
+    else if ((x > 2.35 * a) || a < 12) {
+        return igamma_continued_fraction(a, x);
+    }
+    else {
+       return igamma_asymp(a, x); 
+    }
 }
