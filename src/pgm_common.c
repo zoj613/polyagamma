@@ -30,20 +30,20 @@ ppgm_gammaq(double s, double x)
     size_t ss, k;
     double sum, a, sqrt_x;
 
-    //ss = (size_t)s;
-    //if (s == ss && s < 30) {
-    //    for (k = sum = a = 1; k < ss; k++) {
-    //        sum += (a *= x / k);
-    //    }
-    //    return exp(-x) * sum;
-    //}
-    //else if (s == (ss + 0.5) && s < 30) {
-    //    sqrt_x = sqrt(x);
-    //    for (k = a = 1, sum = 0; k < ss + 1; k++) {
-    //        sum += (a *= x / (k - 0.5));
-    //    }
-    //    return kf_erfc(sqrt_x) + exp(-x) * one_sqrtpi * sum / sqrt_x;
-    //}
+    ss = (size_t)s;
+    if (s == ss && s < 30) {
+        for (k = sum = a = 1; k < ss; k++) {
+            sum += (a *= x / k);
+        }
+        return exp(-x) * sum;
+    }
+    else if (s == (ss + 0.5) && s < 30) {
+        sqrt_x = sqrt(x);
+        for (k = a = 1, sum = 0; k < ss + 1; k++) {
+            sum += (a *= x / (k - 0.5));
+        }
+        return kf_erfc(sqrt_x) + exp(-x) * one_sqrtpi * sum / sqrt_x;
+    }
     return kf_gammaq(s, x);
 }
 
@@ -121,25 +121,25 @@ pgm_lgamma(double z)
 
     double out, z2, sum, a, b;
     size_t zz, k;
+    return lgamma(z);
+    //if (z < 1) {
+    //    // use Pugh(2004)'s algorithm for small z.
+    //     a = z - 1;
+    //     for (k = 1, sum = d[0] + d[0] / a; k < 11; k++) {
+    //         sum += d[k] / (a + k);
+    //     }
+    //     b = z - 0.5;
+    //     return log(sum) + log2sepi - b + b * log(b + 10.900511);
+    //}
 
-    if (z < 1) {
-        // use Pugh(2004)'s algorithm for small z.
-         a = z - 1;
-         for (k = 1, sum = d[0] + d[0] / a; k < 11; k++) {
-             sum += d[k] / (a + k);
-         }
-         b = z - 0.5;
-         return log(sum) + log2sepi - b + b * log(b + 10.900511);
-    }
+    //zz = (size_t)z;
+    //if (z < 127 && z == zz) 
+    //    return logfactorial[zz - 1];
 
-    zz = (size_t)z;
-    if (z < 127 && z == zz) 
-        return logfactorial[zz - 1];
-
-    z2 = z * z;
-    out = (z - 0.5) * log(z) - z + PGM_LS2PI;
-    out += a1 / z - a2 / (z2 * z) + a3 / (z2 * z2 * z);
-    return out;
+    //z2 = z * z;
+    //out = (z - 0.5) * log(z) - z + PGM_LS2PI;
+    //out += a1 / z - a2 / (z2 * z) + a3 / (z2 * z2 * z);
+    //return out;
 }
 
 /*
@@ -308,7 +308,7 @@ ratfun(double x, size_t n, size_t m, const double* arr1, const double* arr2)
 
 // exp(x) - 1
 static NPY_INLINE double
-exmin1(double x)
+expmin1(double x)
 {
     static double a[] = {
         9.999999998390e-01, 6.652950247674e-2,
@@ -318,20 +318,27 @@ exmin1(double x)
         1.000000000000e+0, -4.334704979491e-1,
         7.338073943202e-2, -5.003986850699e-3
     };
-    double y;
 
-    if (x < LOG_EPS) y = -1;
-    else if (x > EXP_HIGH) y = DBL_MAX;
-    else if (x < -0.69 || x > 0.41) y = exp(x) - 1;
+    if (x < LOG_EPS) {
+        return -1;
+    }
+    else if (x > EXP_HIGH) {
+        return DBL_MAX;
+    }
+    else if (x < -0.69 || x > 0.41) {
+        return exp(x) - 1;
+    }
+    else {
+        return expm1(x);
+    }
     //else return expm1(x);
-    else y = ratfun(x, 3, 3, a, b) * x;
-    return y;
+    //else y = ratfun(x, 3, 3, a, b) * x;
 }
 
 
 // log(1 + x) - x
 static NPY_INLINE double
-auxln(double x)
+log1pminx(double x)
 {
     static double a[] = {
          -4.999999994526e-1, -5.717084236157e-1, -1.423751838241e-1,
@@ -341,231 +348,280 @@ auxln(double x)
         1.000000000000e+0, 1.810083408290e+0, 
         9.914744762863e-1, 1.575899184525e-1
     };
-    double y, z;
+    double z;
 
-    if (x <= -1) y = -DBL_MAX;
-    else if (x < -0.7 || x > 1.36) y = log(1 + x) - x;
-    else if (fabs(x) < DBL_EPSILON) y = -0.5 * sqrt(x);
-    else if (x > 0) y = sqrt(x) * ratfun(x, 4, 3, a, b);
+    if (x <= -1) {
+        return -DBL_MAX;
+    }
+    else if (x < -0.7 || x > 1.36) {
+        return log(1 + x) - x;
+    }
+    else if (fabs(x) < DBL_EPSILON) {
+        return -0.5 * sqrt(x);
+    }
+    else if (x > 0) {
+        return sqrt(x) * ratfun(x, 4, 3, a, b);
+    }
     else {
         z = -x / (1 + x);
-        if (z > 1.36) y = -(log(1 + z) - z) + x * z;
-        else y = -sqrt(z) * ratfun(z, 4, 3, a, b);
+        if (z > 1.36) {
+            return -(log(1 + z) - z) + x * z;
+        }
+        else {
+            return -sqrt(z) * ratfun(z, 4, 3, a, b);
+        }
     }
-    return y;
 }
 
 // Gamma*(x)
 static NPY_INLINE double
 gammastar(double x)
 {
-    double a, g;
+    double a;
 
     if (x > 1e10) {
-        if (x > 1 / (12 * DBL_EPSILON)) g = 1;
-        else g = 1 + 1 / (12 * x);
+        if (x > (1 / (12 * DBL_EPSILON))) {
+            return 1;
+        }
+        else {
+            return 1 + 1 / (12 * x);
+        }
     }
     else if (x >= 12) {
-        const double arr1[] = {1.000000000949e+0, 9.781658613041e-1, 7.806359425652e-2};
-        const double arr2[] = {1.000000000000e+0, 9.781658613041e-1, 8.948328926305e-1};
         a = 1 / x;
-        g = (arr1[0] + a * (arr1[1] + a * arr1[2])) / (arr2[0] + a * arr2[1]);
+        return (1.000000000949 + a * (9.781658613041e-1 + a * 7.806359425652e-2)) /
+               (1 + a * 8.948328926305e-1);
     }
     else if (x >= 1) {
-        static double arr1[] = {
+        static const double arr1[] = {
             5.115471897484e-2, 4.990196893575e-1,
             9.404953102900e-1, 9.999999625957e-1
         };
-        static double arr2[] = {
+        static const double arr2[] = {
             1.544892866413e-2, 4.241288251916e-1,
             8.571609363101e-1, 1.000000000000e+0,
         };
-        g = ratfun(x, 3, 3, arr1, arr2);
+        return ratfun(x, 3, 3, arr1, arr2);
     }
     else if (x > DBL_MIN) {
-        a = 1 +  1 / x;
-        g = gammastar(x + 1) * sqrt(a) * exp(-1 + x * log(a));
+        a = 1 + 1 / x;
+        return gammastar(x + 1) * sqrt(a) * exp(x * log(a) - 1);
     }
     else {
-        g = 1 / (SQRT_2PI * SQRT_MIN);
+        return 1 / (SQRT_2PI * SQRT_MIN);
     }
-    return g;
 }
 
 //g(x) in 1/Gamma(1 + x) = 1 + x * (x - 1) * g(x) for 0<=x<=1
 static NPY_INLINE double
 auxgam(double x)
 {
-    static double arr1[] = {
+    static const double arr1[] = {
         -5.772156647338e-1, -1.087824060619e-1,
         4.369287357367e-2, -6.127046810372e-3,
     };
-    static double arr2[] = {
+    static const double arr2[] = {
         1.000000000000e+0, 3.247396119172e-1, 1.776068284106e-1,
         2.322361333467e-2, 8.148654046054e-3,
     };
-    double g;
 
-    if (x <= -1) g = -0.5;
-    else if (x < 0) g = -(1 + sqrt(x + 1) * ratfun(x + 1, 3, 4, arr1, arr2)) / (1 - x);
-    else if (x <= 1) g = ratfun(x, 3, 4, arr1, arr2);
-    else if (x <= 2) g = ((x - 2) * ratfun(x - 1, 3, 4, arr1, arr2) - 1) / sqrt(x);
-    else g = (1 / tgamma(x + 1) - 1) / (x * (x - 1));
-    return g;
+    if (x <= -1) {
+        return -0.5;
+    }
+    else if (x < 0) {
+        return -(1 + sqrt(x + 1) * ratfun(x + 1, 3, 4, arr1, arr2)) / (1 - x);
+    }
+    else if (x <= 1) {
+        return ratfun(x, 3, 4, arr1, arr2);
+    }
+    else if (x <= 2) {
+        return ((x - 2) * ratfun(x - 1, 3, 4, arr1, arr2) - 1) / sqrt(x);
+    }
+    else {
+        return (1 / tgamma(x + 1) - 1) / (x * (x - 1));
+    }
 }
 
 // D(a, x) = x^a * e^-x / Gamma(a + 1)
 static NPY_INLINE double
 compute_dax(double a, double x)
 {
-    double mu, auxlnmu, dp;
+    static const double twopi = 6.283185307179586;
+    double dp;
 
-    mu = (x - a) / a;
-    auxlnmu = auxln(mu);
-    dp = a * auxlnmu - 0.5 * log(2 * NPY_PI * a);
+    dp = a * log1pminx((x - a) / a) - 0.5 * log(twopi * a);
     if (dp < EXP_LOW) {
-        dp = 0;
+        return 0;
     }
     else {
-        dp = exp(dp) / gammastar(a);
+        return exp(dp) / gammastar(a);
     }
-    return dp;
 }
 
 // compute Q(a, x) using the taylor series expansion for P(a, x);
 #define PGM_EPS 1e-15
 static NPY_INLINE double
-igamma_taylor_p(double a, double x)
+q_taylorp(double a, double x)
 {
 	double sum, r, dax;
 	size_t n;
+
+    dax = compute_dax(a, x);
+    if (dax == 0) {
+        return 1; 
+    }
+
 	for (n = 1, sum = r = 1; n < 100; n++) {
 		sum += (r *= x / (a + n));
 		if (r / sum < PGM_EPS) {
             break;
         }
 	}
-    dax = compute_dax(a, x);
-    if (dax == 0) { 
-        return (x - a) / a < 0 ? 1 : 0;
-    }
-    else {
-        return 1 - dax * sum;
-    }
+    return 1 - dax * sum;
 }
 
 
 // compute Q(a, x) using a specialized Taylor expansion when x is small.
 static NPY_INLINE double
-igamma_taylor_q(double a, double x)
+q_taylorq(double a, double x, double logx)
 {
-    double p, q, r, s, t, u, v, xpowa;
     size_t i;
+    double p, q, r, s, t, u, v;
 
-    r = a * log(x);
-    if (r < -0.69 || r > 0.41) {
-        xpowa = exp(r);
-        q = xpowa - 1;
-    }
-    else {
-        q = exmin1(r);
-        xpowa = q + 1;
-    }
+    r = a * logx;
+    q = expmin1(r);
     s = -a * (a - 1) * auxgam(a);
     u = s - q * (1 - s);
 
-    for (i = 0, p = a * x, q = a + 1, r = a + 3, t = v = 1; i < 100; i++) {
-        p += x; q += r; r += 2; t = -p * t / q; v = v + t;
+    for (i = 0, p = a * x, q = a + 1, r = a + 3, t = v = 1; i < 200; i++) {
+        p += x;
+        q += r;
+        r += 2;
+        t = -p * t / q;
+        v += t;
         if (fabs(t / v) < PGM_EPS) {
             break;
         }
     }
-    v = a * (1 - s) * exp((a + 1) * log(x)) * v / (a + 1);
+    v = a * (1 - s) * exp((a + 1) * logx) * v / (a + 1);
     return u + v;
 }
 
+// compute Q(a, x) using a continued fraction expansion.
 static NPY_INLINE double
-igamma_continued_fraction(double a, double x)
+q_continued_frac(double a, double x)
 {
-    double g, r, s, t, tau, ro, p, q; 
-    double c = x + 1 - a;
     size_t i;
+    double dax, c, g, r, s, t, tau, ro, p, q; 
 
-    for (i = p = ro = 0, t = g = 1, q = (x - 1 - a) * c, r = 4 * c, s = 1 - a; i < 100; i++) {
-        p += s; q += r; r += 8; s += 2; tau = p * (ro + 1); ro = tau / (q - tau); t *= ro; g += t;
-        if (fabs(t / g) < PGM_EPS) break;
+    dax = compute_dax(a, x);
+    if (dax == 0) {
+        return 0;
     }
-    double dax = compute_dax(a, x);
-    if (dax == 0) { 
-        return (x - a) / a < 0 ? 1 : 0;
+
+    c = x + 1 - a;
+    q = (x - 1 - a) * c;
+    for (i = p = ro = 0, t = g = 1, r = 4 * c, s = 1 - a; i < 200; i++) {
+        p += s;
+        q += r;
+        r += 8;
+        s += 2;
+        tau = p * (ro + 1);
+        ro = tau / (q - tau);
+        t *= ro;
+        g += t;
+        if (fabs(t / g) < PGM_EPS) {
+            break;
+        }
     }
-    else {
-        return (a / c) * g * dax;
-    }
+    return (a / c) * g * dax;
 }
 
+// compute Q(a, x) using the asymptotic expansion
 static NPY_INLINE double
-igamma_asymp(double a, double x)
+q_asymp(double a, double x)
 {
+    static const double twopi = 6.283185307179586;
     static const double fm[] = {
         1.0000000000e+0, -3.3333333333e-1, 8.3333333333e-2, -1.4814814815e-2,
         1.1574074074e-3, 3.5273368607e-4, -1.7875514403e-4, 3.9192631785e-5,
         -2.1854485107e-6, -1.8540622107e-6, 8.2967113410e-7, -1.7665952737e-7,
         6.7078535434e-9, 1.0261809784e-8, -4.3820360185e-9, 9.1476995822e-10,
     };
+    double dax, mu, y, eta, v, s, u, t; 
+    size_t i;
+
+    dax = compute_dax(a, x);
+    if (dax == 0) {
+        return 1;
+    }
+
     double bm[16] = {0};
-    double mu = (x - a) / a;
-    double y = - auxln(mu); 
-    double eta = sqrt(2 * y);
-    double v = 0.5 * erfc(sqrt(a * y)) * gammastar(a) * sqrt(2 * NPY_PI * a);
-    double s = 1;
+    mu = (x - a) / a;
+    y = -log1pminx(mu); 
+    eta = sqrt(2 * y);
+    v = 0.5 * erfc(sqrt(a * y)) * gammastar(a) * sqrt(twopi * a);
+    s = 1;
     if (mu < 0) {
         s = -1;
         eta *= s;
     }
-    bm[14] = fm[15], bm[13] = fm[14];
-    double u = 0, t; 
-    for (size_t i = 13; i > 0; i--) {
+    for (i = 13, u = 0, bm[14] = fm[15], bm[13] = fm[14]; i > 0; i--) {
         t = fm[i] + (i + 1) * bm[i + 1] / a;
         u = eta * u + t;
         bm[i - 1] = t;
     }
     u *= s;
-    double dax = compute_dax(a, x);
-    double q, p = (u + v) * dax;
     if (s == 1) {
-        q = p;
+        return (u + v) * dax;
     }
-    else {
-        q = 1 - p;
-    }
-    return q;
+    return 1 - (u + v) * dax;
 }
 
 
+/*
+ * Compute Q(a, x) using Gil's algorithm [1].
+ *
+ * References
+ * ----------
+ *  [1]
+ */
 NPY_INLINE double
 pgm_gammaq(double a, double x)
 {
     static const double loghalf = -0.6931471805599453;
+    static const double one_sqrtpi = 0.5641895835477563;
     double alpha;
+    size_t aa, k;
+    double sum, z, sqrt_x;
+    double logx = log(x);
 
-    alpha = x >= 0.5 ? x : loghalf / log(x); 
+   // aa = (size_t)a;
+   // if (a < 30 && a == aa) {
+   //     for (k = sum = z = 1; k < aa; k++) {
+   //         sum += (z *= x / k);
+   //     }
+   //     return exp(-x) * sum;
+   // }
+   // else if (a < 30 && a == (aa + 0.5)) {
+   //     sqrt_x = sqrt(x);
+   //     for (k = z = 1, sum = 0; k < aa + 1; k++) {
+   //         sum += (z *= x / (k - 0.5));
+   //     }
+   //     return erfc(sqrt_x) + exp(-x) * one_sqrtpi * sum / sqrt_x;
+   // }
 
+    alpha = x >= 0.5 ? x : loghalf / logx; 
     if (a > alpha) {
-        if ((x < 0.3 * a) || a < 12) {
-            return igamma_taylor_p(a, x);
-        }
-        else {
-            return igamma_asymp(a, x);
-        }
+        return (x < 0.3 * a) || a < 12 ? q_taylorp(a, x) : q_asymp(a, x);
     }
-    else if (x < 1.5) {
-        return igamma_taylor_q(a, x);
+    else if (a < -DBL_MIN / logx) {
+        return 0;
     }
-    else if ((x > 2.35 * a) || a < 12) {
-        return igamma_continued_fraction(a, x);
+    else if (x < 1) {
+        return q_taylorq(a, x, logx);
     }
     else {
-       return igamma_asymp(a, x); 
+        return (x > 2.35 * a) || a < 12 ? q_continued_frac(a, x) : q_asymp(a, x);
     }
 }
