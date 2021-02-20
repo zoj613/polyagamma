@@ -8,6 +8,7 @@
 #define PGM_LS2PI 0.9189385332046727  // log(sqrt(2 * pi))
 
 
+double pgm_erfc(double z);
 double pgm_lgamma(double z);
 double pgm_gammaq(double s, double x);
 double inverse_gaussian_cdf(double x, double mu, double lambda);

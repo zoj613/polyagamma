@@ -5,48 +5,54 @@
 #include "pgm_igammaq.h"
 #include <float.h>
 
-#include <math.h>
-
-
-/* compute the upper incomplete gamma function.
- *
- * This function extends `kf_gammaq` by accounting for integer and half-integer
- * arguments of `s` when s < 30.
- *
- * TODO: Need to get rid of `kf_gammaq` entirely and re-implement upper
- * incomplete gamma using the algorithm in [1]. See GH Issue #36.
- *
- * References
- * ----------
- *  [1] Rémy Abergel and Lionel Moisan. 2020. Algorithm 1006: Fast and Accurate
- *      Evaluation of a Generalized Incomplete Gamma Function. ACM Trans. Math.
- *      Softw. 46, 1, Article 10 (April 2020), 24 pages. DOI:doi.org/10.1145/3365983
- */
+#define SQRT_PI sqrt(NPY_PI)
 NPY_INLINE double
-ppgm_gammaq(double s, double x)
+ppgm_erfc(double z)
 {
-    // 1 / sqrt(pi)
-    static const double one_sqrtpi = 0.5641895835477563;
-    size_t ss, k;
-    double sum, a, sqrt_x;
+    size_t k;
+    double a, b, c, b_c;
+    double z2 = z * z;
 
-    ss = (size_t)s;
-    if (s == ss && s < 30) {
-        for (k = sum = a = 1; k < ss; k++) {
-            sum += (a *= x / k);
-        }
-        return exp(-x) * sum;
+    if (z > 37) {
+        return z > 0 ? 0 : 2;
     }
-    else if (s == (ss + 0.5) && s < 30) {
-        sqrt_x = sqrt(x);
-        for (k = a = 1, sum = 0; k < ss + 1; k++) {
-            sum += (a *= x / (k - 0.5));
+    for (k = 1, a = 1, b = c =  1 / z2; k < 100; k++) {
+        a = 1 / (1 + (0.5 * k * a) / z2);
+        b *= (a - 1);
+        c += b;
+        if (fabs(b / c) < 1e-7) {
+            break;
         }
-        return kf_erfc(sqrt_x) + exp(-x) * one_sqrtpi * sum / sqrt_x;
     }
-    return kf_gammaq(s, x);
+    a = exp(-z2) * z * c / SQRT_PI;
+    return z > 0 ? a : 2 - a;
 }
+NPY_INLINE double
+pgm_erfc(double z)
+{
+    double c, d, h, u, v, y, z2;
+    size_t k;
 
+    if (z > 37) {
+        return z > 0 ? 0 : 2;
+    }
+
+    z2 = z * z;
+    for (k = 1, d = 0, c = y = v = 2 * z2 + 1; k < 100; k += 2) {
+        u = k * (k + 1);
+        v += 4;
+        c = v - u / c;
+        d = 1 / (v - u * d);
+        h = c * d;
+        y *= h;
+        if (fabs(h - 1) <= 1e-10) {
+            break;
+        }
+    }
+    c = exp(-z2) * 2 * z / y / SQRT_PI;
+    return z > 0 ? c : 2 - c; 
+}
+#undef SQRT_PI
 /*
  * Calculate logarithm of the gamma function of z.
  *
@@ -121,25 +127,25 @@ pgm_lgamma(double z)
 
     double out, z2, sum, a, b;
     size_t zz, k;
-    return lgamma(z);
-    //if (z < 1) {
-    //    // use Pugh(2004)'s algorithm for small z.
-    //     a = z - 1;
-    //     for (k = 1, sum = d[0] + d[0] / a; k < 11; k++) {
-    //         sum += d[k] / (a + k);
-    //     }
-    //     b = z - 0.5;
-    //     return log(sum) + log2sepi - b + b * log(b + 10.900511);
-    //}
 
-    //zz = (size_t)z;
-    //if (z < 127 && z == zz) 
-    //    return logfactorial[zz - 1];
+    if (z < 1) {
+        // use Pugh(2004)'s algorithm for small z.
+         a = z - 1;
+         for (k = 1, sum = d[0] + d[0] / a; k < 11; k++) {
+             sum += d[k] / (a + k);
+         }
+         b = z - 0.5;
+         return log(sum) + log2sepi - b + b * log(b + 10.900511);
+    }
 
-    //z2 = z * z;
-    //out = (z - 0.5) * log(z) - z + PGM_LS2PI;
-    //out += a1 / z - a2 / (z2 * z) + a3 / (z2 * z2 * z);
-    //return out;
+    zz = (size_t)z;
+    if (z < 127 && z == zz) 
+        return logfactorial[zz - 1];
+
+    z2 = z * z;
+    out = (z - 0.5) * log(z) - z + PGM_LS2PI;
+    out += a1 / z - a2 / (z2 * z) + a3 / (z2 * z2 * z);
+    return out;
 }
 
 /*
@@ -177,7 +183,7 @@ inverse_gaussian_cdf(double x, double mu, double lambda)
     double b = a * (x / mu);
     double c = exp(lambda / mu);
 
-    return 0.5 * (erfc(a - b) + c * erfc(b + a) * c);
+    return 0.5 * (kf_erfc(a - b) + c * kf_erfc(b + a) * c);
 }
 
 /*
@@ -290,6 +296,61 @@ random_right_bounded_inverse_gaussian(bitgen_t* bitgen_state, double mu,
 #define SQRT_PI sqrt(NPY_PI)
 #define ONE_SQRTPI 1 / SQRT_PI
 
+static NPY_INLINE double
+error_function(double x, bool erfc, bool expo)
+{
+    double y;
+    if (erfc) {
+        if (x < -SQRT_MIN_LOG_EPS) {
+            return 2;
+        }
+        else if (x < -DBL_EPSILON) {
+            return 2 - error_function(-x, true, false);
+        }
+        else if (x < DBL_EPSILON) {
+           return 1; 
+        }
+        else if (x < 0.5) {
+            return expo ? exp(x * x) : 1;
+        }
+        else if (x < 4) {
+            double ak[] = {
+                7.3738883116, 6.8650184849, 3.0317993362, 5.6316961891e-1, 4.3187787405e-5
+            };
+            double bk[] = {
+                7.3739608908, 15.184908190, 12.795529509, 5.3542167949, 1.0000000000
+            };
+            return expo ? 1 : exp(-x * x) * ratfun(x, 4, 4, ak, bk);
+        }
+        else {
+            double xl;
+            if (expo) {
+                xl = 1 / (DBL_MIN * SQRT_PI);
+                if (x > xl) {
+                    return 0;
+                }
+                else if (x > ONE_SQRT2EPS) {
+                    return 1 / (x * SQRT_PI);
+                }
+                else {
+                    double z = x * x;
+                    double y = 1;
+                }
+            }
+            else {
+                if (x < SQRT_MIN_EXPLOW) {
+                    double z = x * x;
+                    double y = exp(-z);
+                    if (x * DBL_MIN > y / SQRT_PI) {
+                        return 0;
+                    }
+                }
+
+            }
+        }
+    }
+
+}
 // function to perform a rational approximation
 static NPY_INLINE double
 ratfun(double x, size_t n, size_t m, const double* arr1, const double* arr2)
@@ -543,10 +604,19 @@ q_asymp(double a, double x)
 {
     static const double twopi = 6.283185307179586;
     static const double fm[] = {
-        1.0000000000e+0, -3.3333333333e-1, 8.3333333333e-2, -1.4814814815e-2,
-        1.1574074074e-3, 3.5273368607e-4, -1.7875514403e-4, 3.9192631785e-5,
-        -2.1854485107e-6, -1.8540622107e-6, 8.2967113410e-7, -1.7665952737e-7,
-        6.7078535434e-9, 1.0261809784e-8, -4.3820360185e-9, 9.1476995822e-10,
+        1.0000000000000000e+0, -3.3333333333333333e-1,
+        8.3333333333333333e-2, -1.4814814814814815e-2,
+        1.1574074074074074e-3, 3.527336860670194e-4,
+        -1.7875514403292181e-4, 3.9192631785224378e-5,
+        -2.1854485106799922e-6, -1.85406221071516e-6,
+        8.296711340953086e-7, -1.7665952736826079e-7,
+        6.7078535434014986e-9, 1.0261809784240308e-8,
+        -4.3820360184533532e-9, 9.1476995822367902e-10,
+        -2.551419399494625e-11, -5.8307721325504251e-11,
+        2.4361948020667416e-11, -5.0276692801141756e-12,
+        1.1004392031956135e-13, 3.3717632624009854e-13,
+        -1.3923887224181621e-13, 2.8534893807047443e-14,
+        -5.1391118342425726e-16, -1.9752288294349443e-15
     };
     double dax, mu, y, eta, v, s, u, t; 
     size_t i;
@@ -556,17 +626,17 @@ q_asymp(double a, double x)
         return 1;
     }
 
-    double bm[16] = {0};
+    double bm[26] = {0};
     mu = (x - a) / a;
     y = -log1pminx(mu); 
     eta = sqrt(2 * y);
-    v = 0.5 * erfc(sqrt(a * y)) * gammastar(a) * sqrt(twopi * a);
+    v = 0.5 * kf_erfc(sqrt(a * y)) * gammastar(a) * sqrt(twopi * a);
     s = 1;
     if (mu < 0) {
         s = -1;
         eta *= s;
     }
-    for (i = 13, u = 0, bm[14] = fm[15], bm[13] = fm[14]; i > 0; i--) {
+    for (i = 23, u = 0, bm[24] = fm[25], bm[23] = fm[24]; i > 0; i--) {
         t = fm[i] + (i + 1) * bm[i + 1] / a;
         u = eta * u + t;
         bm[i - 1] = t;
@@ -591,27 +661,28 @@ pgm_gammaq(double a, double x)
 {
     static const double loghalf = -0.6931471805599453;
     static const double one_sqrtpi = 0.5641895835477563;
-    double alpha;
+    double alpha, sum, z, sqrt_x, logx;
     size_t aa, k;
-    double sum, z, sqrt_x;
-    double logx = log(x);
 
-   // aa = (size_t)a;
-   // if (a < 30 && a == aa) {
-   //     for (k = sum = z = 1; k < aa; k++) {
-   //         sum += (z *= x / k);
-   //     }
-   //     return exp(-x) * sum;
-   // }
-   // else if (a < 30 && a == (aa + 0.5)) {
-   //     sqrt_x = sqrt(x);
-   //     for (k = z = 1, sum = 0; k < aa + 1; k++) {
-   //         sum += (z *= x / (k - 0.5));
-   //     }
-   //     return erfc(sqrt_x) + exp(-x) * one_sqrtpi * sum / sqrt_x;
-   // }
+    aa = (size_t)a;
+    if (a < 30 && a == aa) {
+        for (k = sum = z = 1; k < aa; k++) {
+            sum += (z *= x / k);
+        }
+        return exp(-x) * sum;
+    }
+    else if (a < 30 && a == (aa + 0.5)) {
+        sqrt_x = sqrt(x);
+        for (k = z = 1, sum = 0; k < aa + 1; k++) {
+            sum += (z *= x / (k - 0.5));
+        }
+        return kf_erfc(sqrt_x) + exp(-x) * one_sqrtpi * sum / sqrt_x;
+    }
+    else {
+        logx = log(x);
+        alpha = x >= 0.5 ? x : loghalf / logx; 
+    }
 
-    alpha = x >= 0.5 ? x : loghalf / logx; 
     if (a > alpha) {
         return (x < 0.3 * a) || a < 12 ? q_taylorp(a, x) : q_asymp(a, x);
     }
