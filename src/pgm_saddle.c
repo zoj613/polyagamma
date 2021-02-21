@@ -1,7 +1,7 @@
 /* Copyright (c) 2020-2021, Zolisa Bleki
  *
  * SPDX-License-Identifier: BSD-3-Clause */
-#include "pgm_igammaq.h"
+#include "pgm_common.h"
 #include "pgm_saddle.h"
 
 
@@ -244,7 +244,7 @@ initialize_config(struct config* cfg, double h, double z)
     double xl, xc, xr, ul, ur, tr, alpha_l, alpha_r, one_xl, one_xc, half_z2;
     bool is_zero = z == 0 ? true : false;
 
-    xl = is_zero ? 1 : tanh(z) / z;
+    xl = is_zero ? 1 : tanh_x(z);
     xc = 2.75 * xl;
     xr = 3 * xl;
 
@@ -334,13 +334,13 @@ random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
     cfg.half_h = 0.5 * h;
     cfg.hh_xc = cfg.half_h * cfg.one_xc;
 
-    bl = tangent_at_x(0, &cfg, LEFT);
+    bl = cfg.intercept_l;
     sqrt_rho_l = sqrt(-2 * cfg.Lprime_l);
     one_srho_l = 1 / sqrt_rho_l;
     kappa_l = cfg.sqrt_alpha_l * exp(h * (0.5 * cfg.one_xc + bl - sqrt_rho_l));
     p = kappa_l * inverse_gaussian_cdf(cfg.xc, one_srho_l, h);
 
-    br = tangent_at_x(0, &cfg, RIGHT);
+    br = cfg.intercept_r;
     hrho_r = -(h * cfg.Lprime_r);
     kappa_r = cfg.coef_r * exp(h * (br - log(hrho_r)) + pgm_lgamma(h));
     q = kappa_r * pgm_gammaq(h, hrho_r * cfg.xc);
@@ -354,7 +354,7 @@ random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
             x = random_left_bounded_gamma(bitgen_state, h, hrho_r, cfg.xc);
         }
         v = next_double(bitgen_state) * bounding_kernel(x, h, &cfg);
-    } while(v > saddle_point(x, h, z, cfg.sqrt_h_2pi));
+    } while (v > saddle_point(x, h, z, cfg.sqrt_h_2pi));
 
     return 0.25 * h * x;
 }
