@@ -95,10 +95,10 @@ random_polyagamma_hybrid(bitgen_t* bitgen_state, double h, double z)
     }
 
     is_integer = h == (size_t)h;
-    if (h > 20) {
+    if (h > 15) {
         return random_polyagamma_saddle(bitgen_state, h, z);
     }
-    else if (is_integer && z < 2) {
+    else if (is_integer && z <= 1) {
         return random_polyagamma_devroye(bitgen_state, h, z);
     }
     else {
