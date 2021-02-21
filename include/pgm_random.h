@@ -2,6 +2,7 @@
 #define PGM_RANDOM_H
 
 #include <numpy/random/bitgen.h>
+#include <numpy/npy_common.h>
 
 
 typedef enum {GAMMA, DEVROYE, ALTERNATE, SADDLE, HYBRID} sampler_t;
@@ -38,8 +39,9 @@ typedef enum {GAMMA, DEVROYE, ALTERNATE, SADDLE, HYBRID} sampler_t;
  *     techniques." arXiv preprint arXiv:1405.0506 (2014)
  *
  */
-double pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z,
-                             sampler_t method);
+extern double pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z,
+                                    sampler_t method);
+
 /*
  * Generate n samples from a PG(h, z) distribution.
  *
@@ -51,8 +53,14 @@ double pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z,
  *      The array to place the generated samples. Only the first n elements
  *      will be populated.
  */
-void pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
-                                sampler_t method, size_t n, double* out);
+NPY_INLINE void
+pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
+                           sampler_t method, size_t n, double* out)
+{
+    while (n--) {
+        out[n] = pgm_random_polyagamma(bitgen_state, h, z, method);
+    }
+}
 
 /*
  * Generate n samples from a PG(h[i], z[i]) distribution, where h and z are
@@ -60,12 +68,15 @@ void pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
  *
  * h, z and out must be at least `n` in length. Only the first n elements of
  * `out` will be filled.
- *
- * WARNING: The `out` array must NOT overlap with any of the h and z arrays, else
- * the behaviour is undefined and the returned samples will likely be incorrect.
  */
-void pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h,
-                                 const double* z, sampler_t method, size_t n,
-                                 double* restrict out);
+NPY_INLINE void
+pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h,
+                            const double* z, sampler_t method, size_t n,
+                            double* restrict out)
+{
+    while (n--) {
+        out[n] = pgm_random_polyagamma(bitgen_state, h[n], z[n], method);
+    }
+}
 
 #endif

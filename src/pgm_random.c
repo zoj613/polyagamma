@@ -1,10 +1,21 @@
 /* Copyright (c) 2020-2021, Zolisa Bleki
  *
  * SPDX-License-Identifier: BSD-3-Clause */
-#include "../include/pgm_random.h"
+#include <numpy/random/distributions.h>
 #include "pgm_devroye.h"
 #include "pgm_alternate.h"
 #include "pgm_saddle.h"
+#include "../include/pgm_random.h"
+
+
+extern NPY_INLINE void
+pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
+                           sampler_t method, size_t n, double* out);
+
+extern NPY_INLINE void
+pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h,
+                            const double* z, sampler_t method, size_t n,
+                            double* restrict out);
 
 /*
  * Sample from a PG(h. z) using a Normal Approximation. For sufficiently large
@@ -31,6 +42,28 @@ random_polyagamma_normal_approx(bitgen_t* bitgen_state, double h, double z)
         variance = 0.25 * h * (sinh(z) - z) * (1 - x * x) / (z * z * z);
     }
     return mean + random_standard_normal(bitgen_state) * sqrt(variance);
+}
+
+#ifndef PGM_GAMMA_LIMIT
+#define PGM_GAMMA_LIMIT 200
+#endif
+/*
+ * Sample from PG(h, z) using the Gamma convolution approximation method.
+ *
+ * The infinite sum is truncated to 200 terms.
+ */
+static NPY_INLINE double
+random_polyagamma_gamma_conv(bitgen_t* bitgen_state, double h, double z)
+{
+    static const double pi2 = 9.869604401089358;
+    const double z2 = z * z;
+    double c, out = 0;
+
+    for (size_t n = PGM_GAMMA_LIMIT; n--; ) {
+        c = n + 0.5;
+        out += random_standard_gamma(bitgen_state, h) / (pi2 * c * c + z2);
+    }
+    return 0.5 * out;
 }
 
 /*
@@ -62,10 +95,10 @@ random_polyagamma_hybrid(bitgen_t* bitgen_state, double h, double z)
     }
 
     is_integer = h == (size_t)h;
-    if (h > 20) {
+    if (h > 15) {
         return random_polyagamma_saddle(bitgen_state, h, z);
     }
-    else if (is_integer && z < 2) {
+    else if (is_integer && z <= 1) {
         return random_polyagamma_devroye(bitgen_state, h, z);
     }
     else {
@@ -89,26 +122,5 @@ pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z, sampler_t meth
             return random_polyagamma_saddle(bitgen_state, h, z);
         default:
             return random_polyagamma_hybrid(bitgen_state, h, z);
-    }
-}
-
-
-NPY_INLINE void
-pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
-                           sampler_t method, size_t n, double* out)
-{
-    while (n--) {
-        out[n] = pgm_random_polyagamma(bitgen_state, h, z, method);
-    }
-}
-
-
-NPY_INLINE void
-pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h,
-                            const double* z, sampler_t method, size_t n,
-                            double* restrict out)
-{
-    while (n--) {
-        out[n] = pgm_random_polyagamma(bitgen_state, h[n], z[n], method);
     }
 }

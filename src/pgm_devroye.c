@@ -1,29 +1,8 @@
 /* Copyright (c) 2020-2021, Zolisa Bleki
  *
  * SPDX-License-Identifier: BSD-3-Clause */
+#include "pgm_common.h"
 #include "pgm_devroye.h"
-
-
-#ifndef PGM_GAMMA_LIMIT
-#define PGM_GAMMA_LIMIT 200
-#endif
-/*
- * Sample from PG(h, z) using the Gamma convolution approximation method.
- *
- * The infinite sum is truncated to 200 terms.
- */
-NPY_INLINE double
-random_polyagamma_gamma_conv(bitgen_t* bitgen_state, double h, double z)
-{
-    const double z2 = z * z;
-    double c, out = 0;
-
-    for (size_t n = PGM_GAMMA_LIMIT; n--; ) {
-        c = n + 0.5;
-        out += random_standard_gamma(bitgen_state, h) / (PGM_PI2 * c * c + z2);
-    }
-    return 0.5 * out;
-}
 
 // the truncation point
 #define T 0.64

@@ -1,7 +1,7 @@
 /* Copyright (c) 2020-2021, Zolisa Bleki
  *
  * SPDX-License-Identifier: BSD-3-Clause */
-#include "pgm_igammaq.h"
+#include "pgm_common.h"
 #include "pgm_alternate.h"
 #include "pgm_alternate_trunc_points.h"
 
