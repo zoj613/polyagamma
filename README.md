@@ -1,6 +1,6 @@
 # polya-gamma
 [![PyPI - Wheel][4]](https://pypi.org/project/polyagamma/#files)
-[![PyPI][5]](https://pypi.org/project/polyagamma/)
+[![PyPI][5]](https://pypi.org/project/polyagamma/#history)
 [![PyPI - License][6]](https://github.com/zoj613/polyagamma/blob/main/LICENSE)
 [![CircleCI][7]](https://circleci.com/gh/zoj613/polyagamma/)
 [![Codecov][8]](https://codecov.io/gh/zoj613/polyagamma/)
@@ -30,9 +30,12 @@ existing libraries.
 To get the latest version of the package, one can install it by downloading the wheel/source distribution 
 from the [releases][3] page, or using `pip` with the following shell command:
 ```shell
-$ pip install -U polyagamma
+$ pip install polyagamma
 ```
-
+To install the latest pre-release version, use:
+```shell
+$ pip install --pre -U polyagamma
+```
 Alternatively, once can install from source by cloning the repo. This requires an installation of [poetry][2]
 and the following shell commands:
 ```shell
@@ -95,7 +98,8 @@ For an example of how to use `polyagamma` in a C program, see [here][1].
 
 Below are runtime plots of 20000 samples generated for various values of `h` 
 and `z`, using each method. We restrict `h` to integer values to accomodate the 
-`devroye` method, which cannot be used for non-integer `h`.
+`devroye` method, which cannot be used for non-integer `h`. The version of the
+package used to generate them is `v1.1.0-beta.3`.
 
 ![](./scripts/perf_methods_0.0.svg) | ![](./scripts/perf_methods_2.5.svg)
 | --- | --- |
@@ -105,9 +109,9 @@ and `z`, using each method. We restrict `h` to integer values to accomodate the
 
 Generally:
 - The `gamma` method is slowest and should be avoided in cases where speed is paramount.
-- For `h > 20`, the `saddle` method is the fastest for any value of `z`.
-- For `z < 2` and integer `h < 20`, the `devroye` method is the most efficient.
-- For `z > 2` and integer/non-integer `h < 20`, the `alternate` method is the most efficient.
+- For `h > 15`, the `saddle` method is the fastest for any value of `z`.
+- For `z <= 1` and integer `h <= 15`, the `devroye` method is the most efficient.
+- For `z > 1` and integer/non-integer `h <= 15`, the `alternate` method is the most efficient.
 - For `h > 50` (or any value large enough), the normal approximation to the distribution is 
 fastest (not reported in the above plot but it is around 10 times faster than the `saddle` 
 method and also equally accurate).
@@ -134,9 +138,16 @@ generating exactly one sample from the distribution. This is mainly due to the
 overhead introduced by creating the bitgenerator + acquiring/releasing the thread lock + 
 doing parameter validation checks at every call to the function. This overhead can 
 somewhat be mitigated by passing in a random generator instance at every call to 
-the `polyagamma` function.
+the `polyagamma` function. For example, on an `iPython` session:
+```ipynb
+In [4]: %timeit polyagamma()
+94.6 µs ± 1.25 µs per loop (mean ± std. dev. of 7 runs, 10000 loops each)
+In [9]: %timeit polyagamma(random_state=rng)
+4.95 µs ± 15.8 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
+```
 
-To generate the above plots locally, run `python scripts/benchmark.py --size=<some size>> --z=<z value>`. 
+
+To generate the above plots locally, run `python scripts/benchmark.py --size=<some size> --z=<z value>`.
 Note that the runtimes may differ  than the ones reported here, depending on the machine this script 
 is ran on.
 
@@ -158,13 +169,14 @@ To submit a PR, follow the steps below:
 - Polson, Nicholas G., James G. Scott, and Jesse Windle. "Bayesian inference for logistic models using Pólya–Gamma latent variables." Journal of the American statistical Association 108.504 (2013): 1339-1349.
 - J. Windle, N. G. Polson, and J. G. Scott. "Improved Polya-gamma sampling". Technical Report, University of Texas at Austin, 2013b.
 - Windle, Jesse, Nicholas G. Polson, and James G. Scott. "Sampling Polya-Gamma random variates: alternate and approximate techniques." arXiv preprint arXiv:1405.0506 (2014)
+- Windle, J. (2013). Forecasting high-dimensional, time-varying variance-covariance matrices with high-frequency data and sampling Pólya-Gamma random variates for posterior distributions derived from logistic likelihoods.(PhD thesis). Retrieved from http://hdl.handle.net/2152/21842 .
 
 
 [1]: ./examples/c_polyagamma.c
 [2]: https://python-poetry.org/docs/pyproject/
 [3]: https://github.com/zoj613/polyagamma/releases
 [4]: https://img.shields.io/pypi/wheel/polyagamma?style=flat-square
-[5]: https://img.shields.io/pypi/v/polyagamma?style=flat-square
+[5]: https://img.shields.io/github/v/release/zoj613/polyagamma?include_prereleases&style=flat-square
 [6]: https://img.shields.io/pypi/l/polyagamma?style=flat-square
 [7]: https://img.shields.io/circleci/build/github/zoj613/polyagamma/main?style=flat-square
 [8]: https://img.shields.io/codecov/c/github/zoj613/polyagamma?style=flat-square
