@@ -342,8 +342,8 @@ random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
 
     br = cfg.intercept_r;
     hrho_r = -(h * cfg.Lprime_r);
-    kappa_r = cfg.coef_r * exp(h * (br - log(hrho_r)) + pgm_lgamma(h));
-    q = kappa_r * pgm_gammaq(h, hrho_r * cfg.xc);
+    kappa_r = cfg.coef_r * exp(h * (br - log(hrho_r)));
+    q = kappa_r * pgm_gammaq(h, hrho_r * cfg.xc, false);
 
     ratio = p / (p + q);
     do {

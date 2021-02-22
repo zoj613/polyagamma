@@ -1,8 +1,12 @@
+/* Copyright (c) 2020-2021, Zolisa Bleki
+ *
+ * SPDX-License-Identifier: BSD-3-Clause */
 #ifndef PGM_COMMON_H
 #define PGM_COMMON_H
-#include <float.h>
+
+#pragma once
 #include <numpy/random/distributions.h>
-#include "pgm_igammaq.h"
+#include <float.h>
 
 #define PGM_PI2 9.869604401089358  // pi^2
 #define PGM_PI2_8 1.233700550136169  // pi^2 / 8
@@ -344,43 +348,177 @@ random_right_bounded_inverse_gaussian(bitgen_t* bitgen_state, double mu,
     return x;
 }
 
-/* compute the upper incomplete gamma function.
+#define PGM_CONFLUENT_EPSILON 1e-07
+
+/*
+ * Compute function G(p, x) (A confluent hypergeometric function ratio).
+ * This function is defined in equation 14 of [1] and this implementation
+ * uses a continued fraction (eq. 15) defined for x <= p. The continued
+ * fraction is evaluated using the Modified Lentz method.
  *
- * This function extends `kf_gammaq` by accounting for integer and half-integer
- * arguments of `s` when s < 30.
+ * G(p, x) = a_1/b_1+ a_2/b_2+ a_3/b_3+ ..., such that a_1 = 1 and for n >= 1:
+ * a_2n = -(p - 1 + n)*x, a_(2n+1) = n*x, b_n = p - 1 + n.
  *
- * TODO: Need to get rid of `kf_gammaq` entirely and re-implement upper
- * incomplete gamma using the algorithm in [1]. See GH Issue #36.
+ * Note that b_n can be reduced to b_1 = p, b_n = b_(n-1) + 1 for n >= 2. Also
+ * for odd n, the argument of a_n is "k=(n-1)/2" and for even n "k=n/2". This
+ * means we can pre-compute constant terms s = 0.5 * x and r = -(p - 1) * x.
+ * This simplifies a_n into: a_n = s * (n - 1) for odd n and a_n = r - s * n
+ * for even n >= 2. The terms for the first iteration are pre-calculated as
+ * explained in [1].
  *
  * References
  * ----------
- *  [1] Rémy Abergel and Lionel Moisan. 2020. Algorithm 1006: Fast and Accurate
- *      Evaluation of a Generalized Incomplete Gamma Function. ACM Trans. Math.
- *      Softw. 46, 1, Article 10 (April 2020), 24 pages. DOI:doi.org/10.1145/3365983
+ *  [1] Algorithm 1006: Fast and accurate evaluation of a generalized
+ *      incomplete gamma function, Rémy Abergel and Lionel Moisan, ACM
+ *      Transactions on Mathematical Software (TOMS), 2020. DOI: 10.1145/3365983
  */
-NPY_INLINE double
-pgm_gammaq(double s, double x)
+static NPY_INLINE double
+confluent_x_smaller(double p, double x)
 {
-    // 1 / sqrt(pi)
-    static const double one_sqrtpi = 0.5641895835477563;
-    size_t ss, k;
-    double sum, a, sqrt_x;
+    size_t n;
+    double f, c, d, delta;
+    double a = 1, b = p;
+    double r = -(p - 1) * x;
+    double s = 0.5 * x;
+    for (n = 2, f = a / b, c = a / DBL_MIN, d = 1 / b; n < 100; n++) {
+        a =  n & 1 ? s * (n - 1) : r - s * n;
+        b++;
 
-    ss = (size_t)s;
-    if (s == ss && s < 30) {
-        for (k = sum = a = 1; k < ss; k++) {
-            sum += (a *= x / k);
+        c = b + a / c;
+        if (c < DBL_MIN) {
+            c = DBL_MIN;
         }
-        return exp(-x) * sum;
-    }
-    else if (s == (ss + 0.5) && s < 30) {
-        sqrt_x = sqrt(x);
-        for (k = a = 1, sum = 0; k < ss + 1; k++) {
-            sum += (a *= x / (k - 0.5));
+
+        d = a * d + b;
+        if (d < DBL_MIN) {
+            d = DBL_MIN;
         }
-        return pgm_erfc(sqrt_x) + exp(-x) * one_sqrtpi * sum / sqrt_x;
+
+        d = 1 / d;
+        delta = c * d;
+        f *= delta;
+        if (fabs(delta - 1) < PGM_CONFLUENT_EPSILON) {
+            break;
+        }
     }
-    return kf_gammaq(s, x);
+    return f;
+}
+
+/*
+ * Compute function G(p, x) (A confluent hypergeometric function ratio).
+ * This function is defined in equation 14 of [1] and this implementation
+ * uses a continued fraction (eq. 16) defined for x > p. The continued
+ * fraction is evaluated using the Modified Lentz method.
+ *
+ * G(p, x) = a_1/b_1+ a_2/b_2+ a_3/b_3+ ..., such that a_1 = 1 and for n > 1:
+ * a_n = -(n - 1) * (n - p - 1), and for n >= 1: b_n = x + 2n - 1 - p.
+ *
+ * Note that b_n can be re-written as b_1 = x - p + 1 and
+ * b_n = (((x - p + 1) + 2) + 2) + 2 ...) for n >= 2. Thus b_n = b_(n-1) + 2
+ * for n >= 2. Also a_n can be re-written as a_n = (n - 1) * ((p - (n - 1)).
+ * So if we can initialize the series with a_1 = 1 and instead of computing
+ * (n - 1) at every iteration we can instead start the counter at n = 1 and
+ * just compute a_(n+1) = n * (p - n). This doesnt affect b_n terms since all
+ * we need is to keep incrementing b_n by 2 every iteration after initializing
+ * the series with b_1 = x - p + 1.
+ *
+ * References
+ * ----------
+ *  [1] Algorithm 1006: Fast and accurate evaluation of a generalized
+ *      incomplete gamma function, Rémy Abergel and Lionel Moisan, ACM
+ *      Transactions on Mathematical Software (TOMS), 2020. DOI: 10.1145/3365983
+ */
+static NPY_INLINE double
+confluent_p_smaller(double p, double x)
+{
+    size_t n;
+    double f, c, d, delta;
+    double a = 1, b = x - p + 1;
+    for (n = 1, f = a / b, c = a / DBL_MIN, d = 1 / b; n < 100; n++) {
+        a = n * (p - n);
+        b += 2;
+
+        c = b + a / c;
+        if (c < DBL_MIN) {
+            c = DBL_MIN;
+        }
+
+        d = a * d + b;
+        if (d < DBL_MIN) {
+            d = DBL_MIN;
+        }
+
+        d = 1 / d;
+        delta = c * d;
+        f *= delta;
+        if (fabs(delta - 1) < PGM_CONFLUENT_EPSILON) {
+            break;
+        }
+    }
+    return f;
+}
+
+/*
+ * Compute the (normalized) upper incomplete gamma function for the pair (p, x).
+ *
+ * We use the algorithm described in [1]. We use two continued fractions to
+ * evaluate the function in the regions {0 < x <= p} and {0 <= p < x}
+ * (algorithm 3 of [1]).
+ *
+ * We also use a terminating series to evaluate the normalized version for
+ * integer and half-integer values of p <= 30 as described in [2]. This is
+ * faster than the algorithm of [1] when p is small since not more than p terms
+ * are required to evaluate the function.
+ *
+ * Parameters
+ * ----------
+ *  normalized : if true, the normalized upper incomplete gamma is returned,
+ *      else the non-normalized version is returned for the arguments (p, x).
+ *
+ * References
+ * ----------
+ *  [1] Algorithm 1006: Fast and accurate evaluation of a generalized
+ *      incomplete gamma function, Rémy Abergel and Lionel Moisan, ACM
+ *      Transactions on Mathematical Software (TOMS), 2020. DOI: 10.1145/3365983
+ *  [2] https://www.boost.org/doc/libs/1_71_0/libs/math/doc/html/math_toolkit/sf_gamma/igamma.html
+ */
+static NPY_INLINE double
+pgm_gammaq(double p, double x, bool normalized)
+{
+    if (normalized) {
+        size_t p_int = (size_t)p;
+        double sum, r;
+        size_t k;
+        if (p == p_int && p < 30) {
+            for (k = sum = r = 1; k < p_int; k++) {
+                sum += (r *= x / k);
+            }
+            return exp(-x) * sum;
+        }
+        else if (p == (p_int + 0.5) && p < 30) {
+            static const double one_sqrtpi = 0.5641895835477563;
+            double sqrt_x = sqrt(x);
+            for (k = r = 1, sum = 0; k < p_int + 1; k++) {
+                sum += (r *= x / (k - 0.5));
+            }
+            return pgm_erfc(sqrt_x) + exp(-x) * one_sqrtpi * sum / sqrt_x;
+        }
+    }
+
+    bool x_smaller = p >= x;
+    double f = x_smaller ? confluent_x_smaller(p, x) : confluent_p_smaller(p, x);
+
+    if (normalized) {
+        double out = f * exp(-x + p * log(x) - pgm_lgamma(p));
+        return x_smaller ? 1 - out : out;
+    }
+    else if (x_smaller) {
+        double lgam = pgm_lgamma(p);
+        return (1 - f * exp(-x + p * log(x) - lgam)) * exp(lgam);
+    }
+    else {
+        return f * exp(-x + p * log(x));
+    }
 }
 
 #endif

@@ -119,7 +119,7 @@ calculate_ratio(struct config* cfg)
     else {
         p = exp(cfg->hlog2) * pgm_erfc(h / sqrt(2 * t));
     }
-    q = exp(h * (PGM_LOGPI_2 - cfg->log_lambda_z)) * pgm_gammaq(h, cfg->lambda_z * t);
+    q = exp(h * (PGM_LOGPI_2 - cfg->log_lambda_z)) * pgm_gammaq(h, cfg->lambda_z * t, true);
     cfg->ratio = p / (p + q);
 }
 
