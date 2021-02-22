@@ -76,70 +76,74 @@ pgm_erfc(double z)
 #define LOG_MAX log(DBL_MAX)
 #define LOG_MIN log(DBL_MIN)
 #define LOG_EPS log(DBL_EPSILON)
-#define SQRT_MIN_LOG_EPS log(-LOG_EPS)
+#define SQRT_MIN_LOG_EPS sqrt(-LOG_EPS)
 #define ONE_SQRT2EPS 1 / sqrt(2 * DBL_EPSILON)
 #define EXP_LOW LOG_MIN
-#define SQRT_MIN_EXPLOW sqrt(-EXPLOW)
 #define EXP_HIGH LOG_MAX
+#define SQRT_MIN_EXP_LOW sqrt(-EXP_LOW)
 #define SQRT_2PI sqrt(2 * NPY_PI)
 #define LOG_SQRT_2PI log(SQRT_2PI)
 #define SQRT_PI sqrt(NPY_PI)
 #define ONE_SQRTPI 1 / SQRT_PI
+#define ONE_MINSQRTPI ONE_SQRTPI / DBL_MIN
 
 static NPY_INLINE double
-error_function(double x, bool erfc, bool expo)
+error_function(double x, bool scaled)
 {
-    double y;
-    if (erfc) {
-        if (x < -SQRT_MIN_LOG_EPS) {
-            return 2;
-        }
-        else if (x < -DBL_EPSILON) {
-            return 2 - error_function(-x, true, false);
-        }
-        else if (x < DBL_EPSILON) {
-           return 1; 
-        }
-        else if (x < 0.5) {
-            return expo ? exp(x * x) : 1;
-        }
-        else if (x < 4) {
-            double ak[] = {
-                7.3738883116, 6.8650184849, 3.0317993362, 5.6316961891e-1, 4.3187787405e-5
-            };
-            double bk[] = {
-                7.3739608908, 15.184908190, 12.795529509, 5.3542167949, 1.0000000000
-            };
-            return expo ? 1 : exp(-x * x) * ratfun(x, 4, 4, ak, bk);
-        }
-        else {
-            double xl;
-            if (expo) {
-                xl = 1 / (DBL_MIN * SQRT_PI);
-                if (x > xl) {
-                    return 0;
-                }
-                else if (x > ONE_SQRT2EPS) {
-                    return 1 / (x * SQRT_PI);
-                }
-                else {
-                    double z = x * x;
-                    double y = 1;
-                }
-            }
-            else {
-                if (x < SQRT_MIN_EXPLOW) {
-                    double z = x * x;
-                    double y = exp(-z);
-                    if (x * DBL_MIN > y / SQRT_PI) {
-                        return 0;
-                    }
-                }
-
-            }
-        }
+    if (x < -SQRT_MIN_LOG_EPS) {
+        return 2;
     }
+    else if (x < -DBL_EPSILON) {
+        return 2 - error_function(-x, false);
+    }
+    else if (x < DBL_EPSILON) {
+       return 1; 
+    }
+    else if (x < 0.5) {
+        static const double p0 = 2.13853322378e+01;
+        static const double p1 = 1.72227577039;
+        static const double p2 = 3.16652890658e-01;
+        static const double q0 = 1.89522572415e+01;
+        static const double q1 = 7.84374570830;
+        double z = x * x;
+        double r = x * ((p2 * z + p1) * z + p0) / ((z + q1) * z + q0);
+        return (scaled ? exp(z) : 1) * (1 - r);
+    }
+    else if (x < 4) {
+        static const double p0 = 7.3738883116;
+        static const double p1 = 6.8650184849;
+        static const double p2 = 3.0317993362;
+        static const double p3 = 5.6316961891e-01;
+        static const double p4 = 4.3187787405e-05;
+        static const double q0 = 7.3739608908;
+        static const double q1 = 1.5184908190e+01;
+        static const double q2 = 1.2795529509e+01;
+        static const double q3 = 5.3542167949;
+        double y = scaled ? 1 : exp(-x * x);
+        return y * ((((p4 * x + p3) * x + p2) * x + p1) * x + p0) /
+                    ((((x + q3) * x + q2) * x + q1) * x + q0);
+    }
+    else if (x > SQRT_MIN_EXP_LOW) { 
+        return 0;
+    } else if (scaled && x > ONE_SQRT2EPS) {
+        return ONE_SQRTPI / x;
+    }
+    double z = x * x;
+    double y = scaled ? 1 : exp(-z);
 
+    if ((x * DBL_MIN) > (y * ONE_SQRTPI)) {
+        return 0;
+    }
+    else {
+        static const double p0 = -4.25799643553e-02;
+        static const double p1 = -1.96068973726e-01;
+        static const double p2 = -5.16882262185e-02;
+        static const double q0 = 1.50942070545e-01;
+        static const double q1 = 9.21452411694e-01;
+        z = 1 / z;
+        z *= ((p2 * z + p1) * z + p0) / ((z + q1) * z + q0);
+        return y * (ONE_SQRTPI + z) / x;
+    }
 }
 
 // function to perform a rational approximation
