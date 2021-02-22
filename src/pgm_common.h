@@ -8,6 +8,88 @@
 #define PGM_PI2_8 1.233700550136169  // pi^2 / 8
 #define PGM_LOGPI_2 0.4515827052894548  // log(pi / 2)
 #define PGM_LS2PI 0.9189385332046727  // log(sqrt(2 * pi))
+#define PGM_1_SQRTPI 0.5641895835477563   // 1 / sqrt(pi)
+
+
+/*
+ * Compute the complementary error function.
+ *
+ * This implementation uses Rational Chebyshev Approximations for as described
+ * in [1]. The polynomial coefficients are obtained from [2] and some from [3].
+ * Maximum relative error compared to the standard library erfc function is
+ * 1.077760e-09.
+ *
+ * References
+ * ----------
+ * [1] Cody, W. J. Rational Chebyshev approximations for the error function.
+ *     Math. Comp. 23 (1969), 631–637.
+ * [2] Temme, N. (1994). A Set of Algorithms for the Incomplete Gamma Functions.
+ *     Probability in the Engineering and Informational Sciences, 8(2),
+ *     291-307. doi:10.1017/S0269964800003417.
+ * [3] https://www.netlib.org/specfun/erf
+ */
+NPY_INLINE double
+pgm_erfc(double x)
+{
+    static const double big_val = 26.615717509251258;
+    static const double small_val = -6.003636680306125;
+
+    if (x < small_val) {
+        return 2;
+    }
+    else if (x < -DBL_EPSILON) {
+        return 2 - pgm_erfc(-x);
+    }
+    else if (x < DBL_EPSILON) {
+       return 1;
+    }
+    else if (x < 0.5) {
+        static const double p0 = 3.20937758913846947e+03;
+        static const double p1 = 3.77485237685302021e+02;
+        static const double p2 = 1.13864154151050156e+02;
+        static const double p3 = 3.16112374387056560e+00;
+        static const double p4 = 1.85777706184603153e-01;
+        static const double q0 = 2.84423683343917062e+03;
+        static const double q1 = 1.28261652607737228e+03;
+        static const double q2 = 2.44024637934444173e+02;
+        static const double q3 = 2.36012909523441209e+01;
+        double z = x * x;
+        return 1 - x * ((((p4 * z + p3) * z + p2) * z + p1) * z + p0) /
+                        ((((z + q3) * z + q2) * z + q1) * z + q0);
+    }
+    else if (x < 4) {
+        static const double p0 = 7.3738883116;
+        static const double p1 = 6.8650184849;
+        static const double p2 = 3.0317993362;
+        static const double p3 = 5.6316961891e-01;
+        static const double p4 = 4.3187787405e-05;
+        static const double q0 = 7.3739608908;
+        static const double q1 = 1.5184908190e+01;
+        static const double q2 = 1.2795529509e+01;
+        static const double q3 = 5.3542167949;
+        return exp(-x * x) * ((((p4 * x + p3) * x + p2) * x + p1) * x + p0) /
+                              ((((x + q3) * x + q2) * x + q1) * x + q0);
+    }
+    else if (x < big_val) {
+        double z = x * x;
+        double y = exp(-z);
+
+        if (x * DBL_MIN > y * PGM_1_SQRTPI) {
+            return 0;
+        }
+        static const double p0 = -4.25799643553e-02;
+        static const double p1 = -1.96068973726e-01;
+        static const double p2 = -5.16882262185e-02;
+        static const double q0 = 1.50942070545e-01;
+        static const double q1 = 9.21452411694e-01;
+        z = 1 / z;
+        z *= ((p2 * z + p1) * z + p0) / ((z + q1) * z + q0);
+        return y * (PGM_1_SQRTPI + z) / x;
+    }
+    else {
+        return 0;
+    }
+}
 
 /*
  * Calculate the cumulative distribution function of an Inverse-Gaussian.
@@ -19,7 +101,7 @@ inverse_gaussian_cdf(double x, double mu, double lambda)
     double b = a * (x / mu);
     double c = exp(lambda / mu);
 
-    return 0.5 * (kf_erfc(a - b) + c * kf_erfc(b + a) * c);
+    return 0.5 * (pgm_erfc(a - b) + c * pgm_erfc(b + a) * c);
 }
 
 /*
@@ -296,7 +378,7 @@ pgm_gammaq(double s, double x)
         for (k = a = 1, sum = 0; k < ss + 1; k++) {
             sum += (a *= x / (k - 0.5));
         }
-        return kf_erfc(sqrt_x) + exp(-x) * one_sqrtpi * sum / sqrt_x;
+        return pgm_erfc(sqrt_x) + exp(-x) * one_sqrtpi * sum / sqrt_x;
     }
     return kf_gammaq(s, x);
 }

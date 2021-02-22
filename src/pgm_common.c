@@ -5,6 +5,9 @@
 
 
 extern NPY_INLINE double
+pgm_erfc(double x);
+
+extern NPY_INLINE double
 pgm_gammaq(double s, double x);
 
 extern NPY_INLINE double
