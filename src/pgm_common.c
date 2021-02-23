@@ -8,9 +8,6 @@ extern NPY_INLINE double
 pgm_erfc(double x, bool scaled);
 
 extern NPY_INLINE double
-pgm_gammaq(double s, double x);
-
-extern NPY_INLINE double
 pgm_lgamma(double z);
 
 extern NPY_INLINE double
@@ -24,189 +21,29 @@ random_right_bounded_inverse_gaussian(bitgen_t* bitgen_state, double mu,
                                       double lambda, double t);
 
 
-#define SQRT_PI sqrt(npy_pi)
-NPY_INLINE double
-ppgm_erfc(double z)
-{
-    size_t k;
-    double a, b, c, b_c;
-    double z2 = z * z;
-
-    if (z > 37) {
-        return z > 0 ? 0 : 2;
-    }
-    for (k = 1, a = 1, b = c =  1 / z2; k < 100; k++) {
-        a = 1 / (1 + (0.5 * k * a) / z2);
-        b *= (a - 1);
-        c += b;
-        if (fabs(b / c) < 1e-7) {
-            break;
-        }
-    }
-    a = exp(-z2) * z * c / SQRT_PI;
-    return z > 0 ? a : 2 - a;
-}
-NPY_INLINE double
-pgm_erfc(double z)
-{
-    double c, d, h, u, v, y, z2;
-    size_t k;
-
-    if (z > 37) {
-        return z > 0 ? 0 : 2;
-    }
-
-    z2 = z * z;
-    for (k = 1, d = 0, c = y = v = 2 * z2 + 1; k < 100; k += 2) {
-        u = k * (k + 1);
-        v += 4;
-        c = v - u / c;
-        d = 1 / (v - u * d);
-        h = c * d;
-        y *= h;
-        if (fabs(h - 1) <= 1e-10) {
-            break;
-        }
-    }
-    c = exp(-z2) * 2 * z / y / SQRT_PI;
-    return z > 0 ? c : 2 - c; 
-}
-#undef SQRT_PI
-
-
-#define SQRT_MAX sqrt(DBL_MAX)
-#define SQRT_MIN sqrt(DBL_MIN)
-#define LOG_MAX log(DBL_MAX)
-#define LOG_MIN log(DBL_MIN)
-#define LOG_EPS log(DBL_EPSILON)
-#define SQRT_MIN_LOG_EPS sqrt(-LOG_EPS)
-#define ONE_SQRT2EPS 1 / sqrt(2 * DBL_EPSILON)
-#define EXP_LOW LOG_MIN
-#define EXP_HIGH LOG_MAX
-#define SQRT_MIN_EXP_LOW sqrt(-EXP_LOW)
-#define SQRT_2PI sqrt(2 * NPY_PI)
-#define LOG_SQRT_2PI log(SQRT_2PI)
-#define SQRT_PI sqrt(NPY_PI)
-#define ONE_SQRTPI 1 / SQRT_PI
-#define ONE_MINSQRTPI ONE_SQRTPI / DBL_MIN
-
-static NPY_INLINE double
-error_function(double x, bool scaled)
-{
-    if (x < -SQRT_MIN_LOG_EPS) {
-        return 2;
-    }
-    else if (x < -DBL_EPSILON) {
-        return 2 - error_function(-x, false);
-    }
-    else if (x < DBL_EPSILON) {
-       return 1; 
-    }
-    else if (x < 0.5) {
-        static const double p0 = 2.13853322378e+01;
-        static const double p1 = 1.72227577039;
-        static const double p2 = 3.16652890658e-01;
-        static const double q0 = 1.89522572415e+01;
-        static const double q1 = 7.84374570830;
-        double z = x * x;
-        double r = x * ((p2 * z + p1) * z + p0) / ((z + q1) * z + q0);
-        return (scaled ? exp(z) : 1) * (1 - r);
-    }
-    else if (x < 4) {
-        static const double p0 = 7.3738883116;
-        static const double p1 = 6.8650184849;
-        static const double p2 = 3.0317993362;
-        static const double p3 = 5.6316961891e-01;
-        static const double p4 = 4.3187787405e-05;
-        static const double q0 = 7.3739608908;
-        static const double q1 = 1.5184908190e+01;
-        static const double q2 = 1.2795529509e+01;
-        static const double q3 = 5.3542167949;
-        double y = scaled ? 1 : exp(-x * x);
-        return y * ((((p4 * x + p3) * x + p2) * x + p1) * x + p0) /
-                    ((((x + q3) * x + q2) * x + q1) * x + q0);
-    }
-    else if (x > SQRT_MIN_EXP_LOW) { 
-        return 0;
-    } else if (scaled && x > ONE_SQRT2EPS) {
-        return ONE_SQRTPI / x;
-    }
-    double z = x * x;
-    double y = scaled ? 1 : exp(-z);
-
-    if ((x * DBL_MIN) > (y * ONE_SQRTPI)) {
-        return 0;
-    }
-    else {
-        static const double p0 = -4.25799643553e-02;
-        static const double p1 = -1.96068973726e-01;
-        static const double p2 = -5.16882262185e-02;
-        static const double q0 = 1.50942070545e-01;
-        static const double q1 = 9.21452411694e-01;
-        z = 1 / z;
-        z *= ((p2 * z + p1) * z + p0) / ((z + q1) * z + q0);
-        return y * (ONE_SQRTPI + z) / x;
-    }
-}
-
-// function to perform a rational approximation
-static NPY_INLINE double
-ratfun(double x, size_t n, size_t m, const double* arr1, const double* arr2)
-{
-    double num, den;
-    size_t i, k;
-
-    for (i = n - 1, num = arr1[n]; -1 < i; i--) {
-        num = num * x + arr1[i]; 
-    }
-    for (k = m - 1, den = arr2[m]; -1 < k; k--) {
-        den = den * x + arr2[k]; 
-    }
-    return num / den;
-}
-
-// exp(x) - 1
-static NPY_INLINE double
-expmin1(double x)
-{
-    static double a[] = {
-        9.999999998390e-01, 6.652950247674e-2,
-        2.331217139081e-2, 1.107965764952e-3
-    };
-    static double b[] = {
-        1.000000000000e+0, -4.334704979491e-1,
-        7.338073943202e-2, -5.003986850699e-3
-    };
-
-    if (x < LOG_EPS) {
-        return -1;
-    }
-    else if (x > EXP_HIGH) {
-        return DBL_MAX;
-    }
-    else if (x < -0.69 || x > 0.41) {
-        return exp(x) - 1;
-    }
-    else {
-        return expm1(x);
-    }
-    //else return expm1(x);
-    //else y = ratfun(x, 3, 3, a, b) * x;
-}
-
-// log(1 + x) - x
+/*
+ * Computes f(x) = log(1 + x) - x while avoiding cancellation issues.
+ *
+ * Algorithm is from [1]. For the range -0.7 <=x<=1.3 a rational approximation
+ * is used.
+ *
+ * References
+ * ----------
+ * [1] Temme, N. (1994). A Set of Algorithms for the Incomplete Gamma Functions.
+ *     Probability in the Engineering and Informational Sciences, 8(2),
+ *     291-307. doi:10.1017/S0269964800003417.
+ */
 static NPY_INLINE double
 log1pminx(double x)
 {
-    static double a[] = {
-         -4.999999994526e-1, -5.717084236157e-1, -1.423751838241e-1,
-         -8.310525299547e-4, 3.899341537646e-5
-    };
-    static double b[] = {
-        1.000000000000e+0, 1.810083408290e+0, 
-        9.914744762863e-1, 1.575899184525e-1
-    };
-    double z;
+    static const double p0 = -4.999999994526e-01;
+    static const double p1 = -5.717084236157e-01;
+    static const double p2 = -1.423751838241e-01;
+    static const double p3 = -8.310525299547e-04;
+    static const double p4 = 3.899341537646e-05;
+    static const double q1 = 1.810083408290e+00;
+    static const double q2 = 9.914744762863e-01;
+    static const double q3 = 1.575899184525e-01;
 
     if (x <= -1) {
         return -DBL_MAX;
@@ -218,144 +55,206 @@ log1pminx(double x)
         return -0.5 * sqrt(x);
     }
     else if (x > 0) {
-        return sqrt(x) * ratfun(x, 4, 3, a, b);
+        return sqrt(x) * ((((p4 * x + p3) * x + p2) * x + p1) * x + p0) /
+                          (((q3 * x + q2) * x + q1) * x + 1);
     }
     else {
-        z = -x / (1 + x);
+        double z = -x / (1 + x);
         if (z > 1.36) {
             return -(log(1 + z) - z) + x * z;
         }
         else {
-            return -sqrt(z) * ratfun(z, 4, 3, a, b);
+            return -sqrt(z) * ((((p4 * z + p3) * z + p2) * z + p1) * z + p0) /
+                                (((q3 * z + q2) * z + q1) * z + 1) + x * z;
         }
     }
 }
 
-// Gamma*(x)
+/*
+ * Computes the tempered gamma function for x > 0.
+ *
+ * The function is defined as Gamma(x) = * sqrt(2pi)*exp(-x)*x^(x-0.5)*gammastar(x).
+ * where gammastar is the tempered gamma function, as described in [1].
+ *
+ * References
+ * ----------
+ * [1] Temme, N. (1994). A Set of Algorithms for the Incomplete Gamma Functions.
+ *     Probability in the Engineering and Informational Sciences, 8(2),
+ *     291-307. doi:10.1017/S0269964800003417.
+ */
 static NPY_INLINE double
 gammastar(double x)
 {
-    double a;
-
-    if (x > 1e10) {
-        if (x > (1 / (12 * DBL_EPSILON))) {
-            return 1;
-        }
-        else {
-            return 1 + 1 / (12 * x);
-        }
+    if (x > 1e+10) {
+        return x > (1 / (12 * DBL_EPSILON)) ? 1 : 1 + 1 / (12 * x);
     }
     else if (x >= 12) {
-        a = 1 / x;
-        return (1.000000000949 + a * (9.781658613041e-1 + a * 7.806359425652e-2)) /
-               (1 + a * 8.948328926305e-1);
+        static const double p0 = 1.000000000949e+00;
+        static const double p1 = 9.781658613041e-01;
+        static const double p2 = 7.806359425652e-02;
+        static const double q1 = 8.948328926305e-01;
+        double a = 1 / x;
+        return ((p2 * a + p1) * a + p0) / (q1 * a + 1);
     }
     else if (x >= 1) {
-        static const double arr1[] = {
-            5.115471897484e-2, 4.990196893575e-1,
-            9.404953102900e-1, 9.999999625957e-1
-        };
-        static const double arr2[] = {
-            1.544892866413e-2, 4.241288251916e-1,
-            8.571609363101e-1, 1.000000000000e+0,
-        };
-        return ratfun(x, 3, 3, arr1, arr2);
+        static const double p0 = 5.115471897484e-02;
+        static const double p1 = 4.990196893575e-01;
+        static const double p2 = 9.404953102900e-01;
+        static const double p3 = 9.999999625957e-01;
+        static const double q0 = 1.544892866413e-02;
+        static const double q1 = 4.241288251916e-01;
+        static const double q2 = 8.571609363101e-01;
+        return (((p3 * x + p2) * x + p1) * x + p0) / (((x + q2) * x + q1) * x + q0);
     }
     else if (x > DBL_MIN) {
-        a = 1 + 1 / x;
+        double a = 1 + 1 / x;
         return gammastar(x + 1) * sqrt(a) * exp(x * log(a) - 1);
     }
     else {
-        return 1 / (SQRT_2PI * SQRT_MIN);
+        // 1 / (sqrt(2 * pi) * sqrt(DBL_MIN));
+        return 2.6744707353778563e+153;
     }
 }
 
-//g(x) in 1/Gamma(1 + x) = 1 + x * (x - 1) * g(x) for 0<=x<=1
+/*
+ * Computes g(x) in 1/Gamma(1 + x) = 1 + x * (x - 1) * g(x) for 0<=x<=1, as
+ * described in [1].
+ *
+ * References
+ * ----------
+ * [1] Temme, N. (1994). A Set of Algorithms for the Incomplete Gamma Functions.
+ *     Probability in the Engineering and Informational Sciences, 8(2),
+ *     291-307. doi:10.1017/S0269964800003417.
+ */
 static NPY_INLINE double
 auxgam(double x)
 {
-    static const double arr1[] = {
-        -5.772156647338e-1, -1.087824060619e-1,
-        4.369287357367e-2, -6.127046810372e-3,
-    };
-    static const double arr2[] = {
-        1.000000000000e+0, 3.247396119172e-1, 1.776068284106e-1,
-        2.322361333467e-2, 8.148654046054e-3,
-    };
+    static const double p0 = -5.772156647338e-01;
+    static const double p1 = -1.087824060619e-01;
+    static const double p2 = 4.369287357367e-02;
+    static const double p3 = -6.127046810372e-03;
+    static const double q1 = 3.247396119172e-01;
+    static const double q2 = 1.776068284106e-01;
+    static const double q3 = 2.322361333467e-02;
+    static const double q4 = 8.148654046054e-03;
 
     if (x <= -1) {
         return -0.5;
     }
     else if (x < 0) {
-        return -(1 + sqrt(x + 1) * ratfun(x + 1, 3, 4, arr1, arr2)) / (1 - x);
+        double z = x + 1;
+        double r = ((((z + p3) * z + p2) * z + p1) * z + p0) /
+                    ((((q4 * z + q3) * z + q2) * z + q1) * z + 1);
+        return -(1 + sqrt(z) * r) / (1 - x);
     }
     else if (x <= 1) {
-        return ratfun(x, 3, 4, arr1, arr2);
+        return ((((x + p3) * x + p2) * x + p1) * x + p0) /
+                ((((q4 * x + q3) * x + q2) * x + q1) * x + 1);
     }
     else if (x <= 2) {
-        return ((x - 2) * ratfun(x - 1, 3, 4, arr1, arr2) - 1) / sqrt(x);
+        double z = x - 1;
+        double r = ((((z + p3) * z + p2) * z + p1) * z + p0) /
+                    ((((q4 * z + q3) * z + q2) * z + q1) * z + 1);
+        return (r * (z - 1) - 1) / sqrt(x);
     }
     else {
         return (1 / tgamma(x + 1) - 1) / (x * (x - 1));
     }
 }
 
-// D(a, x) = x^a * e^-x / Gamma(a + 1)
+/*
+ * Computes the function D(a, x) = x^a * e^-x / Gamma(a + 1),.
+ *
+ * It is common occuring term in many representations of the incomplete gamma
+ * function. Careful computaton of the term is required especially for large
+ * arguments because it determines the accuracy of the result of the incomplete
+ * gamma function.
+ *
+ * Here, mu = (x - a) / a
+ *
+ * References
+ * ----------
+ * [1] Temme, N. (1994). A Set of Algorithms for the Incomplete Gamma Functions.
+ *     Probability in the Engineering and Informational Sciences, 8(2),
+ *     291-307. doi:10.1017/S0269964800003417.
+ */
 static NPY_INLINE double
-compute_dax(double a, double x)
+compute_dax(double a, double mu)
 {
     static const double twopi = 6.283185307179586;
-    double dp;
+    static const double log_min = -708.3964185322641;  // log(DBL_MIN)
 
-    dp = a * log1pminx((x - a) / a) - 0.5 * log(twopi * a);
-    if (dp < EXP_LOW) {
-        return 0;
-    }
-    else {
-        return exp(dp) / gammastar(a);
-    }
+    double dp = a * log1pminx(mu) - 0.5 * log(twopi * a);
+    return dp < log_min ? 0 : exp(dp) / gammastar(a);
 }
 
-// compute Q(a, x) using the taylor series expansion for P(a, x);
+/*
+ * Compute Q(a, x) using Gautschi's algorithm for the taylor series expansion of
+ * P(a, x) and the relation Q(a, x) = 1 - P(a, x).
+ *
+ * Gil et al [3] shows that no more than 30 terms are needed for a <= 10000 for
+ * the series to converge if used when x <= 0.3 * a and epsilon = 1e-15.
+ *
+ * References
+ * ----------
+ * [1] Temme, N. (1994). A Set of Algorithms for the Incomplete Gamma Functions.
+ *     Probability in the Engineering and Informational Sciences, 8(2),
+ *     291-307. doi:10.1017/S0269964800003417.
+ * [2] Gautschi, W. (1979). A computational procedure for incomplete gamma
+ *     functions. ACM Trans-actions on Mathematical Software 5: 466-481.
+ * [3] A. Gil, J. Segura, and N. M. Temme. 2012. Efficient and accurate
+ *     algorithms for the computation and inversion of the incomplete gamma
+ *     function ratios. SIAM Journal on Scientific Computing 34, 6 (2012),
+ *     A2965--A2981.
+ */
 #define PGM_EPS 1e-15
 static NPY_INLINE double
-q_taylorp(double a, double x)
+taylor_p(double a, double x)
 {
-	double sum, r, dax;
-	size_t n;
-
-    dax = compute_dax(a, x);
+    double dax = compute_dax(a, (x - a) / a);
     if (dax == 0) {
-        return 1; 
+        return 1;
     }
 
-	for (n = 1, sum = r = 1; n < 100; n++) {
+    double sum = 1, r = 1;
+	for (size_t n = 1; n < 30 && (r / sum) > PGM_EPS; n++) {
 		sum += (r *= x / (a + n));
-		if (r / sum < PGM_EPS) {
-            break;
-        }
 	}
     return 1 - dax * sum;
 }
 
-
-// compute Q(a, x) using a specialized Taylor expansion when x is small.
+/*
+ * Compute Q(a, x) using Gautschi's algorithm of a Taylor expansion when x<1.
+ *
+ * Gil et al [3] uses this algorithm when 0 < x <= 1.5 and a > threshold, where
+ * the threshold depends on the value of x.
+ *
+ * References
+ * ----------
+ * [1] Temme, N. (1994). A Set of Algorithms for the Incomplete Gamma Functions.
+ *     Probability in the Engineering and Informational Sciences, 8(2),
+ *     291-307. doi:10.1017/S0269964800003417.
+ * [2] Gautschi, W. (1979). A computational procedure for incomplete gamma
+ *     functions. ACM Trans-actions on Mathematical Software 5: 466-481.
+ * [3] A. Gil, J. Segura, and N. M. Temme. 2012. Efficient and accurate
+ *     algorithms for the computation and inversion of the incomplete gamma
+ *     function ratios. SIAM Journal on Scientific Computing 34, 6 (2012),
+ *     A2965--A2981.
+ */
 static NPY_INLINE double
-q_taylorq(double a, double x, double logx)
+taylor_q(double a, double x, double logx)
 {
     size_t i;
-    double p, q, r, s, t, u, v;
-
-    r = a * logx;
-    q = expmin1(r);
-    s = -a * (a - 1) * auxgam(a);
-    u = s - q * (1 - s);
-
-    for (i = 0, p = a * x, q = a + 1, r = a + 3, t = v = 1; i < 200; i++) {
+    double v, t;
+    double s = -a * (a - 1) * auxgam(a);
+    double u = s - expm1(a * logx) * (1 - s);
+    double r = a + 3;
+    double p = a * x;
+    double q = a + 1;
+    for (i = 0, v = t = 1; i < 100; r += 2, i++) {
         p += x;
         q += r;
-        r += 2;
-        t = -p * t / q;
+        t *= -p / q;
         v += t;
         if (fabs(t / v) < PGM_EPS) {
             break;
@@ -365,26 +264,41 @@ q_taylorq(double a, double x, double logx)
     return u + v;
 }
 
-// compute Q(a, x) using a continued fraction expansion.
+/*
+ * Compute Q(a, x) using Gautschi's algorithm of a continued fraction.
+ *
+ * GIl et al [3] uses this expansion for when x > 2.35 * a and/or a < 12.
+ *
+ * References
+ * ----------
+ * [1] Temme, N. (1994). A Set of Algorithms for the Incomplete Gamma Functions.
+ *     Probability in the Engineering and Informational Sciences, 8(2),
+ *     291-307. doi:10.1017/S0269964800003417.
+ * [2] Gautschi, W. (1979). A computational procedure for incomplete gamma
+ *     functions. ACM Trans-actions on Mathematical Software 5: 466-481.
+ * [3] A. Gil, J. Segura, and N. M. Temme. 2012. Efficient and accurate
+ *     algorithms for the computation and inversion of the incomplete gamma
+ *     function ratios. SIAM Journal on Scientific Computing 34, 6 (2012),
+ *     A2965--A2981.
+ */
 static NPY_INLINE double
-q_continued_frac(double a, double x)
+continued_frac(double a, double x)
 {
-    size_t i;
-    double dax, c, g, r, s, t, tau, ro, p, q; 
-
-    dax = compute_dax(a, x);
+    double dax = compute_dax(a, (x - a) / a);
     if (dax == 0) {
-        return 0;
+        return 1;
     }
 
-    c = x + 1 - a;
-    q = (x - 1 - a) * c;
-    for (i = p = ro = 0, t = g = 1, r = 4 * c, s = 1 - a; i < 200; i++) {
+    size_t i;
+    double g, t, tau, ro, p;
+    double c = x + 1 - a;
+    double q = (x - 1 - a) * c;
+    double r = 4 * c;
+    double s = 1 - a;
+    for (i = p = ro = 0, t = g = 1; i < 100; r += 8, s += 2, i++) {
         p += s;
-        q += r;
-        r += 8;
-        s += 2;
         tau = p * (ro + 1);
+        q += r;
         ro = tau / (q - tau);
         t *= ro;
         g += t;
@@ -395,7 +309,34 @@ q_continued_frac(double a, double x)
     return (a / c) * g * dax;
 }
 
-// compute Q(a, x) using the asymptotic expansion
+/*
+ * compute Q(a, x) using a uniformly asymptotic expansion explained in [1].
+ *
+ * Gil et al [4] uses this expansion when a >= 12 and |eta| <= 1, where eta
+ * satisfies the expression 0.5 * eta^2 = (x/a) - 1 - log(x/a). They also use
+ * 25 coefficients for the recursive infinite sum used to compute the
+ * expansion. This is said to be sufficient for a = 12, and fewer coefficients
+ * are needed for larger a. We use the representation in equation 5.1 of [4].
+ * Cofficients 1-16 are obtained from [1] and coefficients 17-26 from the
+ * cephes library, via Scipy's `scipy.special` module at:
+ * https://github.com/scipy/scipy/blob/master/scipy/special/cephes/igam.h
+ *
+ * References
+ * ----------
+ * [1] Temme, N. (1994). A Set of Algorithms for the Incomplete Gamma Functions.
+ *     Probability in the Engineering and Informational Sciences, 8(2),
+ *     291-307. doi:10.1017/S0269964800003417.
+ * [2] Temme, N.M. (1979). The asymptotic expansions of the incomplete gamma
+ *     functions. SIAM Journal on Mathematical Analysis 10: 239-253. 8.
+ * [3] Temme, N.M. (1987). On the computation of the incomplete gamma functions
+ *     for large values of the parameters. In E.J.C. Mason & M.G. Cox (eds.),
+ *     Algorithms for approximation. Pro-ceedings of the IMA-Conference,
+ *     Shrivenham, July 15-19, 1985, Oxford, Clarendon, pp. 479-489.
+ * [4] A. Gil, J. Segura, and N. M. Temme. 2012. Efficient and accurate
+ *     algorithms for the computation and inversion of the incomplete gamma
+ *     function ratios. SIAM Journal on Scientific Computing 34, 6 (2012),
+ *     A2965--A2981.
+ */
 static NPY_INLINE double
 q_asymp(double a, double x)
 {
@@ -415,80 +356,86 @@ q_asymp(double a, double x)
         -1.3923887224181621e-13, 2.8534893807047443e-14,
         -5.1391118342425726e-16, -1.9752288294349443e-15
     };
-    double dax, mu, y, eta, v, s, u, t; 
-    size_t i;
 
-    dax = compute_dax(a, x);
+    double mu = (x - a) / a;
+    double dax = compute_dax(a, mu);
     if (dax == 0) {
-        return 1;
+        return mu < 0 ? 1 : 0;
     }
 
-    double bm[26] = {0};
-    mu = (x - a) / a;
-    y = -log1pminx(mu); 
-    eta = sqrt(2 * y);
-    v = 0.5 * kf_erfc(sqrt(a * y)) * gammastar(a) * sqrt(twopi * a);
-    s = 1;
-    if (mu < 0) {
-        s = -1;
-        eta *= s;
-    }
+    double y = -log1pminx(mu);
+    double eta = sqrt(2 * y);
+    double v = 0.5 * pgm_erfc(sqrt(a * y), true) * gammastar(a) * sqrt(twopi * a);
+    size_t i;
+    double s = mu < 0 ? -1 : 1;
+    double bm[25] = {0};
+    double u, t;
+    eta *= s;
     for (i = 23, u = 0, bm[24] = fm[25], bm[23] = fm[24]; i > 0; i--) {
         t = fm[i] + (i + 1) * bm[i + 1] / a;
         u = eta * u + t;
         bm[i - 1] = t;
     }
     u *= s;
-    if (s == 1) {
-        return (u + v) * dax;
-    }
-    return 1 - (u + v) * dax;
+    return s == 1 ? (u + v) * dax : 1 - (u + v) * dax;
 }
 
 /*
- * Compute Q(a, x) using Gil's algorithm [1].
+ * Compute Q(a, x), the upper incomplete gamma ratio using Gil's algorithm [1].
+ *
+ * An appropriate expansion is used depending on the pair (a, x). Refer to [1]
+ * for more details.
+ *
+ * For integer and half-integer values we use special cased expansion that are
+ * more efficient than the ones outlined by Gil et al [2].
  *
  * References
  * ----------
- *  [1]
+ *  [1] A. Gil, J. Segura, and N. M. Temme. 2012. Efficient and accurate
+ *      algorithms for the computation and inversion of the incomplete gamma
+ *      function ratios. SIAM Journal on Scientific Computing 34, 6 (2012), A2965--A2981
+ *  [2] https://www.boost.org/doc/libs/1_71_0/libs/math/doc/html/math_toolkit/sf_gamma/igamma.html
  */
 NPY_INLINE double
 pgm_gammaq(double a, double x)
 {
     static const double loghalf = -0.6931471805599453;
-    static const double one_sqrtpi = 0.5641895835477563;
-    double alpha, sum, z, sqrt_x, logx;
-    size_t aa, k;
+    size_t aa = (size_t)a;
 
-    aa = (size_t)a;
     if (a < 30 && a == aa) {
+        size_t k;
+        double sum, z;
         for (k = sum = z = 1; k < aa; k++) {
             sum += (z *= x / k);
         }
         return exp(-x) * sum;
     }
     else if (a < 30 && a == (aa + 0.5)) {
-        sqrt_x = sqrt(x);
+        static const double one_sqrtpi = 0.5641895835477563;
+        size_t k;
+        double sum, z;
+        double sqrt_x = sqrt(x);
         for (k = z = 1, sum = 0; k < aa + 1; k++) {
             sum += (z *= x / (k - 0.5));
         }
-        return kf_erfc(sqrt_x) + exp(-x) * one_sqrtpi * sum / sqrt_x;
-    }
-    else {
-        logx = log(x);
-        alpha = x >= 0.5 ? x : loghalf / logx; 
+        return pgm_erfc(sqrt_x, false) + exp(-x) * one_sqrtpi * sum / sqrt_x;
     }
 
+    double logx = log(x);
+    double alpha = x >= 0.5 ? x : loghalf / logx;
+
     if (a > alpha) {
-        return (x < 0.3 * a) || a < 12 ? q_taylorp(a, x) : q_asymp(a, x);
+        return (x < 0.3 * a) || a < 12 ? taylor_p(a, x) : q_asymp(a, x);
     }
     else if (a < -DBL_MIN / logx) {
         return 0;
     }
-    else if (x < 1) {
-        return q_taylorq(a, x, logx);
+    else if (x <= 1.5) {
+        return taylor_q(a, x, logx);
     }
     else {
-        return (x > 2.35 * a) || a < 12 ? q_continued_frac(a, x) : q_asymp(a, x);
+        return (x > 2.35 * a) || a < 12 ? continued_frac(a, x) : q_asymp(a, x);
     }
 }
+
+#undef PGM_EPS

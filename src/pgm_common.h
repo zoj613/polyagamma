@@ -11,6 +11,7 @@
 #define PGM_1_SQRTPI 0.5641895835477563   // 1 / sqrt(pi)
 
 
+double pgm_gammaq(double s, double x);
 /*
  * Compute the complementary error function or its scaled version.
  *
@@ -349,45 +350,6 @@ random_right_bounded_inverse_gaussian(bitgen_t* bitgen_state, double mu,
         x = random_wald(bitgen_state, mu, lambda);
     } while (x >= t);
     return x;
-}
-
-/* compute the upper incomplete gamma function.
- *
- * This function extends `kf_gammaq` by accounting for integer and half-integer
- * arguments of `s` when s < 30.
- *
- * TODO: Need to get rid of `kf_gammaq` entirely and re-implement upper
- * incomplete gamma using the algorithm in [1]. See GH Issue #36.
- *
- * References
- * ----------
- *  [1] Rémy Abergel and Lionel Moisan. 2020. Algorithm 1006: Fast and Accurate
- *      Evaluation of a Generalized Incomplete Gamma Function. ACM Trans. Math.
- *      Softw. 46, 1, Article 10 (April 2020), 24 pages. DOI:doi.org/10.1145/3365983
- */
-NPY_INLINE double
-pgm_gammaq(double s, double x)
-{
-    // 1 / sqrt(pi)
-    static const double one_sqrtpi = 0.5641895835477563;
-    size_t ss, k;
-    double sum, a, sqrt_x;
-
-    ss = (size_t)s;
-    if (s == ss && s < 30) {
-        for (k = sum = a = 1; k < ss; k++) {
-            sum += (a *= x / k);
-        }
-        return exp(-x) * sum;
-    }
-    else if (s == (ss + 0.5) && s < 30) {
-        sqrt_x = sqrt(x);
-        for (k = a = 1, sum = 0; k < ss + 1; k++) {
-            sum += (a *= x / (k - 0.5));
-        }
-        return pgm_erfc(sqrt_x, false) + exp(-x) * one_sqrtpi * sum / sqrt_x;
-    }
-    return kf_gammaq(s, x);
 }
 
 #endif
