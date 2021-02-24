@@ -9,7 +9,6 @@ source_files = [
     "polyagamma/_polyagamma.c",
     "src/pgm_random.c",
     "src/pgm_alternate.c",
-    "src/pgm_igammaq.c",
     "src/pgm_devroye.c",
     "src/pgm_common.c",
     "src/pgm_saddle.c",
