@@ -53,7 +53,7 @@ initialize_config(struct config* cfg, double z)
         cfg->mu = 1 / z;
         cfg->k = PGM_PI2_8 + 0.5 * z * z;
         q = NPY_PI_2 * exp(-cfg->k * T) / cfg->k;
-        p = 2 * exp(-z) * inverse_gaussian_cdf(T, cfg->mu, 1);
+        p = 2 * exp(-z) * inverse_gaussian_cdf(T, cfg->mu, 1, false);
         cfg->ratio = p / (p + q);
     }
     else {

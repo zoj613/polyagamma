@@ -13,6 +13,7 @@
 #define PGM_LOGPI_2 0.4515827052894548  // log(pi / 2)
 #define PGM_LS2PI 0.9189385332046727  // log(sqrt(2 * pi))
 #define PGM_1_SQRTPI 0.5641895835477563   // 1 / sqrt(pi)
+#define PGM_MAX_EXP 708.3964202663686  // maximum allowed exp() argument
 
 
 /*
@@ -97,15 +98,21 @@ pgm_erfc(double x)
 
 /*
  * Calculate the cumulative distribution function of an Inverse-Gaussian.
+ *
+ * the robust variable is set to true to avoid exp() overflow with large
+ * values for lambda. Otherwise, it is set to false in other cases to avoid
+ * unnecessary log() call.
  */
 NPY_INLINE double
-inverse_gaussian_cdf(double x, double mu, double lambda)
+inverse_gaussian_cdf(double x, double mu, double lambda, bool robust)
 {
-    double a = sqrt(0.5 * lambda / x);
+    double a = sqrt(0.5 * (lambda / x));
     double b = a * (x / mu);
-    double c = exp(lambda / mu);
 
-    return 0.5 * (pgm_erfc(a - b) + c * pgm_erfc(b + a) * c);
+    if (robust) {
+        return 0.5 * (pgm_erfc(a - b) + exp(2 * (lambda / mu) + log(pgm_erfc(b + a))));
+    }
+    return 0.5 * (pgm_erfc(a - b) + exp(2 * lambda / mu) * pgm_erfc(b + a));
 }
 
 /*
@@ -249,7 +256,7 @@ pgm_lgamma(double z)
             return -log(z);
         }
         else {
-            return 708.3964202663686;  //-log(DBL_MIN);
+            return PGM_MAX_EXP;
         }
     }
 }
@@ -514,10 +521,20 @@ pgm_gammaq(double p, double x, bool normalized)
     }
     else if (x_smaller) {
         double lgam = pgm_lgamma(p);
-        return (1 - f * exp(-x + p * log(x) - lgam)) * exp(lgam);
+        double exp_lgam = lgam >= PGM_MAX_EXP ? exp(PGM_MAX_EXP) : exp(lgam);
+        double arg = -x + p * log(x) - lgam;
+
+        if (arg >= PGM_MAX_EXP) {
+            arg = PGM_MAX_EXP;
+        }
+        else if (arg <= -PGM_MAX_EXP) {
+            arg = -PGM_MAX_EXP;
+        }
+        return (1 - f * exp(arg)) * exp_lgam;
     }
     else {
-        return f * exp(-x + p * log(x));
+        double arg = -x + p * log(x);
+        return f * (arg >= PGM_MAX_EXP ? exp(PGM_MAX_EXP) : exp(arg));
     }
 }
 
