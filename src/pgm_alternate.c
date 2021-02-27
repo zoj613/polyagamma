@@ -58,11 +58,10 @@ get_truncation_point(double h)
         }
         break;
     }
-    double x0, x1, f0, f1;
-    x0 = pgm_h[index - 1];
-    f0 = pgm_f[index - 1];
-    x1 = pgm_h[index + 1];
-    f1 = pgm_f[index + 1];
+    double x0 = pgm_h[index - 1];
+    double f0 = pgm_f[index - 1];
+    double x1 = pgm_h[index + 1];
+    double f1 = pgm_f[index + 1];
     return f0 + (f1 - f0) * (pgm_h[index] - x0) / (x1 - x0);
 }
 
@@ -77,7 +76,7 @@ piecewise_coef(size_t n, struct config* cfg)
 
     return exp(cfg->hlog2 + lgamh_plus_n + log(h_plus_2n) - cfg->lgammah -
                pgm_lgamma(n + 1) - PGM_LS2PI - 1.5 * cfg->logx - 
-               0.5 * h_plus_2n * h_plus_2n / cfg->x);
+               0.5 * (h_plus_2n * h_plus_2n) / cfg->x);
 }
 
 
@@ -85,16 +84,15 @@ piecewise_coef(size_t n, struct config* cfg)
 static NPY_INLINE double
 bounding_kernel(struct config* cfg)
 {
-    static const double lsp_2 = 0.22579135264472733;  // log(sqrt(pi / 2))
-    double logx = cfg->logx;
-    double h = cfg->h;
-    double x = cfg->x;
-
-    if (x > cfg->t) {
-        return exp(h * lsp_2 + (h - 1) * logx - PGM_PI2_8 * x - cfg->lgammah);
+    if (cfg->x > cfg->t) {
+        // log(sqrt(pi / 2))
+        static const double lsp_2 = 0.22579135264472733;
+        return exp(cfg->h * lsp_2 + (cfg->h - 1) * cfg->logx -
+                   PGM_PI2_8 * cfg->x - cfg->lgammah);
     }
-    else if (x > 0) {
-        return exp(cfg->hlog2 + cfg->logh - PGM_LS2PI - 0.5 * cfg->h2 / x - 1.5 * logx);
+    else if (cfg->x > 0) {
+        return exp(cfg->hlog2 + cfg->logh - PGM_LS2PI -
+                   0.5 * cfg->h2 / cfg->x - 1.5 * cfg->logx);
     }
     return 0;
 }
@@ -111,15 +109,17 @@ static NPY_INLINE void
 calculate_ratio(struct config* cfg)
 {
     double p, q;
-    double h = cfg->h, z = cfg->z, t = cfg->t;
 
-    if (z > 0) {
-        p = exp(cfg->hlog2 - h * z) * inverse_gaussian_cdf(t, cfg->h_z, cfg->h2, false);
+    if (cfg->z > 0) {
+        p = exp(cfg->hlog2 - cfg->h * cfg->z) *
+            inverse_gaussian_cdf(cfg->t, cfg->h_z, cfg->h2, false);
     }
     else {
-        p = exp(cfg->hlog2) * pgm_erfc(h / sqrt(2 * t));
+        p = exp(cfg->hlog2) * pgm_erfc(cfg->h / sqrt(2 * cfg->t));
     }
-    q = exp(h * (PGM_LOGPI_2 - cfg->log_lambda_z)) * pgm_gammaq(h, cfg->lambda_z * t, true);
+    q = exp(cfg->h * (PGM_LOGPI_2 - cfg->log_lambda_z)) *
+            pgm_gammaq(cfg->h, cfg->lambda_z * cfg->t, true);
+
     cfg->ratio = p / (p + q);
 }
 
@@ -131,7 +131,7 @@ static NPY_INLINE void
 initialize_config(struct config* cfg, double h, double z)
 {
     cfg->z = z;
-    cfg->lambda_z = z ? (PGM_PI2 / 8 + 0.5 * z * z) : PGM_PI2 / 8;
+    cfg->lambda_z = z > 0 ? PGM_PI2_8 + 0.5 * (z * z) : PGM_PI2_8;
     cfg->log_lambda_z = log(cfg->lambda_z);
 
     cfg->h = h;
@@ -142,7 +142,7 @@ initialize_config(struct config* cfg, double h, double z)
     cfg->lgammah = pgm_lgamma(h);
     cfg->half_h2 = 0.5 * cfg->h2;
     cfg->hlog2 = h * PGM_LOG2;
-    cfg->h_z = z ? h / z : 0;
+    cfg->h_z = z > 0 ? h / z : 0;
 
     calculate_ratio(cfg);
 }
@@ -159,7 +159,7 @@ update_config(struct config* cfg, double h)
     cfg->lgammah = pgm_lgamma(h);
     cfg->half_h2 = 0.5 * cfg->h2;
     cfg->hlog2 = h * PGM_LOG2;
-    if (cfg->z) cfg->h_z = h / cfg->z;
+    if (cfg->z > 0) cfg->h_z = h / cfg->z;
 
     calculate_ratio(cfg);
 }
@@ -176,9 +176,6 @@ update_config(struct config* cfg, double h)
 static NPY_INLINE double
 random_jacobi_alternate_bounded(bitgen_t* bitgen_state, struct config* cfg)
 {
-    size_t n;
-    double u, s, old_s;
-
     for (;;) {
         if (next_double(bitgen_state) > cfg->ratio) {
             cfg->x = random_left_bounded_gamma(bitgen_state, cfg->h,
@@ -194,11 +191,11 @@ random_jacobi_alternate_bounded(bitgen_t* bitgen_state, struct config* cfg)
         }
 
         cfg->logx = log(cfg->x);
-        u = next_double(bitgen_state) * bounding_kernel(cfg);
-        s = piecewise_coef(0, cfg);
+        double u = next_double(bitgen_state) * bounding_kernel(cfg);
+        double s = piecewise_coef(0, cfg);
 
-        for (n = 1;; ++n) {
-            old_s = s;
+        for (size_t n = 1;; ++n) {
+            double old_s = s;
             if (n & 1) {
                 s -= piecewise_coef(n, cfg);
                 if ((old_s >= s) && (u <= s))
@@ -239,13 +236,13 @@ NPY_INLINE double
 random_polyagamma_alternate(bitgen_t *bitgen_state, double h, double z)
 {
     struct config cfg;
-    double out = 0, chunk_size = pgm_h_range;
+    double out = 0;
 
     if (h > 4) {
-        initialize_config(&cfg, chunk_size, z);
+        initialize_config(&cfg, pgm_h_range, z);
         while (h > 4) {
             out += random_jacobi_alternate_bounded(bitgen_state, &cfg);
-            h -= chunk_size;
+            h -= pgm_h_range;
         }
         update_config(&cfg, h);
         out += random_jacobi_alternate_bounded(bitgen_state, &cfg);
