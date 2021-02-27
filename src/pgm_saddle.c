@@ -5,27 +5,23 @@
 #include "pgm_saddle.h"
 
 
-typedef enum {LEFT, RIGHT} SIDE_t;
-
 struct config {
+    // shape parameter
+    double h;
+    // exponential tilting parameter
+    double z;
+    // a sample from the proposal distribution
+    double x;
     // center point
     double xc;
-    // inverse of center point
-    double one_xc;
     // log of center point
     double logxc;
-    // left tangent point
-    double xl;
-    // right tangent point
-    double xr;
     // derivative of the line to xl
     double Lprime_l;
     // derivative of the line to xr
     double Lprime_r;
     // sqrt(1 / alpha_l) constant
     double sqrt_alpha_l;
-    // sqrt(1 / alpha_r) constant
-    double sqrt_alpha_r;
     // y intercept of tangent line to xl.
     double intercept_l;
     // y intercept of tangent line to xr.
@@ -40,6 +36,8 @@ struct config {
     double half_h;
     // 0.5 * h / xc
     double hh_xc;
+    // 0.5 * z * z
+    double half_z2;
 };
 
 /*
@@ -65,20 +63,17 @@ struct config {
 static NPY_INLINE double
 tanh_x(double x)
 {
+    if (x > 4.95) {
+        return 1 / x;
+    }
     static const double p0 = -0.16134119023996228053e+04;
     static const double p1 = -0.99225929672236083313e+02;
     static const double p2 = -0.96437492777225469787e+00;
     static const double q0 = 0.48402357071988688686e+04;
     static const double q1 = 0.22337720718962312926e+04;
     static const double q2 = 0.11274474380534949335e+03;
-    double x2, r;
-
-    if (x > 4.95) {
-        return 1 / x;
-    }
-    x2 = x * x;
-    r = x2 * ((p2 * x2 + p1) * x2 + p0) / (((x2 + q2) * x2 + q1) * x2 + q0);
-    return 1 + r;
+    double x2 = x * x;
+    return 1 + x2 * ((p2 * x2 + p1) * x2 + p0) / (((x2 + q2) * x2 + q1) * x2 + q0);
 }
 
 /*
@@ -98,18 +93,16 @@ struct func_return {
 static NPY_INLINE void
 cgf_prime(double u, struct func_return* ret)
 {
-    double ss;
     double s = 2 * u;
 
     if (s == 0) {
         ret->f = 1;
     }
     else if (s < 0) {
-        ss = sqrt(-s);
-        ret->f = tanh_x(ss);
+        ret->f = tanh_x(sqrt(-s));
     }
     else {
-        ss = sqrt(s);
+        double ss = sqrt(s);
         ret->f = tan(ss) / ss;
     }
     ret->fprime = ret->f * ret->f + (1 - ret->f) / s;
@@ -182,11 +175,11 @@ static NPY_INLINE double
 newton_raphson(double arg, double x0, struct func_return* value)
 {
     static const double atol = 1e-20, rtol = 1e-05;
-    double fval, x = 0;
+    double x = 0;
 
     for (size_t i = 0; i < PGM_MAX_ITER; i++) {
         cgf_prime(x0, value);
-        fval = value->f - arg;
+        double fval = value->f - arg;
         if (fabs(fval) <= rtol) {
             return x0;
         }
@@ -208,27 +201,16 @@ newton_raphson(double arg, double x0, struct func_return* value)
 static NPY_INLINE double
 cgf(double u, double z)
 {
-    double s, out;
-
-    if (z == 0) {
-        out = 0;
-    }
-    else {
-        out = log(cosh(z));
-    }
+    double out = z > 0 ? log(cosh(z)) : 0;
 
     if (u == 0) {
         return out;
     }
     else if (u > 0) {
-        s = 2 * u;
-        s = sqrt(s);
-        out -= log(cos(s));
+        out -= log(cos(sqrt(2 * u)));
     }
     else {
-        s = -2 * u;
-        s = sqrt(s);
-        out -= log(cosh(s));
+        out -= log(cosh(sqrt(-2 * u)));
     }
     return out; 
 }
@@ -239,86 +221,71 @@ cgf(double u, double z)
 static NPY_INLINE void
 initialize_config(struct config* cfg, double h, double z)
 {
-    const static double twopi = 6.283185307179586;
+    bool is_zero = z > 0 ? false : true;
+    double xl = is_zero ? 1 : tanh_x(z);
+    cfg->xc = 2.75 * xl;
+    double xr = 3 * xl;
+    cfg->h = h;
+    cfg->z = z;
+
+    cfg->half_h = 0.5 * h;
+    double one_xc = 1 / cfg->xc;
+    cfg->hh_xc = cfg->half_h * one_xc;
+    double one_xl = 1 / xl;
+    cfg->half_z2 = is_zero ? 0 : 0.5 * (z * z);
+    double ul = -cfg->half_z2;
+
     struct func_return f;
-    double xl, xc, xr, ul, ur, tr, alpha_l, alpha_r, one_xl, one_xc, half_z2;
-    bool is_zero = z == 0 ? true : false;
-
-    xl = is_zero ? 1 : tanh_x(z);
-    xc = 2.75 * xl;
-    xr = 3 * xl;
-
-    one_xl = 1 / xl;
-    one_xc = 1 / xc;
-    half_z2 = is_zero ? 0 : 0.5 * z * z;
-    ul = is_zero ? 0 : -half_z2;
-    ur = newton_raphson(xr, select_starting_guess(xr), &f);
-    newton_raphson(xc, select_starting_guess(xc), &f);
-    tr = (ur + half_z2);
+    double ur = newton_raphson(xr, select_starting_guess(xr), &f);
+    newton_raphson(cfg->xc, select_starting_guess(cfg->xc), &f);
+    double tr = ur + cfg->half_z2;
 
     // t = 0 at x = m, since K'(0) = m when t(x) = 0
-    cfg->Lprime_l = -0.5 * one_xl * one_xl;
+    cfg->Lprime_l = -0.5 * (one_xl * one_xl);
     cfg->Lprime_r = -tr - 1 / xr;
 
-    cfg->xl = xl;
-    cfg->xc = xc;
-    cfg->xr = xr;
-    cfg->one_xc = one_xc;
-    cfg->logxc = log(xc);
+    cfg->logxc = log(cfg->xc);
 
     cfg->intercept_l = cgf(ul, z) - 0.5 * one_xc + one_xl;
     cfg->intercept_r = cgf(ur, z) + 1 - log(xr) + cfg->logxc;
 
-    alpha_r = f.fprime * one_xc * one_xc;  // K''(t(xc)) / xc^2
-    alpha_l = one_xc * alpha_r;  // K''(t(xc)) / xc^3
+    double alpha_r = f.fprime * (one_xc * one_xc);  // K''(t(xc)) / xc^2
+    double alpha_l = one_xc * alpha_r;  // K''(t(xc)) / xc^3
 
     cfg->sqrt_alpha_l = 1 / sqrt(alpha_l);
-    cfg->sqrt_alpha_r = 1 / sqrt(alpha_r);
 
-    cfg->sqrt_h_2pi = sqrt(h / twopi); 
+    cfg->sqrt_h_2pi = sqrt(h / 6.283185307179586);
     cfg->coef_l = cfg->sqrt_h_2pi * cfg->sqrt_alpha_l;
-    cfg->coef_r = cfg->sqrt_h_2pi * cfg->sqrt_alpha_r;
-}
-
-/*
- * Compute L_i(x|z) or L_r(x|z) for a given x value.
- *
- * L_i(x|z) is the line touching the curve of eta(x) at xl.
- * L_r(x|z) is the line touching the curve of eta(x) at xr.
- */
-static NPY_INLINE double
-tangent_at_x(double x, struct config* cfg, SIDE_t side)
-{
-    if (side == LEFT)
-        return cfg->Lprime_l * x + cfg->intercept_l;
-    return cfg->Lprime_r * x + cfg->intercept_r;
+    cfg->coef_r = cfg->sqrt_h_2pi / sqrt(alpha_r);
 }
 
 /*
  * Compute the saddle point estimate at x.
  */
 static NPY_INLINE double
-saddle_point(double x, double h, double z, double coef)
+saddle_point(struct config* cfg)//double x, double h, double z, double coef)
 {
     struct func_return f;
-    double u = newton_raphson(x, select_starting_guess(x), &f);
-    double t = u + 0.5 * z * z; 
+    double u = newton_raphson(cfg->x, select_starting_guess(cfg->x), &f);
+    double t = u + cfg->half_z2; 
 
-    return coef * exp(h * (cgf(u, z) - t * x)) / sqrt(f.fprime);
+    return cfg->sqrt_h_2pi * exp(cfg->h * (cgf(u, cfg->z) - t * cfg->x)) / sqrt(f.fprime);
 }
 
 /*
  * k(x|h,z): The bounding kernel of the saddle point approximation.
  */
 static NPY_INLINE double
-bounding_kernel(double x, double h, struct config* cfg)
+bounding_kernel(struct config* cfg)
 {
-    if (x > cfg->xc) {
-        return cfg->coef_r * exp(h * (cfg->logxc + tangent_at_x(x, cfg, RIGHT)) +
-                (h - 1) * log(x));
+    if (cfg->x > cfg->xc) {
+        double tanline_at_x = cfg->Lprime_r * cfg->x + cfg->intercept_r;
+        return cfg->coef_r * exp(cfg->h * (cfg->logxc + tanline_at_x) +
+                                 (cfg->h - 1) * log(cfg->x));
     }
-    return cfg->coef_l * exp(cfg->hh_xc - 1.5 * log(x) - cfg->half_h / x +
-                             h * tangent_at_x(x, cfg, LEFT));
+    double tanline_at_x = cfg->Lprime_l * cfg->x + cfg->intercept_l;
+    return cfg->coef_l * exp(-cfg->half_h / cfg->x + cfg->h * tanline_at_x +
+                             cfg->hh_xc - 1.5 * log(cfg->x));
 }
 
 /*
@@ -328,33 +295,28 @@ NPY_INLINE double
 random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
 {
     struct config cfg;
-    double p, q, ratio, kappa_l, kappa_r, bl, br, sqrt_rho_l, one_srho_l, hrho_r, x, v;
+    double p, q, ratio, sqrt_rho_l, one_srho_l, hrho_r;
 
     initialize_config(&cfg, h, z);
-    cfg.half_h = 0.5 * h;
-    cfg.hh_xc = cfg.half_h * cfg.one_xc;
 
-    bl = cfg.intercept_l;
     sqrt_rho_l = sqrt(-2 * cfg.Lprime_l);
     one_srho_l = 1 / sqrt_rho_l;
-    kappa_l = cfg.sqrt_alpha_l * exp(h * (0.5 * cfg.one_xc + bl - sqrt_rho_l));
-    p = kappa_l * inverse_gaussian_cdf(cfg.xc, one_srho_l, h, true);
+    p = cfg.sqrt_alpha_l * exp(h * (0.5 / cfg.xc + cfg.intercept_l - sqrt_rho_l)) *
+        inverse_gaussian_cdf(cfg.xc, one_srho_l, h, true);
 
-    br = cfg.intercept_r;
     hrho_r = -(h * cfg.Lprime_r);
-    kappa_r = cfg.coef_r * exp(h * (br - log(hrho_r)));
-    q = kappa_r * pgm_gammaq(h, hrho_r * cfg.xc, false);
+    q = cfg.coef_r * exp(h * (cfg.intercept_r - log(hrho_r))) *
+        pgm_gammaq(h, hrho_r * cfg.xc, false);
 
     ratio = p / (p + q);
     do {
         if (next_double(bitgen_state) < ratio) {
-            x = random_right_bounded_inverse_gaussian(bitgen_state, one_srho_l, h, cfg.xc);
+            cfg.x = random_right_bounded_inverse_gaussian(bitgen_state, one_srho_l, h, cfg.xc);
         }
         else {
-            x = random_left_bounded_gamma(bitgen_state, h, hrho_r, cfg.xc);
+            cfg.x = random_left_bounded_gamma(bitgen_state, h, hrho_r, cfg.xc);
         }
-        v = next_double(bitgen_state) * bounding_kernel(x, h, &cfg);
-    } while (v > saddle_point(x, h, z, cfg.sqrt_h_2pi));
+    } while (next_double(bitgen_state) * bounding_kernel(&cfg) > saddle_point(&cfg));
 
-    return 0.25 * h * x;
+    return 0.25 * h * cfg.x;
 }

@@ -8,11 +8,9 @@
 #include <numpy/random/distributions.h>
 #include <float.h>
 
-#define PGM_PI2 9.869604401089358  // pi^2
 #define PGM_PI2_8 1.233700550136169  // pi^2 / 8
 #define PGM_LOGPI_2 0.4515827052894548  // log(pi / 2)
 #define PGM_LS2PI 0.9189385332046727  // log(sqrt(2 * pi))
-#define PGM_1_SQRTPI 0.5641895835477563   // 1 / sqrt(pi)
 #define PGM_MAX_EXP 708.3964202663686  // maximum allowed exp() argument
 
 
@@ -36,10 +34,11 @@
 NPY_INLINE double
 pgm_erfc(double x)
 {
-    static const double big_val = 26.615717509251258;
-    static const double small_val = -6.003636680306125;
+#define PGM_1_SQRTPI 0.5641895835477563   // 1 / sqrt(pi)
+#define PGM_BIG_VAL 26.615717509251258
+#define PGM_SMALL_VAL -6.003636680306125
 
-    if (x < small_val) {
+    if (x < PGM_SMALL_VAL) {
         return 2;
     }
     else if (x < -DBL_EPSILON) {
@@ -75,7 +74,7 @@ pgm_erfc(double x)
         return exp(-x * x) * ((((p4 * x + p3) * x + p2) * x + p1) * x + p0) /
                               ((((x + q3) * x + q2) * x + q1) * x + q0);
     }
-    else if (x < big_val) {
+    else if (x < PGM_BIG_VAL) {
         double z = x * x;
         double y = exp(-z);
 
@@ -94,6 +93,9 @@ pgm_erfc(double x)
     else {
         return 0;
     }
+#undef PGM_1_SQRTPI
+#undef PGM_BIG_VAL
+#undef PGM_SMALL_VAL
 }
 
 /*
@@ -188,9 +190,8 @@ pgm_lgamma(double z)
         457.81238798127816, 462.60817852687489, 467.4121995716082,
         472.22438392698058, 477.04466549258564, 481.87297922988796
     };
-    size_t zz;
 
-    zz = (size_t)z;
+    size_t zz = (size_t)z;
     if (z < 127 && z == zz) {
         return logfactorial[zz - 1];
     }
@@ -274,29 +275,31 @@ pgm_lgamma(double z)
 NPY_INLINE double
 random_left_bounded_gamma(bitgen_t* bitgen_state, double a, double b, double t)
 {
-    double x, log_rho, log_m, a_minus_1, b_minus_a, c0, one_minus_c0;
-
     if (a > 1) {
         b = t * b;
-        a_minus_1 = a - 1;
-        b_minus_a = b - a;
-        c0 = 0.5 * (b_minus_a + sqrt(b_minus_a * b_minus_a + 4 * b)) / b;
-        one_minus_c0 = 1 - c0;
+        double x, threshold;
+        const double amin1 = a - 1;
+        const double bmina = b - a;
+        const double c0 = 0.5 * (bmina + sqrt((bmina * bmina) + 4 * b)) / b;
+        const double one_minus_c0 = 1 - c0;
+        const double log_m = amin1 * (log(amin1 / one_minus_c0) - 1);
 
         do {
             x = b + random_standard_exponential(bitgen_state) / c0;
-            log_rho = a_minus_1 * log(x) - x * one_minus_c0;
-            log_m = a_minus_1 * log(a_minus_1 / one_minus_c0) - a_minus_1;
-        } while (log(1 - random_standard_uniform(bitgen_state)) > (log_rho - log_m));
+            threshold = amin1 * log(x) - x * one_minus_c0 - log_m;
+        } while (log(1 - random_standard_uniform(bitgen_state)) > threshold);
         return t * (x / b);
     }
     else if (a == 1) {
         return t + random_standard_exponential(bitgen_state) / b;
     }
     else {
+        double x;
+        const double amin1 = a - 1;
+        const double tb = t * b;
         do {
-            x = 1 + random_standard_exponential(bitgen_state) / (t * b);
-        } while (log(1 - random_standard_uniform(bitgen_state)) > (a - 1) * log(x));
+            x = 1 + random_standard_exponential(bitgen_state) / tb;
+        } while (log(1 - random_standard_uniform(bitgen_state)) > amin1 * log(x));
         return t * x;
     }
 }
@@ -338,7 +341,6 @@ random_right_bounded_inverse_gaussian(bitgen_t* bitgen_state, double mu,
     if (t < mu) {
         double e1, e2;
         const double a = 1. / (mu * mu);
-        const double half_lambda = -0.5 * lambda;
         do {
             do {
                 e1 = random_standard_exponential(bitgen_state);
@@ -346,7 +348,8 @@ random_right_bounded_inverse_gaussian(bitgen_t* bitgen_state, double mu,
             } while ((e1 * e1) > (2 * e2 / t));
             x = (1 + t * e1);
             x = t / (x * x);
-        } while (a > 0 && log(1 - random_standard_uniform(bitgen_state)) >= half_lambda * a * x);
+        } while (a > 0 && log(1 - random_standard_uniform(bitgen_state)) >=
+                 -0.5 * lambda * a * x);
         return x;
     }
     do {
@@ -494,15 +497,17 @@ pgm_gammaq(double p, double x, bool normalized)
 {
     if (normalized) {
         size_t p_int = (size_t)p;
-        double sum, r;
-        size_t k;
         if (p == p_int && p < 30) {
+            size_t k;
+            double sum, r;
             for (k = sum = r = 1; k < p_int; k++) {
                 sum += (r *= x / k);
             }
             return exp(-x) * sum;
         }
         else if (p == (p_int + 0.5) && p < 30) {
+            size_t k;
+            double sum, r;
             static const double one_sqrtpi = 0.5641895835477563;
             double sqrt_x = sqrt(x);
             for (k = r = 1, sum = 0; k < p_int + 1; k++) {

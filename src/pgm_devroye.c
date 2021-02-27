@@ -25,14 +25,13 @@ struct config {
 static NPY_INLINE double
 piecewise_coef(size_t n, struct config* cfg)
 {
-    double a = n + 0.5;
-    double b = NPY_PI * a;
-
     if (cfg->x > T) {
+        double b = NPY_PI * (n + 0.5);
         return b * exp(-0.5 * cfg->x * b * b);
     }
     else if (cfg->x > 0) {
-        return b * exp(-1.5 * (PGM_LOGPI_2 + cfg->logx) - 2 * a * a / cfg->x);
+        double a = n + 0.5;
+        return NPY_PI * a * exp(-1.5 * (PGM_LOGPI_2 + cfg->logx) - 2 * a * a / cfg->x);
     }
     return 0;
 }
@@ -47,11 +46,12 @@ piecewise_coef(size_t n, struct config* cfg)
 static NPY_INLINE void
 initialize_config(struct config* cfg, double z)
 {
-    double p, q;
 
     if (z > 0) {
+        double p, q;
+
         cfg->mu = 1 / z;
-        cfg->k = PGM_PI2_8 + 0.5 * z * z;
+        cfg->k = PGM_PI2_8 + 0.5 * (z * z);
         q = NPY_PI_2 * exp(-cfg->k * T) / cfg->k;
         p = 2 * exp(-z) * inverse_gaussian_cdf(T, cfg->mu, 1, false);
         cfg->ratio = p / (p + q);
@@ -72,9 +72,6 @@ initialize_config(struct config* cfg, double z)
 static NPY_INLINE double
 random_jacobi(bitgen_t* bitgen_state, struct config* cfg)
 {
-    double s, u;
-    size_t i;
-
     for (;;) {
         if (next_double(bitgen_state) < cfg->ratio) {
             cfg->x = random_right_bounded_inverse_gaussian(bitgen_state, cfg->mu, 1, T);
@@ -83,9 +80,9 @@ random_jacobi(bitgen_t* bitgen_state, struct config* cfg)
             cfg->x = T + random_standard_exponential(bitgen_state) / cfg->k;
         }
         cfg->logx = log(cfg->x);
-        s = piecewise_coef(0, cfg);
-        u = next_double(bitgen_state) * s;
-        for (i = 1;; ++i) {
+        double s = piecewise_coef(0, cfg);
+        double u = next_double(bitgen_state) * s;
+        for (size_t i = 1;; ++i) {
             if (i & 1) {
                 s -= piecewise_coef(i, cfg);
                 if (u <= s)
