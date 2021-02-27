@@ -114,12 +114,12 @@ calculate_ratio(struct config* cfg)
     double h = cfg->h, z = cfg->z, t = cfg->t;
 
     if (z > 0) {
-        p = exp(cfg->hlog2 - h * z) * inverse_gaussian_cdf(t, cfg->h_z, cfg->h2);
+        p = exp(cfg->hlog2 - h * z) * inverse_gaussian_cdf(t, cfg->h_z, cfg->h2, false);
     }
     else {
-        p = exp(cfg->hlog2) * kf_erfc(h / sqrt(2 * t));
+        p = exp(cfg->hlog2) * pgm_erfc(h / sqrt(2 * t));
     }
-    q = exp(h * (PGM_LOGPI_2 - cfg->log_lambda_z)) * pgm_gammaq(h, cfg->lambda_z * t);
+    q = exp(h * (PGM_LOGPI_2 - cfg->log_lambda_z)) * pgm_gammaq(h, cfg->lambda_z * t, true);
     cfg->ratio = p / (p + q);
 }
 

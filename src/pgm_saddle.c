@@ -338,12 +338,12 @@ random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
     sqrt_rho_l = sqrt(-2 * cfg.Lprime_l);
     one_srho_l = 1 / sqrt_rho_l;
     kappa_l = cfg.sqrt_alpha_l * exp(h * (0.5 * cfg.one_xc + bl - sqrt_rho_l));
-    p = kappa_l * inverse_gaussian_cdf(cfg.xc, one_srho_l, h);
+    p = kappa_l * inverse_gaussian_cdf(cfg.xc, one_srho_l, h, true);
 
     br = cfg.intercept_r;
     hrho_r = -(h * cfg.Lprime_r);
-    kappa_r = cfg.coef_r * exp(h * (br - log(hrho_r)) + pgm_lgamma(h));
-    q = kappa_r * pgm_gammaq(h, hrho_r * cfg.xc);
+    kappa_r = cfg.coef_r * exp(h * (br - log(hrho_r)));
+    q = kappa_r * pgm_gammaq(h, hrho_r * cfg.xc, false);
 
     ratio = p / (p + q);
     do {

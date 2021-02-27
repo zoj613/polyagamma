@@ -5,13 +5,13 @@
 
 
 extern NPY_INLINE double
-pgm_gammaq(double s, double x);
+pgm_erfc(double x);
 
 extern NPY_INLINE double
 pgm_lgamma(double z);
 
 extern NPY_INLINE double
-inverse_gaussian_cdf(double x, double mu, double lambda);
+inverse_gaussian_cdf(double x, double mu, double lambda, bool robust);
 
 extern NPY_INLINE double
 random_left_bounded_gamma(bitgen_t* bitgen_state, double a, double b, double t);

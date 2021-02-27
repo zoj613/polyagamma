@@ -1,8 +1,8 @@
 #ifndef PGM_RANDOM_H
 #define PGM_RANDOM_H
 
-#include <numpy/random/bitgen.h>
 #include <numpy/npy_common.h>
+#include <numpy/random/bitgen.h>
 
 
 typedef enum {GAMMA, DEVROYE, ALTERNATE, SADDLE, HYBRID} sampler_t;
