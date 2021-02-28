@@ -23,7 +23,7 @@ if os.getenv("BUILD_WITH_COVERAGE", None):
 include_path = np.get_include()
 extensions = [
     Extension(
-        "_polyagamma",
+        "polyagamma._polyagamma",
         source_files,
         include_dirs=[include_path, "./include"],
         library_dirs=[join(include_path, '..', '..', 'random', 'lib')],
@@ -33,7 +33,7 @@ extensions = [
     ),
 ]
 
-
+#os.system("cp -r include polyagamma/")
 def build(setup_kwargs):
     """Build extension modules."""
     setup_kwargs.update(ext_modules=extensions)
