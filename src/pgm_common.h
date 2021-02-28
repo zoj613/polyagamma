@@ -287,7 +287,7 @@ random_left_bounded_gamma(bitgen_t* bitgen_state, double a, double b, double t)
         do {
             x = b + random_standard_exponential(bitgen_state) / c0;
             threshold = amin1 * log(x) - x * one_minus_c0 - log_m;
-        } while (log(1 - random_standard_uniform(bitgen_state)) > threshold);
+        } while (log1p(-random_standard_uniform(bitgen_state)) > threshold);
         return t * (x / b);
     }
     else if (a == 1) {
@@ -299,7 +299,7 @@ random_left_bounded_gamma(bitgen_t* bitgen_state, double a, double b, double t)
         const double tb = t * b;
         do {
             x = 1 + random_standard_exponential(bitgen_state) / tb;
-        } while (log(1 - random_standard_uniform(bitgen_state)) > amin1 * log(x));
+        } while (log1p(-random_standard_uniform(bitgen_state)) > amin1 * log(x));
         return t * x;
     }
 }
@@ -348,7 +348,7 @@ random_right_bounded_inverse_gaussian(bitgen_t* bitgen_state, double mu,
             } while ((e1 * e1) > (2 * e2 / t));
             x = (1 + t * e1);
             x = t / (x * x);
-        } while (a > 0 && log(1 - random_standard_uniform(bitgen_state)) >=
+        } while (a > 0 && log1p(-random_standard_uniform(bitgen_state)) >=
                  -0.5 * lambda * a * x);
         return x;
     }
