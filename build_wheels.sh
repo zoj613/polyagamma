@@ -7,7 +7,6 @@ set -e -u -x
 cd $(dirname $0)
 
 bin_arr=(
-    /opt/python/cp36-cp36m/bin
     /opt/python/cp37-cp37m/bin
     /opt/python/cp39-cp39/bin
     /opt/python/cp38-cp38/bin
