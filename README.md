@@ -99,7 +99,7 @@ For an example of how to use `polyagamma` in a C program, see [here][1].
 Below are runtime plots of 20000 samples generated for various values of `h` 
 and `z`, using each method. We restrict `h` to integer values to accomodate the 
 `devroye` method, which cannot be used for non-integer `h`. The version of the
-package used to generate them is `v1.1.0-beta.3`.
+package used to generate them is `v1.1.0`.
 
 ![](./scripts/perf_methods_0.0.svg) | ![](./scripts/perf_methods_2.5.svg)
 | --- | --- |
@@ -119,7 +119,7 @@ method and also equally accurate).
 Therefore, we devise a "hybrid/default" sampler that picks a sampler based on the above guidelines.
 
 We also benchmark the hybrid sampler runtime with the sampler found in the `pypolyagamma` 
-package (version `1.2.3`). The version of NumPy we use is `1.19.4`. We use the `pgdrawv` 
+package (version `1.2.3`). The version of NumPy we use is `1.20.1`. We use the `pgdrawv`
 function which takes arrays as input. Below are runtime plots of 20000 samples for each 
 value of `h` and `z`. Values of `h` range from 0.1 to 60, while `z` is set to 0, 2.5, 5, and 10.
 ![](./scripts/perf_samplers_0.0.svg) | ![](./scripts/perf_samplers_2.5.svg)
@@ -141,9 +141,13 @@ somewhat be mitigated by passing in a random generator instance at every call to
 the `polyagamma` function. For example, on an `iPython` session:
 ```ipynb
 In [4]: %timeit polyagamma()
-94.6 µs ± 1.25 µs per loop (mean ± std. dev. of 7 runs, 10000 loops each)
-In [9]: %timeit polyagamma(random_state=rng)
-4.95 µs ± 15.8 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
+83.2 µs ± 1.02 µs per loop (mean ± std. dev. of 7 runs, 10000 loops each)
+
+In [5]: %timeit polyagamma(random_state=rng)
+2.68 µs ± 29.7 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
+
+In [6]: %timeit polyagamma(random_state=rng, disable_checks=True)
+2.58 µs ± 22.3 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
 ```
 
 

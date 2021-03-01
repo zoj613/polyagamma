@@ -40,8 +40,11 @@ def test_polyagamma():
     out = np.array([0., 0., 0., 0., 0.])
     rng_polyagamma(out=out)
     assert not np.allclose(out, 0)
+    out2 = np.array([0., 0., 0., 0., 0., 0.])
+    rng_polyagamma(h, out=out2)
+    assert not np.allclose(out2, 0)
     # test size of output array when a parameter is a sequence
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="`out` must have the same total"):
         rng_polyagamma(h, out=out)
 
     # raise an error when output array with dim > 1 is passed as an arg

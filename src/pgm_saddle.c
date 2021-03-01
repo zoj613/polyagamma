@@ -147,7 +147,7 @@ select_starting_guess(double x)
         return -0.147;
     else if (x > 0.25)
         return -1.78;
-    else return -2;
+    else return -9;
 }
 
 

@@ -8,6 +8,11 @@ Copyright (c) 2020-2021, Zolisa Bleki
 
 SPDX-License-Identifier: BSD-3-Clause
 """
+from cpython.float cimport PyFloat_Check
+from cpython.int cimport PyInt_Check
+from cpython.long cimport PyLong_Check
+from cpython.number cimport PyNumber_Int
+from cpython.object cimport PyObject_RichCompareBool, Py_LE, Py_LT, Py_NE
 from cpython.pycapsule cimport PyCapsule_GetPointer
 from cpython.tuple cimport PyTuple_CheckExact, PyTuple_GET_SIZE, PyTuple_GET_ITEM
 from numpy.random.bit_generator cimport BitGenerator, bitgen_t
@@ -30,22 +35,21 @@ cdef extern from "../include/pgm_random.h":
                                     sampler_t method, size_t n, double* out) nogil
 
 
-cdef inline bint is_sequence(object x):
-    cdef bint out
-    try:
-        iter(x)
-        out = True
-    except TypeError:
-        out = False
-    return out
-
-
 cdef dict METHODS = {
     "gamma": GAMMA,
     "saddle": SADDLE,
     "devroye": DEVROYE,
     "alternate": ALTERNATE,
 }
+
+
+cdef inline bint params_are_numbers(object a, object b):
+    return (PyFloat_Check(a) or PyLong_Check(a) or PyInt_Check(a)) and \
+            (PyFloat_Check(b) or PyLong_Check(b) or PyInt_Check(b))
+
+
+cdef inline bint is_a_number(object o):
+    return PyFloat_Check(o) or PyLong_Check(o) or PyInt_Check(o)
 
 
 cdef inline int check_method(object h, str method, bint disable_checks) except -1:
@@ -56,8 +60,8 @@ cdef inline int check_method(object h, str method, bint disable_checks) except -
         raise ValueError(f"`method` must be one of {set(METHODS)}")
 
     elif not disable_checks and method == "alternate":
-        if np.PyArray_IsPythonNumber(h):
-            raise_error = h < 1
+        if is_a_number(h):
+            raise_error = PyObject_RichCompareBool(h, 1, Py_LT)
         else:
             o = np.PyArray_FROM_O(h) < 1
             raise_error = np.PyArray_Any(o, np.NPY_MAXDIMS, <np.ndarray>NULL)
@@ -65,8 +69,8 @@ cdef inline int check_method(object h, str method, bint disable_checks) except -
             raise ValueError("alternate method must have h >=1")
 
     elif not disable_checks and method == "devroye":
-        if np.PyArray_IsPythonNumber(h):
-            raise_error = <int>h != h
+        if is_a_number(h):
+            raise_error = PyObject_RichCompareBool(PyNumber_Int(h), h, Py_NE)
         else:
             o = np.PyArray_FROM_OT(h, np.NPY_INT) != np.PyArray_FROM_O(h)
             raise_error = np.PyArray_Any(o, np.NPY_MAXDIMS, <np.ndarray>NULL)
@@ -191,12 +195,42 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
     if method is not None:
         stype = <sampler_t>check_method(h, method, disable_checks)
 
-    if is_sequence(h) or is_sequence(z):
+    if params_are_numbers(h, z):
+        if not disable_checks and PyObject_RichCompareBool(h, zero, Py_LE):
+            raise ValueError("`h` must be positive")
+        elif has_out:
+            n = out.shape[0]
+            ch, cz = h, z
+            with bitgenerator.lock, nogil:
+                pgm_random_polyagamma_fill(bitgen, ch, cz, stype, n, &out[0])
+            return
+        elif size is not None:
+            is_tuple = PyTuple_CheckExact(size)
+            if is_tuple:
+                total_size = 1
+                for idx in range(PyTuple_GET_SIZE(size)):
+                    total_size *= <object>PyTuple_GET_ITEM(size, idx)
+                dims = <np.npy_intp>total_size
+            else:
+                dims = <np.npy_intp>size
+            out = np.PyArray_EMPTY(1, &dims, np.NPY_DOUBLE, 0)
+            n = <size_t>dims
+            ch, cz = h, z
+            with bitgenerator.lock, nogil:
+                pgm_random_polyagamma_fill(bitgen, ch, cz, stype, n, &out[0])
+            return np.PyArray_Reshape(out.base, size) if is_tuple else out.base
+        else:
+            ch, cz = h, z
+            with bitgenerator.lock, nogil:
+                cz = pgm_random_polyagamma(bitgen, ch, cz, stype)
+            return cz
+
+    else:
         h = np.PyArray_FROM_OT(h, np.NPY_DOUBLE)
-        z = np.PyArray_FROM_OT(z, np.NPY_DOUBLE)
         if not disable_checks and np.any(h <= zero):
             raise ValueError("values of `h` must be positive")
 
+        z = np.PyArray_FROM_OT(z, np.NPY_DOUBLE)
         bcast = np.PyArray_MultiIterNew2(h, z)
         if has_out and out.shape[0] != bcast.size:
             raise ValueError(
@@ -214,37 +248,8 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
                 cz = (<double*>np.PyArray_MultiIter_DATA(bcast, 1))[0]
                 out[idx] = pgm_random_polyagamma(bitgen, ch, cz, stype);
                 np.PyArray_MultiIter_NEXT(bcast)
-        if not has_out:
-            return np.PyArray_Reshape(out.base, bcast.shape)
 
-    elif not disable_checks and h <= zero:
-        raise ValueError("`h` must positive")
-
-    elif has_out:
-        n = out.shape[0]
-        ch, cz = h, z
-        with bitgenerator.lock, nogil:
-            pgm_random_polyagamma_fill(bitgen, ch, cz, stype, n, &out[0])
-
-    elif size is not None:
-        is_tuple = PyTuple_CheckExact(size)
-        if is_tuple:
-            total_size = 1
-            for idx in range(PyTuple_GET_SIZE(size)):
-                total_size *= <object>PyTuple_GET_ITEM(size, idx)
-            dims = <np.npy_intp>total_size
+        if has_out:
+            return
         else:
-            dims = <np.npy_intp>size
-        out = np.PyArray_EMPTY(1, &dims, np.NPY_DOUBLE, 0)
-
-        n = <size_t>dims
-        ch, cz = h, z
-        with bitgenerator.lock, nogil:
-            pgm_random_polyagamma_fill(bitgen, ch, cz, stype, n, &out[0])
-        return np.PyArray_Reshape(out.base, size) if is_tuple else out.base
-
-    else:
-        ch, cz = h, z
-        with bitgenerator.lock, nogil:
-            cz = pgm_random_polyagamma(bitgen, ch, cz, stype)
-        return cz
+            return np.PyArray_Reshape(out.base, bcast.shape)

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "polyagamma"
-version = "1.0.0"
+version = "1.1.0"
 description = "Efficiently generate samples from the Polya-Gamma distribution using a NumPy/SciPy compatible interface."
 authors = ["Zolisa Bleki"]
 license = "BSD-3-Clause"
@@ -22,10 +22,11 @@ include = [
     {path = "include", format = "sdist"},
     {path = "src/*.c", format = "sdist"},
     {path = "src/*.h", format = "sdist"},
+    "LICENSE",
 ]
 
 [tool.poetry.dependencies]
-python = "^3.6"
+python = "^3.7"
 numpy = "^1.17.0"
 
 [tool.poetry.dev-dependencies]
