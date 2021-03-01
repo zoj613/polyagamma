@@ -23,7 +23,7 @@ if os.getenv("BUILD_WITH_COVERAGE", None):
 include_path = np.get_include()
 extensions = [
     Extension(
-        "polyagamma._polyagamma",
+        "_polyagamma",
         source_files,
         include_dirs=[include_path, "./include"],
         library_dirs=[join(include_path, '..', '..', 'random', 'lib')],

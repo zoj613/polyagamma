@@ -9,11 +9,11 @@ cd $(dirname $0)
 bin_arr=(
     /opt/python/cp37-cp37m/bin
     /opt/python/cp39-cp39/bin
-    /opt/python/cp38-cp38/bin
+    #/opt/python/cp38-cp38/bin
 )
 
 # add  python to image's path
-export PATH=/opt/python/cp38-cp38/bin/:$PATH
+export PATH=/opt/python/cp37-cp37m/bin/:$PATH
 # download install script
 curl -#sSL https://raw.githubusercontent.com/python-poetry/poetry/master/get-poetry.py > get-poetry.py
 # install using local archive
