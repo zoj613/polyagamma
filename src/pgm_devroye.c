@@ -42,22 +42,32 @@ piecewise_coef(size_t n, struct config* cfg)
  *
  * Setting mu=Inf if z=0 ensures that sampling from a truncated inverse-gaussian
  * uses most efficient sampling algorithm in `random_right_bounded_inverse_gaussian`.
+ *
+ * Note that we do not need to calculate the cdf of the inverse gaussian in
+ * order to get the value of `p`. Since the value of the cdf is always
+ * evaluated at the trancation point T, its value is only dependent on `z`.
+ * Thus we simplify the expression for p and arrive at:
+ *      p = erfc(a - b) / exp(z) + exp(z) * erfc(a + b),
+ * where a = 1 / sqrt(2 * T) and b = z * sqrt(T/2).
  */
 static NPY_INLINE void
 initialize_config(struct config* cfg, double z)
 {
-
     if (z > 0) {
+        static const double a = 0.8838834764831844;  // 1 / sqrt(2 * T)
+        static const double t_two = 0.565685424949238;  // sqrt(T/2)
         double p, q;
+        double b = z * t_two;
+        double ez = exp(z);
 
-        cfg->mu = 1 / z;
-        cfg->k = PGM_PI2_8 + 0.5 * (z * z);
+        p = pgm_erfc(a - b) / ez + pgm_erfc(a + b) * ez;
+        cfg->k = PGM_PI2_8 + 0.5 * z * z;
         q = NPY_PI_2 * exp(-cfg->k * T) / cfg->k;
-        p = 2 * exp(-z) * inverse_gaussian_cdf(T, cfg->mu, 1, false);
         cfg->ratio = p / (p + q);
+        cfg->mu = 1 / z;
     }
     else {
-        cfg->mu = NPY_INFINITY;
+        cfg->mu = INFINITY;
         cfg->k = PGM_PI2_8;
         cfg->ratio = 0.4223027567786595;
     }
