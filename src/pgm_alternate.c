@@ -98,6 +98,21 @@ bounding_kernel(struct config* cfg)
 }
 
 /*
+ * Compute the cdf of the inverse-gaussian distribution.
+ */
+static NPY_INLINE double
+invgauss_cdf(double t, double h, double z)
+{
+    static const double one_s2 = 0.7071067811865475;
+    double st = sqrt(t);
+    double a = one_s2 * h / st;
+    double b = z * st * one_s2;
+    double ez = exp(z * h);
+
+    return 0.5 * (pgm_erfc(a - b) + ez * pgm_erfc(b + a) * ez);
+}
+
+/*
  * Calculate the probability of sampling on either side of the truncation point
  *
  * UpperIncompleteGamma(0.5, x) == sqrt(pi) * erfc(sqrt(x)), the
@@ -111,8 +126,7 @@ calculate_ratio(struct config* cfg)
     double p, q;
 
     if (cfg->z > 0) {
-        p = exp(cfg->hlog2 - cfg->h * cfg->z) *
-            inverse_gaussian_cdf(cfg->t, cfg->h_z, cfg->h2, false);
+        p = exp(cfg->hlog2 - cfg->h * cfg->z) * invgauss_cdf(cfg->t, cfg->h_z, cfg->h2);
     }
     else {
         p = exp(cfg->hlog2) * pgm_erfc(cfg->h / sqrt(2 * cfg->t));

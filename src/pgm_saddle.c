@@ -289,6 +289,38 @@ bounding_kernel(struct config* cfg)
 }
 
 /*
+ * Compute the logarithm of the standard normal distribution function (cdf).
+ */
+static NPY_INLINE double
+log_norm_cdf(double x)
+{
+    return log1p(-0.5 * pgm_erfc(x / 1.4142135623730951));
+}
+
+/*
+ * Calculate the logarithm of the cumulative distribution function of an
+ * Inverse-Gaussian.
+ *
+ * We use the computation method presented in [1] to avoid numerical issues
+ * when the inputs have very large/small values.
+ *
+ * References
+ * ----------
+ *  [1] Giner, Goknur and G. Smyth. “statmod: Probability Calculations for the
+ *      Inverse Gaussian Distribution.” R J. 8 (2016): 339.
+ */
+static NPY_INLINE double
+invgauss_logcdf(double x, double mu, double lambda)
+{
+    double qm = x / mu;
+    double t_m =  mu / lambda;
+    double r = sqrt(x / lambda);
+    double a = log_norm_cdf((qm - 1) / r);
+    double b = 2 / t_m + log_norm_cdf(-(qm + 1) / r);
+    return a + log1p(exp(b - a));
+}
+
+/*
  * Sample from PG(h, z) using the Saddle approximation method.
  */
 NPY_INLINE double
@@ -301,8 +333,8 @@ random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
 
     sqrt_rho_l = sqrt(-2 * cfg.Lprime_l);
     one_srho_l = 1 / sqrt_rho_l;
-    p = cfg.sqrt_alpha_l * exp(h * (0.5 / cfg.xc + cfg.intercept_l - sqrt_rho_l)) *
-        inverse_gaussian_cdf(cfg.xc, one_srho_l, h, true);
+    p = cfg.sqrt_alpha_l * exp(h * (0.5 / cfg.xc + cfg.intercept_l - sqrt_rho_l) +
+        invgauss_logcdf(cfg.xc, one_srho_l, h));
 
     hrho_r = -(h * cfg.Lprime_r);
     q = cfg.coef_r * exp(h * (cfg.intercept_r - log(hrho_r))) *

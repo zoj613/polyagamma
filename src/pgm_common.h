@@ -99,25 +99,6 @@ pgm_erfc(double x)
 }
 
 /*
- * Calculate the cumulative distribution function of an Inverse-Gaussian.
- *
- * the robust variable is set to true to avoid exp() overflow with large
- * values for lambda. Otherwise, it is set to false in other cases to avoid
- * unnecessary log() call.
- */
-NPY_INLINE double
-inverse_gaussian_cdf(double x, double mu, double lambda, bool robust)
-{
-    double a = sqrt(0.5 * (lambda / x));
-    double b = a * (x / mu);
-
-    if (robust) {
-        return 0.5 * (pgm_erfc(a - b) + exp(2 * (lambda / mu) + log(pgm_erfc(b + a))));
-    }
-    return 0.5 * (pgm_erfc(a - b) + exp(2 * lambda / mu) * pgm_erfc(b + a));
-}
-
-/*
  * Calculate logarithm of the gamma function of z.
  *
  * This implementation is based on an asymptotic expansion based on stirling's
