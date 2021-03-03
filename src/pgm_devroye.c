@@ -11,6 +11,8 @@
  * recalculation of these values during a single call to the sampler.
  */
 struct config {
+    double z;
+    double z2;
     double mu;
     double k;
     double half_mu2;
@@ -61,16 +63,77 @@ initialize_config(struct config* cfg, double z)
         double ez = exp(z);
 
         p = pgm_erfc(a - b) / ez + pgm_erfc(a + b) * ez;
-        cfg->k = PGM_PI2_8 + 0.5 * z * z;
+        cfg->z2 = z * z;
+        cfg->k = PGM_PI2_8 + 0.5 * cfg->z2;
         q = NPY_PI_2 * exp(-cfg->k * T) / cfg->k;
         cfg->ratio = p / (p + q);
-        cfg->mu = 1 / z;
     }
     else {
-        cfg->mu = INFINITY;
         cfg->k = PGM_PI2_8;
         cfg->ratio = 0.4223027567786595;
+        cfg->z2 = 0;
     }
+    cfg->z = z;
+}
+
+/*
+ * Sample from an Inverse-Gaussian(1/z, 1) truncated on the set {x | x < 0.64}.
+ *
+ * We sample using two algorithms depending on whether 1/z > 0.64 or z < 1.5625.
+ *
+ * When 1/z < 0.64, We use a known sampling algorithm from Devroye
+ * (1986), page 149. We sample until the generated variate is less than 0.64.
+ *
+ * When mu > 0.64, we use a Inverse-Chi-square distribution as a proposal,
+ * as explained in [1], page 134. To generate a sample from this proposal, we
+ * sample from the tail of a standard normal distribution such that the value
+ * is greater than 1/sqrt(0.64). Once we obtain the sample, we square and invert
+ * it to obtain a sample from a Inverse-Chi-Square(df=1) that is less than t.
+ * An efficient algorithm to sample from the tail of a normal distribution
+ * using a pair of exponential variates is shown in Devroye (1986) [page 382]
+ * & Devroye (2009) [page 7]. This sample becomes our proposal. We accept the
+ * sample only if we sample a uniform less than the acceptance porbability.
+ * The probability is exp(-0.5 * z2 * x) (Refer to Appendix 1 of [1] for a
+ * derivation of this probablity).
+ *
+ * References
+ * ----------
+ *  [1] Windle, J. (2013). Forecasting high-dimensional, time-varying
+ *      variance-covariance matrices with high-frequency data and sampling
+ *      Pólya-Gamma random variates for posterior distributions derived from
+ *      logistic likelihoods.(PhD thesis). Retrieved from
+ *      http://hdl.handle.net/2152/21842
+ */
+static NPY_INLINE double
+random_right_bounded_invgauss(bitgen_t* bitgen_state, struct config* cfg)
+{
+    static const double t_inv = 1.5625;  // 1 / T
+    static const double two_t = 3.125;  // 2 / T
+    double x;
+
+    if (cfg->z < t_inv) {
+        do {
+            double e1, e2;
+            do {
+                e1 = random_standard_exponential(bitgen_state);
+                e2 = random_standard_exponential(bitgen_state);
+            } while ((e1 * e1) > (two_t * e2));
+            x = (1 + T * e1);
+            x = T / (x * x);
+        } while (cfg->z > 0 && log1p(-random_standard_uniform(bitgen_state)) >=
+                 -0.5 * cfg->z2 * x);
+        return x;
+    }
+    do {
+        double y = random_standard_normal(bitgen_state);
+        y *= y;
+        double a = y / cfg->z;
+        x = (1 + 0.5 * (a - sqrt(4 * a + a * a))) / cfg->z;
+        if (next_double(bitgen_state) * (1 + x * cfg->z) > 1) {
+            x = 1 / (x * cfg->z2);
+        }
+    } while (x >= T);
+    return x;
 }
 
 /*
@@ -84,7 +147,7 @@ random_jacobi(bitgen_t* bitgen_state, struct config* cfg)
 {
     for (;;) {
         if (next_double(bitgen_state) < cfg->ratio) {
-            cfg->x = random_right_bounded_inverse_gaussian(bitgen_state, cfg->mu, 1, T);
+            cfg->x = random_right_bounded_invgauss(bitgen_state, cfg);
         }
         else {
             cfg->x = T + random_standard_exponential(bitgen_state) / cfg->k;
