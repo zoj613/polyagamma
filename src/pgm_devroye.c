@@ -1,6 +1,7 @@
 /* Copyright (c) 2020-2021, Zolisa Bleki
  *
  * SPDX-License-Identifier: BSD-3-Clause */
+#include "numpy/random/distributions.h"
 #include "pgm_common.h"
 #include "pgm_devroye.h"
 
@@ -119,8 +120,7 @@ random_right_bounded_invgauss(bitgen_t* bitgen_state, struct config* cfg)
             } while ((e1 * e1) > (two_t * e2));
             x = (1 + T * e1);
             x = T / (x * x);
-        } while (cfg->z > 0 && log1p(-random_standard_uniform(bitgen_state)) >=
-                 -0.5 * cfg->z2 * x);
+        } while (cfg->z > 0 && log1p(-next_double(bitgen_state)) >= -0.5 * cfg->z2 * x);
         return x;
     }
     do {
