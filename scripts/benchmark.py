@@ -64,7 +64,7 @@ def benchmark_samplers(seed, out, z_val=0):
             lambda h: pg.pgdrawv(h, z, out),
         ],
         labels=["polyagamma", "pypolyagamma"],
-        n_range=[i for i in np.arange(0.1, 60, 0.4)],
+        n_range=[i for i in np.arange(0.1, 50, 0.4)],
         xlabel="value of $h$",
         equality_check=None,
     )
