@@ -13,7 +13,6 @@
 struct config {
     double z;
     double z2;
-    double mu;
     double k;
     double half_mu2;
     double ratio;
