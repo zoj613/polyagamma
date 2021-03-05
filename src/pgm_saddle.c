@@ -343,8 +343,14 @@ random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
     ratio = p / (p + q);
     do {
         if (next_double(bitgen_state) < ratio) {
+            double mu2 = one_srho_l * one_srho_l;
             do {
-                cfg.x = random_wald(bitgen_state, one_srho_l, h);
+                double y = random_standard_normal(bitgen_state);
+                double w = one_srho_l + 0.5 * mu2 * y * y / h;
+                cfg.x = w - sqrt(w * w - mu2);
+                if (next_double(bitgen_state) * (1 + cfg.x * sqrt_rho_l) > 1) {
+                    cfg.x = mu2 / cfg.x;
+                }
             } while (cfg.x >= cfg.xc);
         }
         else {

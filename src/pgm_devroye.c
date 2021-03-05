@@ -1,7 +1,6 @@
 /* Copyright (c) 2020-2021, Zolisa Bleki
  *
  * SPDX-License-Identifier: BSD-3-Clause */
-#include "numpy/random/distributions.h"
 #include "pgm_common.h"
 #include "pgm_devroye.h"
 
@@ -15,7 +14,6 @@ struct config {
     double z;
     double z2;
     double k;
-    double half_mu2;
     double ratio;
     double x;
     double logx;
@@ -125,9 +123,8 @@ random_right_bounded_invgauss(bitgen_t* bitgen_state, struct config* cfg)
     }
     do {
         double y = random_standard_normal(bitgen_state);
-        y *= y;
-        double a = y / cfg->z;
-        x = (1 + 0.5 * (a - sqrt(4 * a + a * a))) / cfg->z;
+        double w = (cfg->z + 0.5 * y * y) / cfg->z2;
+        x = w - sqrt(w * w - 1 / cfg->z2);
         if (next_double(bitgen_state) * (1 + x * cfg->z) > 1) {
             x = 1 / (x * cfg->z2);
         }
