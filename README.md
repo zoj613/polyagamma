@@ -8,7 +8,6 @@
 
 
 Efficiently generate samples from the Polya-Gamma distribution using a NumPy/SciPy compatible interface.
-![densities](./scripts/densities.svg)
 
 
 ## Features
@@ -99,7 +98,7 @@ For an example of how to use `polyagamma` in a C program, see [here][1].
 Below are runtime plots of 20000 samples generated for various values of `h` 
 and `z`, using each method. We restrict `h` to integer values to accomodate the 
 `devroye` method, which cannot be used for non-integer `h`. The version of the
-package used to generate them is `v1.1.0`.
+package used to generate them is `v1.1.1`.
 
 ![](./scripts/perf_methods_0.0.svg) | ![](./scripts/perf_methods_2.5.svg)
 | --- | --- |
@@ -109,9 +108,9 @@ package used to generate them is `v1.1.0`.
 
 Generally:
 - The `gamma` method is slowest and should be avoided in cases where speed is paramount.
-- For `h > 15`, the `saddle` method is the fastest for any value of `z`.
-- For `z <= 1` and integer `h <= 15`, the `devroye` method is the most efficient.
-- For `z > 1` and integer/non-integer `h <= 15`, the `alternate` method is the most efficient.
+- For `h > 25`, the `saddle` method is the fastest for any value of `z`.
+- For `0 <= z <= 2` and integer `h < 15`, the `devroye` method should be preferred.
+- For `z > 2` and integer/non-integer `h <= 25`, the `alternate` method is the most efficient.
 - For `h > 50` (or any value large enough), the normal approximation to the distribution is 
 fastest (not reported in the above plot but it is around 10 times faster than the `saddle` 
 method and also equally accurate).
@@ -119,7 +118,7 @@ method and also equally accurate).
 Therefore, we devise a "hybrid/default" sampler that picks a sampler based on the above guidelines.
 
 We also benchmark the hybrid sampler runtime with the sampler found in the `pypolyagamma` 
-package (version `1.2.3`). The version of NumPy we use is `1.20.1`. We use the `pgdrawv`
+package (version `1.2.3`). The version of NumPy we use is `1.19.5`. We use the `pgdrawv`
 function which takes arrays as input. Below are runtime plots of 20000 samples for each 
 value of `h` and `z`. Values of `h` range from 0.1 to 60, while `z` is set to 0, 2.5, 5, and 10.
 ![](./scripts/perf_samplers_0.0.svg) | ![](./scripts/perf_samplers_2.5.svg)
@@ -130,10 +129,7 @@ value of `h` and `z`. Values of `h` range from 0.1 to 60, while `z` is set to 0,
 
 It can be seen that when generating many samples at once for any given combination of 
 parameters, `polyagamma` outperforms the `pypolyagamma` package. The exception is when 
-`h < 1`. We rely on the `saddle` method to generate samples when the shape parameter is 
-very small, which is not very efficient for such values. For values of `h` larger than 50, 
-we use the normal approximation, which explains the large dip in runtime past `h=50`. 
-It is also worth noting that the `pypolygamma` package is on average faster than ours at 
+very small (e.g `h < 1`). Although not shown here, for values of `h` larger than 50, we use the normal approximation method. It is also worth noting that the `pypolygamma` package is on average faster than ours at 
 generating exactly one sample from the distribution. This is mainly due to the 
 overhead introduced by creating the bitgenerator + acquiring/releasing the thread lock + 
 doing parameter validation checks at every call to the function. This overhead can 
@@ -150,10 +146,18 @@ In [6]: %timeit polyagamma(random_state=rng, disable_checks=True)
 2.58 µs ± 22.3 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
 ```
 
-
 To generate the above plots locally, run `python scripts/benchmark.py --size=<some size> --z=<z value>`.
 Note that the runtimes may differ  than the ones reported here, depending on the machine this script 
 is ran on.
+
+
+## Density Plots
+Below are density plots of the `PG(h, 0)` distribution using each of the available
+methods. A plot generated using the `pypolyagamma` package is used for comparison.
+
+<p align="center">
+    <img src="./scripts/densities.svg">
+</p>
 
 
 ## Contributing
