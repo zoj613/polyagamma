@@ -51,12 +51,12 @@ def test_polyagamma():
     with pytest.raises(ValueError):
         rng_polyagamma(out=np.empty((2, 1)))
 
-    # h must be equal to or greater than 1
-    with pytest.raises(ValueError):
+    # h must be greater than 0
+    with pytest.raises(ValueError, match="`h` must be positive"):
         rng_polyagamma(0)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="`h` must be positive"):
         rng_polyagamma(-1.3232)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="`h` must be positive"):
         h = [1, 2, 3, 0.00001]
         rng_polyagamma(h)
 
@@ -64,7 +64,7 @@ def test_polyagamma():
     rng_polyagamma(z=-10.5)
 
     # raise error on unknown method names
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="`method` must be one of"):
         rng_polyagamma(method="unknown method")
     # should work for all supported methods
     rng_polyagamma(method="gamma")
@@ -77,9 +77,6 @@ def test_polyagamma():
     rng_polyagamma(h, method="devroye")
     rng_polyagamma(h, method="alternate")
 
-    # raise error for values less than 1 with alternate method
-    with pytest.raises(ValueError):
-        rng_polyagamma(0.9, method="alternate")
     # raise an error when using devroye with non-integer values of h
     with pytest.raises(ValueError):
         rng_polyagamma(2.0000000001, method="devroye")
@@ -90,8 +87,9 @@ def test_polyagamma():
     with pytest.raises(TypeError, match="takes at most 2 positional arguments"):
         rng_polyagamma(1, 0, 5)
 
-    # don't raise error when passed non-positive h values if checks are disabled
-    rng_polyagamma(-1, disable_checks=True)
+    # don't raise error when passed non-integer h values if checks are disabled
+    # when using the devroye method.
+    rng_polyagamma(1.5, method="devroye", disable_checks=True)
 
     # test for reproducibility via random_state
     rng = np.random.default_rng(12345)

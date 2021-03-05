@@ -76,7 +76,7 @@ static NPY_INLINE double
 random_polyagamma_hybrid(bitgen_t* bitgen_state, double h, double z)
 {
     if (h < 1) {
-        return random_polyagamma_saddle(bitgen_state, h, z);
+        return random_polyagamma_alternate(bitgen_state, h, z);
     }
     if (h == 1) {
         return random_polyagamma_devroye(bitgen_state, h, z);

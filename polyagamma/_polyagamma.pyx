@@ -59,28 +59,17 @@ cdef inline int check_method(object h, str method, bint disable_checks,
     if method not in METHODS:
         raise ValueError(f"`method` must be one of {set(METHODS)}")
 
-    if not disable_checks:
-        if method == "alternate":
-            if is_a_number(h):
-                raise_error = PyObject_RichCompareBool(h, 1, Py_LT)
-            else:
-                o = np.PyArray_FROM_O(h) < 1
-                raise_error = np.PyArray_Any(o, np.NPY_MAXDIMS, <np.ndarray>NULL)
-            if raise_error:
-                raise ValueError("alternate method must have h >=1")
-            sampler[0] = ALTERNATE
-            return 1
+    if not disable_checks and method == "devroye":
+        if is_a_number(h):
+            raise_error = PyObject_RichCompareBool(PyNumber_Int(h), h, Py_NE)
+        else:
+            o = np.PyArray_FROM_OT(h, np.NPY_INT) != np.PyArray_FROM_O(h)
+            raise_error = np.PyArray_Any(o, np.NPY_MAXDIMS, <np.ndarray>NULL)
+        if raise_error:
+            raise ValueError("devroye method must have integer values for h")
+        sampler[0] = DEVROYE
+        return 1
 
-        elif method == "devroye":
-            if is_a_number(h):
-                raise_error = PyObject_RichCompareBool(PyNumber_Int(h), h, Py_NE)
-            else:
-                o = np.PyArray_FROM_OT(h, np.NPY_INT) != np.PyArray_FROM_O(h)
-                raise_error = np.PyArray_Any(o, np.NPY_MAXDIMS, <np.ndarray>NULL)
-            if raise_error:
-                raise ValueError("devroye method must have integer values for h")
-            sampler[0] = DEVROYE
-            return 1
     sampler[0] = METHODS[method]
     return 1
 
@@ -119,9 +108,7 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
         The method to use when sampling. If None (default) then a hybrid
         sampler is used that picks a method based on the value of `h`.
         A legal value must be one of {"gamma", "devroye", "alternate", "saddle"}.
-        If the "alternate" method is used, then the value of `h` must be no
-        less than 1. If the "devroye" method is used, the `h` must be a
-        positive integer.
+        If the "devroye" method is used, the `h` must be a positive integer.
     disable_checks : bool, optional
         Whether to check that the `h` parameter contains only positive
         values(s). Disabling may give a performance gain, but may result
