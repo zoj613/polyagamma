@@ -7,12 +7,16 @@
 #pragma once
 #include <numpy/random/distributions.h>
 #include <float.h>
+#include <string.h>
 
 #define PGM_PI2_8 1.233700550136169  // pi^2 / 8
 #define PGM_LOGPI_2 0.4515827052894548  // log(pi / 2)
 #define PGM_LS2PI 0.9189385332046727  // log(sqrt(2 * pi))
 #define PGM_MAX_EXP 708.3964202663686  // maximum allowed exp() argument
 
+
+static NPY_INLINE double
+pgm_gammaq(double p, double x, bool normalized);
 
 /*
  * Compute the complementary error function.
@@ -243,33 +247,112 @@ pgm_lgamma(double z)
     }
 }
 
+
+#ifndef PGM_ARR_LEN
+#define PGM_ARR_LEN 10
+#endif
+// array to store the mixture distribution weights.
+static double wt[PGM_ARR_LEN] = {0};
+// array of flags to indicate whether the corresponding weight has been computed.
+static bool wf[PGM_ARR_LEN] = {false};
+
+/*
+ * Sample from a Gamma distribution left-truncated at 1, using a finite
+ * mixture of gamma distributions. The shape paramater must be an integer.
+ *
+ * This implementation is based on Proposition 3.1 of [1].
+ *
+ * Reference
+ * --------
+ * [1] Philippe, Anne. (1997). Simulation of right- and left-truncated gamma
+ *     distribution by mixtures. Statistics and Computing. 7. 173-181.
+ *     10.1023/A:1018534102043.
+ */
+static NPY_INLINE double
+truncated_gamma_mixture(bitgen_t* bitgen_state, size_t a, double b, bool clear)
+{
+    double sum = 0;
+    double u = next_double(bitgen_state);
+    if (!wf[0]) {
+        wt[0] = exp((a - 1) * log(b) - b) / pgm_gammaq(a, b, false);
+        wf[0] = true;
+    }
+    if (u <= wt[0]) {
+        if (clear) wf[0] = false;
+        return 1 + random_standard_exponential(bitgen_state) / b;
+    }
+    sum += wt[0];
+    for (size_t k = 2; k <= a; k++) {
+        if (!wf[k - 1]) {
+            wt[k - 1] = wt[k - 2] * (a - 1) / b;
+            wf[k - 1] = true;
+        }
+        sum += wt[k - 1];
+
+        if (u <= sum) {
+            if (clear) memset(wf, false, sizeof(*wf) * k);
+            return 1 + random_standard_gamma(bitgen_state, k) / b;
+        }
+    }
+    if (clear) memset(wf, false, sizeof(*wf) * a);
+    return 1 + random_standard_gamma(bitgen_state, a) / b;
+}
+
+/*
+ * Algorithm A5 of Philippe (1997).
+ *
+ *
+ * Reference
+ * --------
+ * [1] Philippe, Anne. (1997). Simulation of right- and left-truncated gamma
+ *     distribution by mixtures. Statistics and Computing. 7. 173-181.
+ *     10.1023/A:1018534102043.
+ */
+static NPY_INLINE double
+random_bounded_gamma_philippe_A5(bitgen_t* bitgen_state, double a, double b)
+{
+    double x, threshold;
+    size_t af = (size_t)a;
+    double af_a = af / a;
+    double aminaf = a - af;
+
+    if (b <= a) {
+        double bf = b * af_a;
+        double c = b * (1 - af_a);
+        do {
+            x = truncated_gamma_mixture(bitgen_state, af, bf, false);
+            threshold = aminaf * log(x) - x * c + aminaf;
+        } while (threshold < log1p(-next_double(bitgen_state)));
+        memset(wf, false, sizeof(*wf) * af);
+        return x;
+    }
+
+    double bf = b - aminaf;
+    double logm = aminaf * log(a / b) - aminaf;
+    do {
+        x = truncated_gamma_mixture(bitgen_state, af, bf, false);
+        threshold = aminaf * log(x) - x * aminaf - logm;
+    } while (threshold < log1p(-next_double(bitgen_state)));
+    memset(wf, false, sizeof(*wf) * af);
+    return x;
+}
+
 /*
  * sample from X ~ Gamma(a, rate=b) truncated on the interval {x | x > t}.
  *
- * For a > 1 we use the algorithm described in Dagpunar (1978)
- * For a == 1, we truncate an Exponential of rate=b.
- * For a < 1, we use algorithm [A4] described in Philippe (1997)
- *
- * TODO: There is a more efficient algorithm for a > 1 in Philippe (1997), which
- * should replace this one in the future.
+ * - For a > 1 we use the algorithm [A5] described in Philippe (1997). When `a`
+ *   is an integer, the acceptance probability is 1.
+ * - For a == 1, we truncate an Exponential of rate=b.
+ * - For a < 1, we use algorithm [A4] described in Philippe (1997)
  */
-NPY_INLINE double
+static NPY_INLINE double
 random_left_bounded_gamma(bitgen_t* bitgen_state, double a, double b, double t)
 {
     if (a > 1) {
-        b = t * b;
-        double x, threshold;
-        const double amin1 = a - 1;
-        const double bmina = b - a;
-        const double c0 = 0.5 * (bmina + sqrt((bmina * bmina) + 4 * b)) / b;
-        const double one_minus_c0 = 1 - c0;
-        const double log_m = amin1 * (log(amin1 / one_minus_c0) - 1);
-
-        do {
-            x = b + random_standard_exponential(bitgen_state) / c0;
-            threshold = amin1 * log(x) - x * one_minus_c0 - log_m;
-        } while (log1p(-random_standard_uniform(bitgen_state)) > threshold);
-        return t * (x / b);
+        if (a == (size_t)a) {
+            return t * truncated_gamma_mixture(bitgen_state, a, t * b, true);
+        }
+        return t * random_bounded_gamma_philippe_A5(bitgen_state, a, t * b);
     }
     else if (a == 1) {
         return t + random_standard_exponential(bitgen_state) / b;

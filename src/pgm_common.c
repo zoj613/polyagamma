@@ -9,6 +9,3 @@ pgm_erfc(double x);
 
 DECLDIR NPY_INLINE double
 pgm_lgamma(double z);
-
-DECLDIR NPY_INLINE double
-random_left_bounded_gamma(bitgen_t* bitgen_state, double a, double b, double t);
