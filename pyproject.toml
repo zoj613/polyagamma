@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "polyagamma"
-version = "1.1.0"
+version = "1.1.1"
 description = "Efficiently generate samples from the Polya-Gamma distribution using a NumPy/SciPy compatible interface."
 authors = ["Zolisa Bleki"]
 license = "BSD-3-Clause"
@@ -27,10 +27,11 @@ include = [
 
 [tool.poetry.dependencies]
 python = "^3.7"
-numpy = "^1.17.0"
+numpy = "^1.19.0"
 
 [tool.poetry.dev-dependencies]
 Cython = "^0.29.21"
+numpy = "1.19.0"
 pytest = "^6.2.1"
 toml = "^0.10.2"
 pytest-cov = "^2.11.1"
@@ -44,5 +45,5 @@ script = "build.py"
 plugins = ["Cython.Coverage"]
 
 [build-system]
-requires = ["poetry-core>=1.0.0", "wheel", "setuptools", "numpy>=1.17.0"]
+requires = ["poetry-core>=1.0.0", "wheel", "setuptools", "numpy>=1.19.0"]
 build-backend = "poetry.core.masonry.api"

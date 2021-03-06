@@ -43,32 +43,23 @@ cdef dict METHODS = {
 }
 
 
-cdef inline bint params_are_numbers(object a, object b):
-    return (PyFloat_Check(a) or PyLong_Check(a) or PyInt_Check(a)) and \
-            (PyFloat_Check(b) or PyLong_Check(b) or PyInt_Check(b))
-
-
 cdef inline bint is_a_number(object o):
     return PyFloat_Check(o) or PyLong_Check(o) or PyInt_Check(o)
 
 
-cdef inline int check_method(object h, str method, bint disable_checks) except -1:
+cdef inline bint params_are_numbers(object a, object b):
+    return is_a_number(a) and is_a_number(b)
+
+
+cdef inline int check_method(object h, str method, bint disable_checks,
+                             sampler_t* sampler) except -1:
     cdef bint raise_error
     cdef object o
 
     if method not in METHODS:
         raise ValueError(f"`method` must be one of {set(METHODS)}")
 
-    elif not disable_checks and method == "alternate":
-        if is_a_number(h):
-            raise_error = PyObject_RichCompareBool(h, 1, Py_LT)
-        else:
-            o = np.PyArray_FROM_O(h) < 1
-            raise_error = np.PyArray_Any(o, np.NPY_MAXDIMS, <np.ndarray>NULL)
-        if raise_error:
-            raise ValueError("alternate method must have h >=1")
-
-    elif not disable_checks and method == "devroye":
+    if not disable_checks and method == "devroye":
         if is_a_number(h):
             raise_error = PyObject_RichCompareBool(PyNumber_Int(h), h, Py_NE)
         else:
@@ -76,8 +67,11 @@ cdef inline int check_method(object h, str method, bint disable_checks) except -
             raise_error = np.PyArray_Any(o, np.NPY_MAXDIMS, <np.ndarray>NULL)
         if raise_error:
             raise ValueError("devroye method must have integer values for h")
-    else:
-        return METHODS[method]
+        sampler[0] = DEVROYE
+        return 1
+
+    sampler[0] = METHODS[method]
+    return 1
 
 
 def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
@@ -114,9 +108,7 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
         The method to use when sampling. If None (default) then a hybrid
         sampler is used that picks a method based on the value of `h`.
         A legal value must be one of {"gamma", "devroye", "alternate", "saddle"}.
-        If the "alternate" method is used, then the value of `h` must be no
-        less than 1. If the "devroye" method is used, the `h` must be a
-        positive integer.
+        If the "devroye" method is used, the `h` must be a positive integer.
     disable_checks : bool, optional
         Whether to check that the `h` parameter contains only positive
         values(s). Disabling may give a performance gain, but may result
@@ -193,7 +185,7 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
     bitgen = <bitgen_t*>PyCapsule_GetPointer(bitgenerator.capsule, "BitGenerator")
 
     if method is not None:
-        stype = <sampler_t>check_method(h, method, disable_checks)
+        check_method(h, method, disable_checks, &stype)
 
     if params_are_numbers(h, z):
         if not disable_checks and PyObject_RichCompareBool(h, zero, Py_LE):

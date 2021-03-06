@@ -99,25 +99,6 @@ pgm_erfc(double x)
 }
 
 /*
- * Calculate the cumulative distribution function of an Inverse-Gaussian.
- *
- * the robust variable is set to true to avoid exp() overflow with large
- * values for lambda. Otherwise, it is set to false in other cases to avoid
- * unnecessary log() call.
- */
-NPY_INLINE double
-inverse_gaussian_cdf(double x, double mu, double lambda, bool robust)
-{
-    double a = sqrt(0.5 * (lambda / x));
-    double b = a * (x / mu);
-
-    if (robust) {
-        return 0.5 * (pgm_erfc(a - b) + exp(2 * (lambda / mu) + log(pgm_erfc(b + a))));
-    }
-    return 0.5 * (pgm_erfc(a - b) + exp(2 * lambda / mu) * pgm_erfc(b + a));
-}
-
-/*
  * Calculate logarithm of the gamma function of z.
  *
  * This implementation is based on an asymptotic expansion based on stirling's
@@ -304,59 +285,6 @@ random_left_bounded_gamma(bitgen_t* bitgen_state, double a, double b, double t)
     }
 }
 
-/*
- * Sample from an Inverse-Gaussian(mu, lambda) truncated on the set {x | x < t}.
- *
- * We sample using two algorithms depending on whether mu > t or mu < t.
- *
- * When mu < t, We use a known sampling algorithm from Devroye
- * (1986), page 149. We sample until the generated variate is less than t.
- *
- * When mu > t, we use a Scaled-Inverse-Chi-square distribution as a proposal,
- * as explained in [1], page 134. To generate a sample from this proposal, we
- * sample from the tail of a standard normal distribution such that the value
- * is greater than 1/sqrt(t). Once we obtain the sample, we square and invert
- * it to obtain a sample from a Scaled-Inverse-Chi-Square(df=1, scale=lambda)
- * that is less than t. An efficient algorithm to sample from the tail of a
- * normal distribution using a pair of exponential variates is shown in
- * Devroye (1986) [page 382] & Devroye (2009) [page 7]. This sample becomes our
- * proposal. We accept the sample only if we sample a uniform less than the
- * acceptance porbability. The probability is exp(-0.5 * lambda * x / mu^2).
- * Refer to Appendix S1 of Polson et al. (2013).
- *
- * References
- * ----------
- *  [1] Windle, J. (2013). Forecasting high-dimensional, time-varying
- *      variance-covariance matrices with high-frequency data and sampling
- *      Pólya-Gamma random variates for posterior distributions derived from
- *      logistic likelihoods.(PhD thesis). Retrieved from
- *      http://hdl.handle.net/2152/21842
- */
-NPY_INLINE double
-random_right_bounded_inverse_gaussian(bitgen_t* bitgen_state, double mu,
-                                      double lambda, double t)
-{
-    double x;
-
-    if (t < mu) {
-        double e1, e2;
-        const double a = 1. / (mu * mu);
-        do {
-            do {
-                e1 = random_standard_exponential(bitgen_state);
-                e2 = random_standard_exponential(bitgen_state);
-            } while ((e1 * e1) > (2 * e2 / t));
-            x = (1 + t * e1);
-            x = t / (x * x);
-        } while (a > 0 && log1p(-random_standard_uniform(bitgen_state)) >=
-                 -0.5 * lambda * a * x);
-        return x;
-    }
-    do {
-        x = random_wald(bitgen_state, mu, lambda);
-    } while (x >= t);
-    return x;
-}
 
 #define PGM_CONFLUENT_EPSILON 1e-07
 
