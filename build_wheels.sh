@@ -26,7 +26,7 @@ function build_poetry_wheels
     for BIN in "${bin_arr[@]}"; do
         rm -Rf build/*
         # install build deps
-        "${BIN}/python" ${HOME}/.poetry/bin/poetry run pip install numpy
+        "${BIN}/python" ${HOME}/.poetry/bin/poetry run pip install numpy==1.19.0
         "${BIN}/python" ${HOME}/.poetry/bin/poetry build -f wheel
         auditwheel repair dist/*.whl --plat $1
         whl="$(basename dist/*.whl)"

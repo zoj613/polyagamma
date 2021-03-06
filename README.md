@@ -22,7 +22,7 @@ existing libraries.
 
 
 ## Dependencies
-- Numpy >= 1.17 
+- Numpy >= 1.19.0
 
 
 ## Installation
@@ -118,7 +118,7 @@ method and also equally accurate).
 Therefore, we devise a "hybrid/default" sampler that picks a sampler based on the above guidelines.
 
 We also benchmark the hybrid sampler runtime with the sampler found in the `pypolyagamma` 
-package (version `1.2.3`). The version of NumPy we use is `1.19.5`. We use the `pgdrawv`
+package (version `1.2.3`). The version of NumPy we use is `1.19.0`. We use the `pgdrawv`
 function which takes arrays as input. Below are runtime plots of 20000 samples for each 
 value of `h` and `z`. Values of `h` range from 0.1 to 60, while `z` is set to 0, 2.5, 5, and 10.
 ![](./scripts/perf_samplers_0.0.svg) | ![](./scripts/perf_samplers_2.5.svg)
