@@ -28,13 +28,15 @@ function build_poetry_wheels
         # install build deps
         "${BIN}/python" ${HOME}/.poetry/bin/poetry run pip install numpy==1.19.0
         "${BIN}/python" ${HOME}/.poetry/bin/poetry build -f wheel
-        auditwheel repair dist/*.whl --plat $1
-        whl="$(basename dist/*.whl)"
-        "${BIN}/python" -m pip install wheelhouse/"$whl"
-        # test if installed wheel imports correctly
-        "${BIN}/python" -c \
-            "from polyagamma import polyagamma; print(f'draw: {polyagamma()}');"
-        rm dist/*.whl
+        for whl in dist/*.whl; do
+            auditwheel repair "$whl" --plat $1
+            whlname="$(basename $whl)"
+            "${BIN}/python" -m pip install wheelhouse/"$whlname"
+            # test if installed wheel imports correctly
+            "${BIN}/python" -c \
+                "from polyagamma import random_polyagamma; print(f'draw: {random_polyagamma()}');"
+            rm "$whl"
+        done
     done
 }
 
