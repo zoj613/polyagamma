@@ -45,50 +45,80 @@ $ poetry install
 $ export PYTHONPATH=$PWD:$PYTHONPATH 
 ```
 
-## Example
+## Examples
 
 ### Python
 
 ```python
 import numpy as np
-from polyagamma import polyagamma
+from polyagamma import random_polyagamma
 
 # generate a PG(1, 0) sample
-o = polyagamma()
+o = random_polyagamma()
 
 # Get a 5 by 10 array of PG(1, 2) variates.
-o = polyagamma(z=2, size=(5, 10))
+o = random_polyagamma(z=2, size=(5, 10))
 
 # Pass sequences as input. Numpy's broadcasting rules apply here.
 h = [[1.5, 2, 0.75, 4, 5],
      [9.5, 8, 7, 6, 0.9]]
-o = polyagamma(h, -2.5)
+o = random_polyagamma(h, -2.5)
 
 # Pass an output array
 out = np.empty(5)
-polyagamma(out=out)
+random_polyagamma(out=out)
 print(out)
 
 # one can choose a sampling method from {devroye, alternate, gamma, saddle}.
 # If not given, the default behaviour is a hybrid sampler that picks a method
 # based on the parameter values.
-o = polyagamma(method="saddle")
+o = random_polyagamma(method="saddle")
 
 # one can also use an existing instance of `numpy.random.Generator` as a parameter.
 # This is useful to reproduce samples generated via a given seed.
 rng = np.random.default_rng(12345)
-o = polyagamma(random_state=rng)
+o = random_polyagamma(random_state=rng)
 
 # If one is using a `numpy.random.RandomState` instance instead of the `Generator`
 # class, the object's underlying bitgenerator can be passed as the value of random_state
 bit_gen = np.random.RandomState(12345)._bit_generator
-o = polyagamma(random_state=bit_gen)
+o = random_polyagamma(random_state=bit_gen)
 
 # When passing a large input array for the shape parameter `h`, parameter value
 # validation checks can be disabled to avoid some overhead, which may boost performance.
 large_h = np.ones(1000000)
-o = polyagamma(large_h, disable_checks=True)
+o = random_polyagamma(large_h, disable_checks=True)
 ```
+
+### Cython
+The package also provides functions that can be imported in cython modules. They are:
+- `random_polyagamma`
+- `random_polyagamma_fill`
+- `random_polyagamma_fill2`
+
+Refer to the [pgm_random.h](./include/pgm_random.h) header file for more info about the
+function signatures. Below is an example of how these functions can be used.
+
+```cython
+from cpython.pycapsule cimport PyCapsule_GetPointer
+from polyagamma cimport random_polyagamma_fill, DEVROYE
+from numpy.random cimport bitgen_t, BitGenerator
+import numpy as np
+
+# assuming there exists an instance of the Generator class called `rng`.
+cdef BitGenerator bitgenerator = rng._bit_generator
+# get pointer to the underlying bitgenerator struct
+cdef bitgen_t* bitgen = <bitgen_t*>PyCapsule_GetPointer(bitgenerator.capsule, "BitGenerator")
+# set distribution parameters
+cdef double h = 1, z = 0
+# get a memory view of the array to store samples in
+cdef double[:] out = np.empty(300)
+with nogil:  # you probably want to acquire a thread lock here as well for thread safety.
+    random_polyagamma_fill(bitgen, h, z, DEVROYE, <int>out.shape[0], &out[0])
+print(out.base)
+...
+```
+
 ### C
 For an example of how to use `polyagamma` in a C program, see [here][1].
 
@@ -136,13 +166,13 @@ doing parameter validation checks at every call to the function. This overhead c
 somewhat be mitigated by passing in a random generator instance at every call to 
 the `polyagamma` function. For example, on an `iPython` session:
 ```ipynb
-In [4]: %timeit polyagamma()
+In [4]: %timeit random_polyagamma()
 83.2 µs ± 1.02 µs per loop (mean ± std. dev. of 7 runs, 10000 loops each)
 
-In [5]: %timeit polyagamma(random_state=rng)
+In [5]: %timeit random_polyagamma(random_state=rng)
 2.68 µs ± 29.7 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
 
-In [6]: %timeit polyagamma(random_state=rng, disable_checks=True)
+In [6]: %timeit random_polyagamma(random_state=rng, disable_checks=True)
 2.58 µs ± 22.3 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
 ```
 
