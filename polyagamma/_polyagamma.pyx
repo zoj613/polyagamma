@@ -21,19 +21,34 @@ import numpy as np
 
 np.import_array()
 
-
-cdef extern from "../include/pgm_random.h":
-    ctypedef enum sampler_t:
-        GAMMA
-        DEVROYE
-        ALTERNATE
-        SADDLE
-        HYBRID
-    double pgm_random_polyagamma(bitgen_t* bg, double h, double z,
+cdef extern from "pgm_random.h":
+    double pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z,
                                  sampler_t method) nogil
-    void pgm_random_polyagamma_fill(bitgen_t* bg, double h, double z,
+    void pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
                                     sampler_t method, size_t n, double* out) nogil
+    void pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h,
+                                     const double* z, sampler_t method, size_t n,
+                                     double* out) nogil
 
+
+# Cython-level function definitions to be shared with other cython modules
+cdef inline double random_polyagamma(bitgen_t* bitgen_state, double h, double z,
+                                     sampler_t method) nogil:
+    return pgm_random_polyagamma(bitgen_state, h, z, method)
+
+
+cdef inline void random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
+                                        sampler_t method, size_t n, double* out) nogil:
+    pgm_random_polyagamma_fill(bitgen_state, h, z, method, n, out)
+
+
+cdef inline void random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h,
+                                         const double* z, sampler_t method,
+                                         size_t n, double* out) nogil:
+    pgm_random_polyagamma_fill2(bitgen_state, h, z, method, n, out)
+
+
+# python-level functions and helpers below
 
 cdef dict METHODS = {
     "gamma": GAMMA,
@@ -47,7 +62,7 @@ cdef inline bint is_a_number(object o):
     return PyFloat_Check(o) or PyLong_Check(o) or PyInt_Check(o)
 
 
-cdef inline bint params_are_numbers(object a, object b):
+cdef inline bint params_are_scalars(object a, object b):
     return is_a_number(a) and is_a_number(b)
 
 
@@ -152,20 +167,20 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
 
     Examples
     --------
-    >>> from polyagamma import polyagamma
+    >>> from polyagamma import random_polyagamma
     # outputs a 5 by 10 array of PG(1, 0) samples.
-    >>> out = polyagamma(size=(5, 10))
+    >>> out = random_polyagamma(size=(5, 10))
     # broadcasting to generate 5 values from PG(1, 5), PG(2, 5),...,PG(5, 5)
     >>> a = [1, 2, 3, 4, 5]
-    >>> polyagamma(a, 5)
+    >>> random_polyagamma(a, 5)
     # using a specific method
-    >>> out = polyagamma(method="devroye")
+    >>> out = random_polyagamma(method="devroye")
     # one can pass an existing instance of numpy.random.Generator as a parameter.
     >>> rng = np.random.default_rng(12345)
-    >>> polyagamma(random_state=rng)
+    >>> random_polyagamma(random_state=rng)
     # Output can be stored in an input array via the ``out`` parameter.
     >>> arr = np.empty(10)
-    >>> polyagamma(size=10, out=arr)
+    >>> random_polyagamma(size=10, out=arr)
 
     """
     # define an ``h`` value small enough to be regarded as a zero
@@ -174,6 +189,7 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
     cdef Py_ssize_t n, idx
     cdef np.broadcast bcast
     cdef double ch, cz
+    cdef double[:] ah, az
     cdef bint is_tuple
     cdef np.npy_intp dims
     cdef BitGenerator bitgenerator
@@ -187,14 +203,14 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
     if method is not None:
         check_method(h, method, disable_checks, &stype)
 
-    if params_are_numbers(h, z):
+    if params_are_scalars(h, z):
         if not disable_checks and PyObject_RichCompareBool(h, zero, Py_LE):
             raise ValueError("`h` must be positive")
         elif has_out:
             n = out.shape[0]
             ch, cz = h, z
             with bitgenerator.lock, nogil:
-                pgm_random_polyagamma_fill(bitgen, ch, cz, stype, n, &out[0])
+                random_polyagamma_fill(bitgen, ch, cz, stype, n, &out[0])
             return
         elif size is not None:
             is_tuple = PyTuple_CheckExact(size)
@@ -209,20 +225,36 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
             n = <size_t>dims
             ch, cz = h, z
             with bitgenerator.lock, nogil:
-                pgm_random_polyagamma_fill(bitgen, ch, cz, stype, n, &out[0])
+                random_polyagamma_fill(bitgen, ch, cz, stype, n, &out[0])
             return np.PyArray_Reshape(out.base, size) if is_tuple else out.base
         else:
             ch, cz = h, z
             with bitgenerator.lock, nogil:
-                cz = pgm_random_polyagamma(bitgen, ch, cz, stype)
+                cz = random_polyagamma(bitgen, ch, cz, stype)
             return cz
 
-    else:
-        h = np.PyArray_FROM_OT(h, np.NPY_DOUBLE)
-        if not disable_checks and np.any(h <= zero):
-            raise ValueError("values of `h` must be positive")
+    h = np.PyArray_FROM_OT(h, np.NPY_DOUBLE)
+    if not disable_checks and np.PyArray_Any(np.PyArray_FROM_OT(h <= zero, np.NPY_INT),
+                                             np.NPY_MAXDIMS, <np.ndarray>NULL):
+        raise ValueError("values of `h` must be positive")
+    z = np.PyArray_FROM_OT(z, np.NPY_DOUBLE)
 
-        z = np.PyArray_FROM_OT(z, np.NPY_DOUBLE)
+    if np.PyArray_NDIM(h) == np.PyArray_NDIM(z) == 1:
+        ah, az = h, z
+        if has_out and (out.shape[0] != ah.shape[0] or out.shape[0] != az.shape[0]):
+            raise IndexError("`out` must have the same length as parameters")
+        elif not has_out:
+            dims = <np.npy_intp>(ah.shape[0])
+            out = np.PyArray_EMPTY(1, &dims, np.NPY_DOUBLE, 0)
+        n = out.shape[0]
+        with bitgenerator.lock, nogil:
+            random_polyagamma_fill2(bitgen, &ah[0], &az[0], stype, n, &out[0])
+        if has_out:
+            return
+        else:
+            return out.base
+
+    else:
         bcast = np.PyArray_MultiIterNew2(h, z)
         if has_out and out.shape[0] != bcast.size:
             raise ValueError(
@@ -238,7 +270,7 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
             for idx in range(n):
                 ch = (<double*>np.PyArray_MultiIter_DATA(bcast, 0))[0]
                 cz = (<double*>np.PyArray_MultiIter_DATA(bcast, 1))[0]
-                out[idx] = pgm_random_polyagamma(bitgen, ch, cz, stype);
+                out[idx] = random_polyagamma(bitgen, ch, cz, stype);
                 np.PyArray_MultiIter_NEXT(bcast)
 
         if has_out:

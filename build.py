@@ -33,7 +33,7 @@ extensions = [
     ),
 ]
 
-#os.system("cp -r include polyagamma/")
+
 def build(setup_kwargs):
     """Build extension modules."""
-    setup_kwargs.update(ext_modules=extensions)
+    setup_kwargs.update(ext_modules=extensions, zip_safe=False)

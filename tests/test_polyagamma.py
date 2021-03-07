@@ -3,7 +3,7 @@ import functools
 import numpy as np
 import pytest
 
-from polyagamma import polyagamma
+from polyagamma import polyagamma, random_polyagamma
 
 
 def test_polyagamma():
@@ -37,6 +37,18 @@ def test_polyagamma():
     assert out.shape == (4,)
     assert not np.allclose(out, 0)
 
+    # test for when h and z are sequences of dimension 1 and equal length
+    h = (1, 2, 3, 4, 5, 6)
+    z = np.ones(6)
+    out = rng_polyagamma(h, z)
+    assert out.shape == (6,)
+    out = np.zeros(6)
+    rng_polyagamma(h, z, out=out)
+    assert not np.allclose(out, 0)
+    with pytest.raises(IndexError, match="must have the same length as parameters"):
+        rng_polyagamma(h, z, out=out[1:])
+
+    # tests for when one of the params is a sequence and the other is not
     out = np.array([0., 0., 0., 0., 0.])
     rng_polyagamma(out=out)
     assert not np.allclose(out, 0)
@@ -98,3 +110,6 @@ def test_polyagamma():
     assert np.allclose(expected, polyagamma(size=5, random_state=rng2))
     assert not np.allclose(expected, polyagamma(size=5))
 
+# test if alias points to the correct object
+def test_polyagamma_alias():
+    assert random_polyagamma is polyagamma
