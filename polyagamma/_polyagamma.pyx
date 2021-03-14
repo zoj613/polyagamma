@@ -17,7 +17,7 @@ from cpython.pycapsule cimport PyCapsule_GetPointer
 from cpython.tuple cimport PyTuple_CheckExact, PyTuple_GET_SIZE, PyTuple_GET_ITEM
 from numpy.random.bit_generator cimport BitGenerator, bitgen_t
 cimport numpy as np
-import numpy as np
+from numpy.random import default_rng
 
 np.import_array()
 
@@ -56,6 +56,7 @@ cdef dict METHODS = {
     "devroye": DEVROYE,
     "alternate": ALTERNATE,
 }
+
 
 cdef const char* BITGEN_NAME = "BitGenerator"
 
@@ -199,7 +200,7 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
     cdef sampler_t stype = HYBRID
     cdef bint has_out = True if out is not None else False
 
-    bitgenerator = np.random.default_rng(random_state)._bit_generator
+    bitgenerator = <BitGenerator>(default_rng(random_state)._bit_generator)
     bitgen = <bitgen_t*>PyCapsule_GetPointer(bitgenerator.capsule, BITGEN_NAME)
 
     if method is not None:
@@ -224,7 +225,7 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
                 dims = <np.npy_intp>size
             out = np.PyArray_EMPTY(1, &dims, np.NPY_DOUBLE, 0)
             with bitgenerator.lock, nogil:
-                random_polyagamma_fill(bitgen, ch, cz, stype, <size_t>dims, &out[0])
+                random_polyagamma_fill(bitgen, ch, cz, stype, out.shape[0], &out[0])
             return np.PyArray_Reshape(out.base, size) if is_tuple else out.base
         else:
             with bitgenerator.lock, nogil:
@@ -244,9 +245,8 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
         elif not has_out:
             dims = <np.npy_intp>(ah.shape[0])
             out = np.PyArray_EMPTY(1, &dims, np.NPY_DOUBLE, 0)
-        n = out.shape[0]
         with bitgenerator.lock, nogil:
-            random_polyagamma_fill2(bitgen, &ah[0], &az[0], stype, n, &out[0])
+            random_polyagamma_fill2(bitgen, &ah[0], &az[0], stype, out.shape[0], &out[0])
         if has_out:
             return
         else:
@@ -263,9 +263,8 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
             dims = <np.npy_intp>(bcast.size)
             out = np.PyArray_EMPTY(1, &dims, np.NPY_DOUBLE, 0)
 
-        n = out.shape[0]
         with bitgenerator.lock, nogil:
-            for idx in range(n):
+            for idx in range(out.shape[0]):
                 ch = (<double*>np.PyArray_MultiIter_DATA(bcast, 0))[0]
                 cz = (<double*>np.PyArray_MultiIter_DATA(bcast, 1))[0]
                 out[idx] = random_polyagamma(bitgen, ch, cz, stype);
