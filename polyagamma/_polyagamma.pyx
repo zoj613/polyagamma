@@ -11,13 +11,13 @@ SPDX-License-Identifier: BSD-3-Clause
 from cpython.float cimport PyFloat_Check
 from cpython.int cimport PyInt_Check
 from cpython.long cimport PyLong_Check
-from cpython.number cimport PyNumber_Int
+from cpython.number cimport PyNumber_Long
 from cpython.object cimport PyObject_RichCompareBool, Py_LE, Py_LT, Py_NE
 from cpython.pycapsule cimport PyCapsule_GetPointer
 from cpython.tuple cimport PyTuple_CheckExact, PyTuple_GET_SIZE, PyTuple_GET_ITEM
 from numpy.random.bit_generator cimport BitGenerator, bitgen_t
 cimport numpy as np
-import numpy as np
+from numpy.random import default_rng
 
 np.import_array()
 
@@ -58,6 +58,9 @@ cdef dict METHODS = {
 }
 
 
+cdef const char* BITGEN_NAME = "BitGenerator"
+
+
 cdef inline bint is_a_number(object o):
     return PyFloat_Check(o) or PyLong_Check(o) or PyInt_Check(o)
 
@@ -76,9 +79,9 @@ cdef inline int check_method(object h, str method, bint disable_checks,
 
     if not disable_checks and method == "devroye":
         if is_a_number(h):
-            raise_error = PyObject_RichCompareBool(PyNumber_Int(h), h, Py_NE)
+            raise_error = PyObject_RichCompareBool(PyNumber_Long(h), h, Py_NE)
         else:
-            o = np.PyArray_FROM_OT(h, np.NPY_INT) != np.PyArray_FROM_O(h)
+            o = np.PyArray_FROM_OT(h, np.NPY_LONG) != np.PyArray_FROM_O(h)
             raise_error = np.PyArray_Any(o, np.NPY_MAXDIMS, <np.ndarray>NULL)
         if raise_error:
             raise ValueError("devroye method must have integer values for h")
@@ -186,7 +189,7 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
     # define an ``h`` value small enough to be regarded as a zero
     DEF zero = 1e-04
 
-    cdef Py_ssize_t n, idx
+    cdef Py_ssize_t idx
     cdef np.broadcast bcast
     cdef double ch, cz
     cdef double[:] ah, az
@@ -197,8 +200,8 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
     cdef sampler_t stype = HYBRID
     cdef bint has_out = True if out is not None else False
 
-    bitgenerator = np.random.default_rng(random_state)._bit_generator
-    bitgen = <bitgen_t*>PyCapsule_GetPointer(bitgenerator.capsule, "BitGenerator")
+    bitgenerator = <BitGenerator>(default_rng(random_state)._bit_generator)
+    bitgen = <bitgen_t*>PyCapsule_GetPointer(bitgenerator.capsule, BITGEN_NAME)
 
     if method is not None:
         check_method(h, method, disable_checks, &stype)
@@ -206,11 +209,10 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
     if params_are_scalars(h, z):
         if not disable_checks and PyObject_RichCompareBool(h, zero, Py_LE):
             raise ValueError("`h` must be positive")
-        elif has_out:
-            n = out.shape[0]
-            ch, cz = h, z
+        ch, cz = h, z
+        if has_out:
             with bitgenerator.lock, nogil:
-                random_polyagamma_fill(bitgen, ch, cz, stype, n, &out[0])
+                random_polyagamma_fill(bitgen, ch, cz, stype, out.shape[0], &out[0])
             return
         elif size is not None:
             is_tuple = PyTuple_CheckExact(size)
@@ -222,33 +224,29 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
             else:
                 dims = <np.npy_intp>size
             out = np.PyArray_EMPTY(1, &dims, np.NPY_DOUBLE, 0)
-            n = <size_t>dims
-            ch, cz = h, z
             with bitgenerator.lock, nogil:
-                random_polyagamma_fill(bitgen, ch, cz, stype, n, &out[0])
+                random_polyagamma_fill(bitgen, ch, cz, stype, out.shape[0], &out[0])
             return np.PyArray_Reshape(out.base, size) if is_tuple else out.base
         else:
-            ch, cz = h, z
             with bitgenerator.lock, nogil:
                 cz = random_polyagamma(bitgen, ch, cz, stype)
             return cz
 
     h = np.PyArray_FROM_OT(h, np.NPY_DOUBLE)
-    if not disable_checks and np.PyArray_Any(np.PyArray_FROM_OT(h <= zero, np.NPY_INT),
+    if not disable_checks and np.PyArray_Any(np.PyArray_FROM_OT(h <= zero, np.NPY_LONG),
                                              np.NPY_MAXDIMS, <np.ndarray>NULL):
         raise ValueError("values of `h` must be positive")
     z = np.PyArray_FROM_OT(z, np.NPY_DOUBLE)
 
     if np.PyArray_NDIM(h) == np.PyArray_NDIM(z) == 1:
         ah, az = h, z
-        if has_out and (out.shape[0] != ah.shape[0] or out.shape[0] != az.shape[0]):
+        if has_out and not (out.shape[0] == ah.shape[0] == az.shape[0]):
             raise IndexError("`out` must have the same length as parameters")
         elif not has_out:
             dims = <np.npy_intp>(ah.shape[0])
             out = np.PyArray_EMPTY(1, &dims, np.NPY_DOUBLE, 0)
-        n = out.shape[0]
         with bitgenerator.lock, nogil:
-            random_polyagamma_fill2(bitgen, &ah[0], &az[0], stype, n, &out[0])
+            random_polyagamma_fill2(bitgen, &ah[0], &az[0], stype, out.shape[0], &out[0])
         if has_out:
             return
         else:
@@ -265,9 +263,8 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
             dims = <np.npy_intp>(bcast.size)
             out = np.PyArray_EMPTY(1, &dims, np.NPY_DOUBLE, 0)
 
-        n = out.shape[0]
         with bitgenerator.lock, nogil:
-            for idx in range(n):
+            for idx in range(out.shape[0]):
                 ch = (<double*>np.PyArray_MultiIter_DATA(bcast, 0))[0]
                 cz = (<double*>np.PyArray_MultiIter_DATA(bcast, 1))[0]
                 out[idx] = random_polyagamma(bitgen, ch, cz, stype);

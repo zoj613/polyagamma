@@ -8,11 +8,11 @@
 #include "../include/pgm_random.h"
 
 
-extern NPY_INLINE void
+DECLDIR NPY_INLINE void
 pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
                            sampler_t method, size_t n, double* out);
 
-extern NPY_INLINE void
+DECLDIR NPY_INLINE void
 pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h,
                             const double* z, sampler_t method, size_t n,
                             double* restrict out);

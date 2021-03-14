@@ -86,9 +86,6 @@ struct func_return {
 
 /*
  * Compute K'(u), the derivative of the Cumulant Generating Function (CGF) of x.
- *
- * For values in the neighborhood of zero, we use a faster Taylor series
- * expansion of the trigonometric and hyperbolic functions.
  */
 static NPY_INLINE void
 cgf_prime(double u, struct func_return* ret)
@@ -216,7 +213,19 @@ cgf(double u, double z)
 }
 
 /*
- * Configure some constants and variables to be used during sampling.
+ * Configure some constants to be used during sampling.
+ *
+ * Notes
+ * -----
+ * Note that unlike the recommendations of Windle et al (2014) to use
+ * xc = 1.1 * xl and xr = 1.2 * xl, we found that using xc = 2.75 * xl and
+ * xr = 3 * xl provides the best envelope for the target density function and
+ * thus gives the best performance in terms of runtime due to the algorithm
+ * rejecting much fewer proposals; while the former produces an envelope that
+ * exceeds the target by too much in height and has a narrower variance, thus
+ * leading to many rejected proposal samples. Tests show that the latter
+ * selection results in the saddle approximation being over twice as fast as
+ * when using the former.
  */
 static NPY_INLINE void
 initialize_config(struct config* cfg, double h, double z)

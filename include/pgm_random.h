@@ -39,8 +39,7 @@ typedef enum {GAMMA, DEVROYE, ALTERNATE, SADDLE, HYBRID} sampler_t;
  *     techniques." arXiv preprint arXiv:1405.0506 (2014)
  *
  */
-extern double pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z,
-                                    sampler_t method);
+double pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z, sampler_t method);
 
 /*
  * Generate n samples from a PG(h, z) distribution.
