@@ -12,9 +12,9 @@ def test_polyagamma():
 
     assert len(rng_polyagamma(size=5)) == 5
     assert rng_polyagamma(size=(5, 2)).shape == (5, 2)
-    # raise an error if shape tuple element is not an integer
-    with pytest.raises(TypeError):
-        rng_polyagamma(size=(5.0, 2))
+    # test if non-integer elements of size get truncated to ints
+    assert rng_polyagamma(size=(5.1, 2.9)).shape == (5, 2)
+    assert rng_polyagamma(size=10.4).shape == (10,)
 
     h = [[[0.59103028], [0.15228518], [0.53494081], [0.85875483], [0.05796053]],
          [[0.63934113], [0.1341983 ], [0.73854957], [0.76351291], [0.38431413]],
