@@ -14,7 +14,7 @@ from cpython.long cimport PyLong_Check
 from cpython.number cimport PyNumber_Long
 from cpython.object cimport PyObject_RichCompareBool, Py_LE, Py_LT, Py_NE
 from cpython.pycapsule cimport PyCapsule_GetPointer
-from cpython.tuple cimport PyTuple_CheckExact, PyTuple_GET_SIZE, PyTuple_GET_ITEM
+from cpython.tuple cimport PyTuple_CheckExact, PyTuple_GET_SIZE
 from numpy.random.bit_generator cimport BitGenerator, bitgen_t
 cimport numpy as np
 from numpy.random import default_rng
@@ -115,6 +115,8 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
         The number of elements to draw from the distribution. If size is
         ``None`` (default) then a single value is returned. If a tuple of
         integers is passed, the returned array will have the same shape.
+        If the element(s) of size is not an integer type, it will be truncated
+        to the largest integer smaller than its value (e.g (2.1, 1) -> (2, 1)).
         This parameter only applies if `h` and `z` are scalars.
     out : array_like, optional
         1d array_like object in which to store samples. This object must
@@ -189,12 +191,11 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
     # define an ``h`` value small enough to be regarded as a zero
     DEF zero = 1e-04
 
-    cdef Py_ssize_t idx
     cdef np.broadcast bcast
     cdef double ch, cz
     cdef double[:] ah, az
-    cdef bint is_tuple
-    cdef np.npy_intp dims
+    cdef double* arr_ptr
+    cdef np.npy_intp arr_len
     cdef BitGenerator bitgenerator
     cdef bitgen_t* bitgen
     cdef sampler_t stype = HYBRID
@@ -215,18 +216,23 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
                 random_polyagamma_fill(bitgen, ch, cz, stype, out.shape[0], &out[0])
             return
         elif size is not None:
-            is_tuple = PyTuple_CheckExact(size)
-            if is_tuple:
-                total_size = 1
-                for idx in range(PyTuple_GET_SIZE(size)):
-                    total_size *= <object>PyTuple_GET_ITEM(size, idx)
-                dims = <np.npy_intp>total_size
+            if PyTuple_CheckExact(size):
+                shape = np.PyArray_FROM_OT(size, np.NPY_INTP)
+                arr = np.PyArray_EMPTY(
+                    PyTuple_GET_SIZE(size),
+                    <np.npy_intp*>np.PyArray_DATA(shape),
+                    np.NPY_DOUBLE,
+                    0
+                )
+                arr_len = np.PyArray_SIZE(arr)
+                arr_ptr = <double*>np.PyArray_DATA(arr)
             else:
-                dims = <np.npy_intp>size
-            out = np.PyArray_EMPTY(1, &dims, np.NPY_DOUBLE, 0)
+                arr_len = <np.npy_intp>size
+                arr = np.PyArray_EMPTY(1, &arr_len, np.NPY_DOUBLE, 0)
+                arr_ptr = <double*>np.PyArray_DATA(arr)
             with bitgenerator.lock, nogil:
-                random_polyagamma_fill(bitgen, ch, cz, stype, out.shape[0], &out[0])
-            return np.PyArray_Reshape(out.base, size) if is_tuple else out.base
+                random_polyagamma_fill(bitgen, ch, cz, stype, arr_len, arr_ptr)
+            return arr
         else:
             with bitgenerator.lock, nogil:
                 cz = random_polyagamma(bitgen, ch, cz, stype)
@@ -243,8 +249,7 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
         if has_out and not (out.shape[0] == ah.shape[0] == az.shape[0]):
             raise IndexError("`out` must have the same length as parameters")
         elif not has_out:
-            dims = <np.npy_intp>(ah.shape[0])
-            out = np.PyArray_EMPTY(1, &dims, np.NPY_DOUBLE, 0)
+            out = np.PyArray_EMPTY(1, <np.npy_intp*>ah.shape, np.NPY_DOUBLE, 0)
         with bitgenerator.lock, nogil:
             random_polyagamma_fill2(bitgen, &ah[0], &az[0], stype, out.shape[0], &out[0])
         if has_out:
@@ -259,18 +264,20 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
                 "`out` must have the same total size as the broadcasted "
                 "result of `h` and `z`"
             )
-        elif not has_out:
-            dims = <np.npy_intp>(bcast.size)
-            out = np.PyArray_EMPTY(1, &dims, np.NPY_DOUBLE, 0)
+        elif has_out:
+            arr_ptr = &out[0]
+        else:
+            arr = np.PyArray_EMPTY(bcast.nd, bcast.dimensions, np.NPY_DOUBLE, 0)
+            arr_ptr = <double*>np.PyArray_DATA(arr)
 
         with bitgenerator.lock, nogil:
-            for idx in range(out.shape[0]):
+            while bcast.index < bcast.size:
                 ch = (<double*>np.PyArray_MultiIter_DATA(bcast, 0))[0]
                 cz = (<double*>np.PyArray_MultiIter_DATA(bcast, 1))[0]
-                out[idx] = random_polyagamma(bitgen, ch, cz, stype);
+                arr_ptr[bcast.index] = random_polyagamma(bitgen, ch, cz, stype)
                 np.PyArray_MultiIter_NEXT(bcast)
 
         if has_out:
             return
         else:
-            return np.PyArray_Reshape(out.base, bcast.shape)
+            return arr

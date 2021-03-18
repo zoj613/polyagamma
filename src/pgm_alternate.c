@@ -280,23 +280,13 @@ random_polyagamma_alternate(bitgen_t *bitgen_state, double h, double z)
 {
     struct config cfg;
 
-    if (h >= (pgm_maxh + 1)) {
+    if (h > pgm_maxh) {
         double out = 0;
-        initialize_config(&cfg, pgm_maxh, z);
+        size_t chunk = h >= (pgm_maxh + 1) ? pgm_maxh : pgm_maxh - 1;
+        initialize_config(&cfg, chunk, z);
         while (h > pgm_maxh) {
             out += random_jacobi_alternate_bounded(bitgen_state, &cfg);
-            h -= pgm_maxh;
-        }
-        update_config(&cfg, h);
-        out += random_jacobi_alternate_bounded(bitgen_state, &cfg);
-        return 0.25 * out;
-    }
-    else if (h > pgm_maxh) {
-        double out = 0;
-        initialize_config(&cfg, pgm_maxh - 1, z);
-        while (h > pgm_maxh) {
-            out += random_jacobi_alternate_bounded(bitgen_state, &cfg);
-            h -= pgm_maxh - 1;
+            h -= chunk;
         }
         update_config(&cfg, h);
         out += random_jacobi_alternate_bounded(bitgen_state, &cfg);
