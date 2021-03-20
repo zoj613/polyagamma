@@ -281,3 +281,95 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
             return
         else:
             return arr
+
+
+cdef extern from "pgm_density.h":
+    double pgm_polyagamma_pdf(double x, double h, double z, size_t terms,
+                              double atol, double rtol) nogil
+
+
+def polyagamma_pdf(x, *, h=1, z=0, size_t terms=200, double atol=0, double rtol=1e-8):
+    """
+    polyagamma_pdf(x, *, h=1, z=0, terms=200, atol=0, rtol=1e-8)
+
+    Calculate the density of PG(h, z) at `x`.
+
+    Parameters
+    ----------
+    h : scalar or sequence, optional
+        The shape parameter of the distribution as described in [1]_.
+        The value(s) must be positive and finite. Defaults to 1.
+    z : scalar or sequence, optional
+        The exponential tilting parameter as described in [1]_. The value(s)
+        must be finite. Defaults to 0.
+    terms : int, optional
+        The maximum number of terms used in the alternating infinite series
+        to approximate the density of the distribution. Defaults to 200.
+    atol : int, optional
+        The absolute tolerance used to test for convergence of the infinite
+        series used to approximate the distribution's density function.
+        Defaults to 0.
+    rtol : int, optional
+        The relative tolerance used to test for convergence of the infinite
+        series used to approximate the distribution's density function.
+        Defaults to 1e-08.
+
+    Returns
+    -------
+    out : numpy.ndarray or scalar
+        Value of the density function at `x` of PG(`h`, `z`).
+
+    Notes
+    -----
+    This function implements the density function as shown in page 6 of [1]_.
+    The infinite sum is truncated at `terms` terms. Convergence of the series
+    is tested after each term is calculated so that if the successive terms
+    are too small to be significant, the calculation is terminated early.
+
+    References
+    ----------
+    .. [1] Polson, Nicholas G., James G. Scott, and Jesse Windle.
+           "Bayesian inference for logistic models using Pólya–Gamma latent
+           variables." Journal of the American statistical Association
+           108.504 (2013): 1339-1349.
+
+    Examples
+    --------
+    >>> from polyagamma import polyagamma_pdf
+    >>> import numpy as np
+    >>> polyagamma_pdf(0.2)
+    2.339176537265802
+    >>> polyagamma_pdf(3, h=6, z=1)
+    0.012537773310578008
+    >>> x = np.linspace(0.01, 0.5, 5)
+    >>> polyagamma_pdf(x)
+    array([1.48671951e-03, 3.21504108e+00, 1.78492273e+00, 9.75298427e-01,
+           5.32845353e-01])
+    >>> polyagamma_pdf(0.75, h=[4, 3, 1])
+    array([1.08247188, 1.1022302 , 0.15517146])
+
+    """
+    cdef double cx, ch, cz
+
+    if is_a_number(x) and is_a_number(h) and is_a_number(z):
+        cx, ch, cz = x, h, z
+        with nogil:
+            cx = pgm_polyagamma_pdf(cx, ch, cz, terms, atol, rtol)
+        return cx
+
+    x = np.PyArray_FROM_OT(x, np.NPY_DOUBLE)
+    h = np.PyArray_FROM_OT(h, np.NPY_DOUBLE)
+    z = np.PyArray_FROM_OT(z, np.NPY_DOUBLE)
+    cdef np.broadcast bcast = np.PyArray_MultiIterNew3(x, h, z)
+    arr = np.PyArray_EMPTY(bcast.nd, bcast.dimensions, np.NPY_DOUBLE, 0)
+    cdef double* arr_ptr = <double*>np.PyArray_DATA(arr)
+
+    with nogil:
+        while bcast.index < bcast.size:
+            cx = (<double*>np.PyArray_MultiIter_DATA(bcast, 0))[0]
+            ch = (<double*>np.PyArray_MultiIter_DATA(bcast, 1))[0]
+            cz = (<double*>np.PyArray_MultiIter_DATA(bcast, 2))[0]
+            arr_ptr[bcast.index] = pgm_polyagamma_pdf(cx, ch, cz, terms, atol, rtol)
+            np.PyArray_MultiIter_NEXT(bcast)
+
+    return arr

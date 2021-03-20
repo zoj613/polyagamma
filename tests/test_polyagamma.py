@@ -3,7 +3,7 @@ import functools
 import numpy as np
 import pytest
 
-from polyagamma import polyagamma, random_polyagamma
+from polyagamma import polyagamma, random_polyagamma, polyagamma_pdf
 
 
 def test_polyagamma():
@@ -113,3 +113,21 @@ def test_polyagamma():
 # test if alias points to the correct object
 def test_polyagamma_alias():
     assert random_polyagamma is polyagamma
+
+
+@pytest.mark.parametrize("method", ("devroye", "alternate", "saddle", "gamma"))
+@pytest.mark.parametrize("h", (1, 4, 7, 15, 25))
+@pytest.mark.parametrize("z", (1, -4, 7, -15, 25))
+def test_polyagamma_pdf(method, h, z):
+    # test pdf calculation of points sampled using each method
+    rng = np.random.default_rng(1)
+    x = random_polyagamma(h, z, size=5000, method=method, random_state=rng)
+    x.sort()
+    d = polyagamma_pdf(x, h=h, z=z)
+    area_under_curve = np.trapz(d, x)
+    # relative tolerance is set so that 0.998 can pass the tests.
+    np.testing.assert_allclose(1.0, area_under_curve, rtol=1e-2)
+    # test value that is unlikely given distribution parameters
+    np.testing.assert_allclose(0, polyagamma_pdf(0))
+    np.testing.assert_allclose(0, polyagamma_pdf(np.inf))
+    np.testing.assert_allclose(0, polyagamma_pdf(-1))

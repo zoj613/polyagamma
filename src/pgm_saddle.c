@@ -159,7 +159,7 @@ select_starting_guess(double x)
  *
  * `atol` is the minimum absolute tolerance – useful for comparisons near zero.
  */
-static NPY_INLINE bool
+DECLDIR NPY_INLINE bool
 is_close(double a, double b, double atol, double rtol)
 {
     return fabs(a - b) <= MAX(rtol * MAX(fabs(a), fabs(b)), atol);
