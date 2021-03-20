@@ -1,4 +1,4 @@
-from _polyagamma import polyagamma
+from _polyagamma import polyagamma, polyagamma_pdf, polyagamma_cdf
 
 __version__ = '1.2.0'
 

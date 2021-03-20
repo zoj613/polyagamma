@@ -3,7 +3,9 @@ import functools
 import numpy as np
 import pytest
 
-from polyagamma import polyagamma, random_polyagamma
+from polyagamma import (
+    polyagamma, random_polyagamma, polyagamma_pdf, polyagamma_cdf
+)
 
 
 def test_polyagamma():
@@ -113,3 +115,32 @@ def test_polyagamma():
 # test if alias points to the correct object
 def test_polyagamma_alias():
     assert random_polyagamma is polyagamma
+
+
+@pytest.mark.parametrize("method", ("devroye", "alternate", "saddle", "gamma"))
+@pytest.mark.parametrize("h", (1, 4, 7, 15, 25))
+@pytest.mark.parametrize("z", (1, -4, 7, -15, 25))
+def test_polyagamma_pdf_cdf(method, h, z):
+    # test pdf calculation of points sampled using each method
+    rng = np.random.default_rng(1)
+    x = random_polyagamma(h, z, size=5000, method=method, random_state=rng)
+    x.sort()
+    d = polyagamma_pdf(x, h=h, z=z)
+    area_under_curve = np.trapz(d, x)
+    xx = x.mean()
+    mask = x <= xx
+    # estimate empirical cdf from the sampled and corresponding density
+    ecdf = np.trapz(d[mask], x[mask])
+    # calculate the cdf of the distribution at the mean of the samples
+    cdf = polyagamma_cdf(xx, h=h, z=z)
+    # test if the empirical cdf is equal to the distribution's to 2 decimals
+    assert np.allclose(ecdf, cdf, rtol=1e-2)
+    # relative tolerance is set so that 0.998 can pass the tests.
+    assert np.allclose(1.0, area_under_curve, rtol=1e-2)
+    # test value that is unlikely given distribution parameters
+    assert np.allclose(0, polyagamma_pdf(0))
+    assert np.allclose(0, polyagamma_pdf(np.inf))
+    assert np.allclose(0, polyagamma_pdf(-1))
+    assert np.allclose(0, polyagamma_cdf(0))
+    assert np.allclose(1, polyagamma_cdf(np.inf))
+    assert np.allclose(0, polyagamma_cdf(-1))
