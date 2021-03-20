@@ -12,6 +12,7 @@ source_files = [
     "src/pgm_devroye.c",
     "src/pgm_common.c",
     "src/pgm_saddle.c",
+    "src/pgm_density.c",
 ]
 
 

@@ -281,3 +281,231 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
             return
         else:
             return arr
+
+
+cdef extern from "pgm_density.h" nogil:
+    double pgm_polyagamma_logpdf(double x, double h, double z)
+    double pgm_polyagamma_logcdf(double x, double h, double z)
+    double pgm_polyagamma_pdf(double x, double h, double z)
+    double pgm_polyagamma_cdf(double x, double h, double z)
+
+
+ctypedef double (*dist_func)(double x, double h, double z) nogil
+
+
+cdef object dispatch(dist_func f, object x, object h, object z):
+    cdef double cx, ch, cz
+
+    if is_a_number(x) and is_a_number(h) and is_a_number(z):
+        cx, ch, cz = x, h, z
+        with nogil:
+            cx = f(cx, ch, cz)
+        return cx
+
+    x = np.PyArray_FROM_OT(x, np.NPY_DOUBLE)
+    h = np.PyArray_FROM_OT(h, np.NPY_DOUBLE)
+    z = np.PyArray_FROM_OT(z, np.NPY_DOUBLE)
+    cdef np.broadcast bcast = np.PyArray_MultiIterNew3(x, h, z)
+    arr = np.PyArray_EMPTY(bcast.nd, bcast.dimensions, np.NPY_DOUBLE, 0)
+    cdef double* arr_ptr = <double*>np.PyArray_DATA(arr)
+
+    with nogil:
+        while bcast.index < bcast.size:
+            cx = (<double*>np.PyArray_MultiIter_DATA(bcast, 0))[0]
+            ch = (<double*>np.PyArray_MultiIter_DATA(bcast, 1))[0]
+            cz = (<double*>np.PyArray_MultiIter_DATA(bcast, 2))[0]
+            arr_ptr[bcast.index] = f(cx, ch, cz)
+            np.PyArray_MultiIter_NEXT(bcast)
+
+    return arr
+
+
+def polyagamma_pdf(x, h=1, z=0):
+    """
+    polyagamma_pdf(x, h=1, z=0)
+
+    Calculate the density of PG(h, z) at `x`.
+
+    Parameters
+    ----------
+    h : scalar or sequence, optional
+        The shape parameter of the distribution as described in [1]_.
+        The value(s) must be positive and finite. Defaults to 1.
+    z : scalar or sequence, optional
+        The exponential tilting parameter as described in [1]_. The value(s)
+        must be finite. Defaults to 0.
+
+    Returns
+    -------
+    out : numpy.ndarray or scalar
+        Value of the density function at `x` of PG(`h`, `z`).
+
+    Notes
+    -----
+    This function implements the density function as shown in page 6 of [1]_.
+    The infinite sum is truncated at a maximum of 200 terms. Convergence of
+    the series is tested after each term is calculated so that if the
+    successive terms are equal up to machine epsilon, the calculation is
+    terminated early.
+
+    References
+    ----------
+    .. [1] Polson, Nicholas G., James G. Scott, and Jesse Windle.
+           "Bayesian inference for logistic models using Pólya–Gamma latent
+           variables." Journal of the American statistical Association
+           108.504 (2013): 1339-1349.
+
+    Examples
+    --------
+    >>> from polyagamma import polyagamma_pdf
+    >>> import numpy as np
+    >>> polyagamma_pdf(0.2)
+    2.339176537265802
+    >>> polyagamma_pdf(3, h=6, z=1)
+    0.012537773310487178
+    >>> x = np.linspace(0.01, 0.5, 5)
+    >>> polyagamma_pdf(x)
+    array([1.48671951e-03, 3.21504108e+00, 1.78492273e+00, 9.75298427e-01,
+           5.32845353e-01])
+    >>> polyagamma_pdf(0.75, h=[4, 3, 1])
+    array([1.08247188, 1.1022302 , 0.15517146])
+
+    """
+    return dispatch(pgm_polyagamma_pdf, x, h, z)
+
+
+def polyagamma_cdf(x, h=1, z=0):
+    """
+    polyagamma_cdf(x, h=1, z=0)
+
+    Calculate the cumulative distribution function of PG(h, z) at `x`.
+
+    Parameters
+    ----------
+    h : scalar or sequence, optional
+        The shape parameter of the distribution as described in [1]_.
+        The value(s) must be positive and finite. Defaults to 1.
+    z : scalar or sequence, optional
+        The exponential tilting parameter as described in [1]_. The value(s)
+        must be finite. Defaults to 0.
+
+    References
+    ----------
+    .. [1] Polson, Nicholas G., James G. Scott, and Jesse Windle.
+           "Bayesian inference for logistic models using Pólya–Gamma latent
+           variables." Journal of the American statistical Association
+           108.504 (2013): 1339-1349.
+
+    Examples
+    --------
+    >>> from polyagamma import polyagamma_cdf
+    >>> import numpy as np
+    >>> polyagamma_cdf(0.2)
+    0.525512539764972
+    >>> polyagamma_cdf(3, h=6, z=1)
+    0.9966435679024789
+    >>> x = np.linspace(0.01, 1, 5)
+    >>> polyagamma_cdf(x)
+    array([1.14660629e-06, 6.42692997e-01, 8.94654581e-01, 9.68941224e-01,
+           9.90843160e-01])
+    >>> polyagamma_cdf(0.75, h=[4, 3, 1])
+    array([0.30130807, 0.57523169, 0.96855568])
+
+    """
+    return dispatch(pgm_polyagamma_cdf, x, h, z)
+
+
+def polyagamma_logpdf(x, h=1, z=0):
+    """
+    polyagamma_logpdf(x, h=1, z=0)
+
+    Calculate the logarithm of the density of PG(h, z) at `x`.
+
+    Parameters
+    ----------
+    h : scalar or sequence, optional
+        The shape parameter of the distribution as described in [1]_.
+        The value(s) must be positive and finite. Defaults to 1.
+    z : scalar or sequence, optional
+        The exponential tilting parameter as described in [1]_. The value(s)
+        must be finite. Defaults to 0.
+
+    Returns
+    -------
+    out : numpy.ndarray or scalar
+        Value of the density function at `x` of PG(`h`, `z`).
+
+    Notes
+    -----
+    This function implements the density function as shown in page 6 of [1]_.
+    The infinite sum is truncated at a maximum of 200 terms.
+
+    References
+    ----------
+    .. [1] Polson, Nicholas G., James G. Scott, and Jesse Windle.
+           "Bayesian inference for logistic models using Pólya–Gamma latent
+           variables." Journal of the American statistical Association
+           108.504 (2013): 1339-1349.
+
+    Examples
+    --------
+    >>> from polyagamma import polyagamma_logpdf
+    >>> import numpy as np
+    >>> polyagamma_logpdf(1e-17)
+    -1.2499999999999942e+16
+    >>> polyagamma_logpdf(3, h=6, z=1)
+    -4.379009326491123
+    >>> x = np.linspace(0.01, 0.5, 5)
+    >>> polyagamma_logpdf(x)
+    array([-6.51118325,  1.16784013,  0.57937512, -0.02501178, -0.62952404])
+    >>> polyagamma_logpdf(0.75, h=[4, 3, 1])
+    array([ 0.07924721,  0.09733558, -1.86322458])
+
+    """
+    return dispatch(pgm_polyagamma_logpdf, x, h, z)
+
+
+def polyagamma_logcdf(x, h=1, z=0):
+    """
+    polyagamma_logcdf(x, h=1, z=0)
+
+    Calculate the logarithm of the distribution function of PG(h, z) at `x`.
+
+    Parameters
+    ----------
+    h : scalar or sequence, optional
+        The shape parameter of the distribution as described in [1]_.
+        The value(s) must be positive and finite. Defaults to 1.
+    z : scalar or sequence, optional
+        The exponential tilting parameter as described in [1]_. The value(s)
+        must be finite. Defaults to 0.
+
+    References
+    ----------
+    .. [1] Polson, Nicholas G., James G. Scott, and Jesse Windle.
+           "Bayesian inference for logistic models using Pólya–Gamma latent
+           variables." Journal of the American statistical Association
+           108.504 (2013): 1339-1349.
+
+    Notes
+    -----
+    This function implements the density function as shown in page 6 of [1]_.
+    The infinite sum is truncated at a maximum of 200 terms.
+
+    Examples
+    --------
+    >>> from polyagamma import polyagamma_logcdf
+    >>> import numpy as np
+    >>> polyagamma_logcdf(1e-5)
+    -12504.327879213783
+    >>> polyagamma_logcdf(3, h=6, z=1)
+    -0.00336207781021014
+    >>> x = np.linspace(0.01, 1, 5)
+    >>> polyagamma_logcdf(x)
+    array([-1.36787040e+01, -4.42088123e-01, -1.11317577e-01, -3.15513153e-02,
+           -9.19917324e-03])
+    >>> polyagamma_logcdf(0.75, h=[4, 3, 1])
+    array([-1.19962205, -0.55298237, -0.0319493 ])
+
+    """
+    return dispatch(pgm_polyagamma_logcdf, x, h, z)
