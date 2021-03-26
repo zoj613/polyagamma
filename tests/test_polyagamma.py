@@ -3,7 +3,14 @@ import functools
 import numpy as np
 import pytest
 
-from polyagamma import polyagamma, random_polyagamma
+from polyagamma import (
+    polyagamma,
+    random_polyagamma,
+    polyagamma_pdf,
+    polyagamma_cdf,
+    polyagamma_logpdf,
+    polyagamma_logcdf
+)
 
 
 def test_polyagamma():
@@ -113,3 +120,61 @@ def test_polyagamma():
 # test if alias points to the correct object
 def test_polyagamma_alias():
     assert random_polyagamma is polyagamma
+
+# "devroye" is not included because it does not play well with non-integer h
+@pytest.mark.parametrize("method", ("alternate", "saddle", "gamma"))
+@pytest.mark.parametrize("h", (0.5, 1, 4, 7, 15, 25))
+@pytest.mark.parametrize("z", (0, 1, -4, 7, -15, 25))
+def test_polyagamma_pdf_cdf(method, h, z):
+    # test pdf calculation of points sampled using each method
+    rng = np.random.default_rng(1)
+    x = random_polyagamma(h, z, size=5000, method=method, random_state=rng)
+    x.sort()
+    d = polyagamma_pdf(x, h=h, z=z)
+    area_under_curve = np.trapz(d, x)
+    # relative tolerance is set so that 0.998 can pass the tests.
+    assert np.isclose(1.0, area_under_curve, rtol=1e-2)
+
+    xx = x.mean()
+    mask = x <= xx
+    # calculate the cdf of the distribution at the mean of the samples
+    cdf = polyagamma_cdf(xx, h=h, z=z)
+    # estimate empirical cdf from the sampled and corresponding density
+    ecdf = np.trapz(d[mask], x[mask])
+    # test if the empirical cdf is equal to the distribution's to 2 decimals
+    assert np.allclose(ecdf, cdf, rtol=1e-2)
+
+    # test value that is unlikely given distribution parameters
+    assert 0 == polyagamma_pdf(0)
+    assert 0 == polyagamma_pdf(np.inf)
+    assert 0 == polyagamma_pdf(-1)
+    assert -np.inf == polyagamma_logpdf(0)
+    assert -np.inf == polyagamma_logpdf(np.inf)
+    assert -np.inf == polyagamma_logpdf(-1)
+    assert 0 == polyagamma_cdf(0)
+    assert 1 == polyagamma_cdf(np.inf)
+    assert 0 == polyagamma_cdf(-1)
+    assert -np.inf == polyagamma_logcdf(0)
+    assert 0 == polyagamma_logcdf(np.inf)
+    assert -np.inf == polyagamma_logcdf(-1)
+
+    # test if log versions agree with the unlogged distribution functions
+    ld = np.exp(polyagamma_logpdf(x, h=h, z=z))
+    assert np.allclose(ld, d)
+    lc = np.exp(polyagamma_logcdf(xx, h=h, z=z))
+    assert np.allclose(lc, cdf)
+
+
+def test_log_extreme_value_behaviour():
+    # test success of directly computing logcdf/logpdf instead of using log(*)
+    with pytest.warns(RuntimeWarning, match="divide by zero encountered in log"):
+        np.log(polyagamma_cdf(0.01, h=10, z=3))
+    assert np.isclose(polyagamma_logcdf(0.01, h=10, z=3), -1238.6998500970105)
+
+    with pytest.warns(RuntimeWarning, match="divide by zero encountered in log"):
+        np.log(polyagamma_pdf(0.01, h=10, z=3))
+    # test extremely small values for logcdf and logpdf
+    assert np.isclose(polyagamma_logcdf(1e-3, h=10, z=3), -12489.8793293567)
+    assert np.isclose(polyagamma_logpdf(1e-3, h=10, z=3), -12473.46649418656)
+    assert np.isclose(polyagamma_logcdf(1e-16), -1250000000000017.2)
+    assert np.isclose(polyagamma_logpdf(1e-16), -1249999999999945.8)
