@@ -12,6 +12,7 @@
 #define PGM_LOGPI_2 0.4515827052894548  // log(pi / 2)
 #define PGM_LS2PI 0.9189385332046727  // log(sqrt(2 * pi))
 #define PGM_MAX_EXP 708.3964202663686  // maximum allowed exp() argument
+#define PGM_LOG2 0.6931471805599453  // log(2)
 
 
 /*
@@ -272,9 +273,6 @@ pgm_lgamma(double z)
  * For a > 1 we use the algorithm described in Dagpunar (1978)
  * For a == 1, we truncate an Exponential of rate=b.
  * For a < 1, we use algorithm [A4] described in Philippe (1997)
- *
- * TODO: There is a more efficient algorithm for a > 1 in Philippe (1997), which
- * should replace this one in the future.
  */
 NPY_INLINE double
 random_left_bounded_gamma(bitgen_t* bitgen_state, double a, double b, double t)

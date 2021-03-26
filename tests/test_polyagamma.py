@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 
 from polyagamma import (
-    polyagamma,
     random_polyagamma,
     polyagamma_pdf,
     polyagamma_cdf,
@@ -15,7 +14,7 @@ from polyagamma import (
 
 def test_polyagamma():
     rng = np.random.default_rng(1)
-    rng_polyagamma = functools.partial(polyagamma, random_state=rng)
+    rng_polyagamma = functools.partial(random_polyagamma, random_state=rng)
 
     assert len(rng_polyagamma(size=5)) == 5
     assert rng_polyagamma(size=(5, 2)).shape == (5, 2)
@@ -112,14 +111,10 @@ def test_polyagamma():
 
     # test for reproducibility via random_state
     rng = np.random.default_rng(12345)
-    expected = polyagamma(size=5, random_state=rng)
+    expected = random_polyagamma(size=5, random_state=rng)
     rng2 = np.random.default_rng(12345)
-    assert np.allclose(expected, polyagamma(size=5, random_state=rng2))
-    assert not np.allclose(expected, polyagamma(size=5))
-
-# test if alias points to the correct object
-def test_polyagamma_alias():
-    assert random_polyagamma is polyagamma
+    assert np.allclose(expected, random_polyagamma(size=5, random_state=rng2))
+    assert not np.allclose(expected, random_polyagamma(size=5))
 
 # "devroye" is not included because it does not play well with non-integer h
 @pytest.mark.parametrize("method", ("alternate", "saddle", "gamma"))

@@ -21,15 +21,14 @@ from numpy.random import default_rng
 
 np.import_array()
 
-cdef extern from "pgm_random.h":
-    double pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z,
-                                 sampler_t method) nogil
+cdef extern from "pgm_random.h" nogil:
+    double pgm_random_polyagamma(bitgen_t* bitgen_state, double h,
+                                 double z, sampler_t method)
     void pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
-                                    sampler_t method, size_t n, double* out) nogil
+                                    sampler_t method, size_t n, double* out)
     void pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h,
-                                     const double* z, sampler_t method, size_t n,
-                                     double* out) nogil
-
+                                     const double* z, sampler_t method,
+                                     size_t n, double* out)
 
 # Cython-level function definitions to be shared with other cython modules
 cdef inline double random_polyagamma(bitgen_t* bitgen_state, double h, double z,

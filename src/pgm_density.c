@@ -7,9 +7,7 @@
 #include "pgm_common.h"
 #include "../include/pgm_density.h"
 
-#define PGM_LOG2 0.6931471805599453  // log(2)
 #define PGM_2PI 6.283185307179586  // 2 * PI
-
 /* Maximum number of series terms to use when approximating the infinite sum
  * representation of the PG(h, z) distribution
  */
@@ -141,7 +139,7 @@ invgamma_logcdf(struct cdf_args* arg)
 static NPY_INLINE double
 norm_logcdf(double x)
 {
-    if (isless(x, -38)) {
+    if (isless(x, -37.5)) {
         static const double p0 = 12.77436324;
         static const double p1 = 5.575192695;
         static const double q0 = 25.54872648;

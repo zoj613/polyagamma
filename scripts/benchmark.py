@@ -5,7 +5,7 @@ import numpy as np
 import perfplot
 from pypolyagamma import PyPolyaGamma
 
-from polyagamma import polyagamma
+from polyagamma import random_polyagamma
 
 
 save_kwargs = {
@@ -31,10 +31,10 @@ def benchmark_methods(seed, out, z_val):
     res = perfplot.bench(
         setup=lambda n: set_val(arr, n),
         kernels=[
-            lambda h: polyagamma(h, z_val, method='devroye', **kwargs),
-            lambda h: polyagamma(h, z_val, method='alternate', **kwargs),
-            lambda h: polyagamma(h, z_val, method='saddle', **kwargs),
-            lambda h: polyagamma(h, z_val, method='gamma', **kwargs),
+            lambda h: random_polyagamma(h, z_val, method='devroye', **kwargs),
+            lambda h: random_polyagamma(h, z_val, method='alternate', **kwargs),
+            lambda h: random_polyagamma(h, z_val, method='saddle', **kwargs),
+            lambda h: random_polyagamma(h, z_val, method='gamma', **kwargs),
         ],
         labels=["devroye", "alternate", "saddle", "gamma"],
         n_range=[i for i in range(1, 60)],
@@ -60,7 +60,7 @@ def benchmark_samplers(seed, out, z_val=0):
     res = perfplot.bench(
         setup=lambda n: set_val(arr, n),
         kernels=[
-            lambda h: polyagamma(h, z_val, **kwargs),
+            lambda h: random_polyagamma(h, z_val, **kwargs),
             lambda h: pg.pgdrawv(h, z, out),
         ],
         labels=["polyagamma", "pypolyagamma"],
