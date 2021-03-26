@@ -141,7 +141,7 @@ invgamma_logcdf(struct cdf_args* arg)
 static NPY_INLINE double
 norm_logcdf(double x)
 {
-    if (isless(x, -38)) {
+    if (isless(x, -37.5)) {
         static const double p0 = 12.77436324;
         static const double p1 = 5.575192695;
         static const double q0 = 25.54872648;
