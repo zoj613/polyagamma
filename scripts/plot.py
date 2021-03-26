@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
 
-from polyagamma import polyagamma
+from polyagamma import random_polyagamma
 from pypolyagamma import PyPolyaGamma
 
 sns.set_style("darkgrid")
@@ -25,7 +25,7 @@ def plot_densities(h=1, z=0, size=1000):
         if method == "$pypolyagamma$":
             data[method] = [pg.pgdraw(h, z) for _ in range(size)]
         else:
-            data[method] = polyagamma(
+            data[method] = random_polyagamma(
                 h=h, z=z, method=method, size=size, random_state=rng
             )
     sns.kdeplot(data=data)
