@@ -7,9 +7,7 @@
 #include "pgm_common.h"
 #include "../include/pgm_density.h"
 
-#define PGM_LOG2 0.6931471805599453  // log(2)
 #define PGM_2PI 6.283185307179586  // 2 * PI
-
 /* Maximum number of series terms to use when approximating the infinite sum
  * representation of the PG(h, z) distribution
  */

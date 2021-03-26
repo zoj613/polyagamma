@@ -133,7 +133,6 @@ calculate_ratio(struct config* cfg)
     cfg->ratio = q / (p + q);
 }
 
-#define PGM_LOG2 0.6931471805599453  // log(2)
 /*
  * Initialize the values used frequently during sampling and store them in
  * the config struct
@@ -173,7 +172,6 @@ update_config(struct config* cfg, double h)
     }
     calculate_ratio(cfg);
 }
-#undef PGM_LOG2
 
 /*
  * Sample from an Inverse-Gaussian(mu, lambda) truncated on the set {x | x < t}.
