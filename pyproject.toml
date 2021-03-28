@@ -22,6 +22,7 @@ include = [
     {path = "include", format = "sdist"},
     {path = "src", format = "sdist"},
     "polyagamma/*.pxd",
+    "polyagamma/*.pyi",
     "LICENSE",
 ]
 
