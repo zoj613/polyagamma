@@ -327,6 +327,8 @@ def polyagamma_pdf(x, h=1, z=0):
 
     Parameters
     ----------
+    x : scalar or sequence
+        The value(s) at which the function is evaluated.
     h : scalar or sequence, optional
         The shape parameter of the distribution as described in [1]_.
         The value(s) must be positive and finite. Defaults to 1.
@@ -381,6 +383,8 @@ def polyagamma_cdf(x, h=1, z=0):
 
     Parameters
     ----------
+    x : scalar or sequence
+        The value(s) at which the function is evaluated.
     h : scalar or sequence, optional
         The shape parameter of the distribution as described in [1]_.
         The value(s) must be positive and finite. Defaults to 1.
@@ -422,6 +426,8 @@ def polyagamma_logpdf(x, h=1, z=0):
 
     Parameters
     ----------
+    x : scalar or sequence
+        The value(s) at which the function is evaluated.
     h : scalar or sequence, optional
         The shape parameter of the distribution as described in [1]_.
         The value(s) must be positive and finite. Defaults to 1.
@@ -472,6 +478,8 @@ def polyagamma_logcdf(x, h=1, z=0):
 
     Parameters
     ----------
+    x : scalar or sequence
+        The value(s) at which the function is evaluated.
     h : scalar or sequence, optional
         The shape parameter of the distribution as described in [1]_.
         The value(s) must be positive and finite. Defaults to 1.
