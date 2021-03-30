@@ -61,7 +61,7 @@ pgm_polyagamma_logpdf(double x, double h, double z)
         return -INFINITY;
     }
 
-    static double arr[PGM_MAX_SERIES_TERMS];
+    double* arr = malloc(PGM_MAX_SERIES_TERMS * sizeof(*arr));
     double a = (fabs(z) > 0 ? h * log(cosh(0.5 * z)) - 0.5 * z * z * x : 0) +
                (h - 1) * PGM_LOG2 - pgm_lgamma(h);
     double b = -PGM_LS2PI - 1.5 * log(x);
@@ -74,7 +74,9 @@ pgm_polyagamma_logpdf(double x, double h, double z)
         sum += (n & 1 ? -1 : 1) * exp(arr[n] - arr[0]) * t / h;
     }
 
-    return (logh + arr[0]) + log(sum);
+    logh += arr[0];
+    free(arr);
+    return logh + log(sum);
 }
 
 /*
@@ -239,7 +241,7 @@ pgm_polyagamma_logcdf(double x, double h, double z)
 
     z = fabs(z);
     double sum = 0;
-    static double arr[PGM_MAX_SERIES_TERMS];
+    double* arr = malloc(PGM_MAX_SERIES_TERMS * sizeof(*arr));
     double c = (z > 0 ? h * log1p(exp(-z)) : h * PGM_LOG2) - pgm_lgamma(h);
     logcdf_func logcdf = z > 0 ? invgauss_logcdf : invgamma_logcdf;
     struct cdf_args arg = {
@@ -255,5 +257,7 @@ pgm_polyagamma_logcdf(double x, double h, double z)
         sum += (n & 1 ? -1 : 1) * exp(arr[n] - arr[0]);
     }
 
-    return (c + arr[0]) + log(sum);
+    c += arr[0];
+    free(arr);
+    return c + log(sum);
 }
