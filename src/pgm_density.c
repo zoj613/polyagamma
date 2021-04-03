@@ -8,9 +8,8 @@
 #include "../include/pgm_density.h"
 
 #define PGM_2PI 6.283185307179586  // 2 * PI
-/* Maximum number of series terms to use when approximating the infinite sum
- * representation of the PG(h, z) distribution
- */
+// Maximum number of series terms to use when approximating the infinite sum
+// representation of the PG(h, z) distribution
 #ifndef PGM_MAX_SERIES_TERMS
 #define PGM_MAX_SERIES_TERMS 200
 #endif
@@ -21,7 +20,14 @@ is_close(double a, double b, double atol, double rtol);
 /*
  * Compute the density function of PG(h, z). PG(h, z) is written as an
  * infinite alternating-sign sum of Inverse-Gaussian densities when z > 0, or
- * a sum of Inverse-Gamma densities when z = 0.
+ * a sum of Inverse-Gamma densities when z = 0. Refer to pages 5 & 6 of [1].
+ *
+ * References
+ * ----------
+ * [1] Polson, Nicholas G., James G. Scott, and Jesse Windle.
+ *     "Bayesian inference for logistic models using Pólya–Gamma latent
+ *     variables." Journal of the American statistical Association
+ *     108.504 (2013): 1339-1349.
  */
 double
 pgm_polyagamma_pdf(double x, double h, double z)
@@ -30,16 +36,18 @@ pgm_polyagamma_pdf(double x, double h, double z)
         return 0;
     }
 
-    double sum = 0;
     double a = (fabs(z) > 0 ? h * log(cosh(0.5 * z)) - 0.5 * z * z * x : 0) +
-               (h - 1) * PGM_LOG2 - pgm_lgamma(h);
+               (h - 1) * PGM_LOG2;
+    double sum = exp(a - 0.125 * h * h / x) * h;
+    char sign = -1;
 
-    for (size_t n = 0; n < PGM_MAX_SERIES_TERMS; n++) {
+    a -= pgm_lgamma(h);
+    for (size_t n = 1; n < PGM_MAX_SERIES_TERMS; n++, sign *= -1) {
         double twonh = 2 * n + h;
         double term = exp(a + pgm_lgamma(n + h) - 0.125 * twonh * twonh / x -
                           pgm_lgamma(n + 1)) * twonh;
         double prev_sum = sum;
-        sum += n & 1 ? -term: term;
+        sum += sign * term;
 
         if (is_close(sum, prev_sum, 0, DBL_EPSILON)) {
             break;
@@ -51,8 +59,8 @@ pgm_polyagamma_pdf(double x, double h, double z)
 /*
  * Approximate the logarithm of the density function of PG(h, z).
  *
- * logsumexp is applied as an attempt to minimize numerical error. The sum of
- * terms is truncated at `PGM_MAX_SERIES_TERMS` terms.
+ * logsumexp is applied as an attempt to prevent underflow. The sum of terms
+ * is truncated at `PGM_MAX_SERIES_TERMS` terms.
  */
 double
 pgm_polyagamma_logpdf(double x, double h, double z)
@@ -61,28 +69,25 @@ pgm_polyagamma_logpdf(double x, double h, double z)
         return -INFINITY;
     }
 
-    double* arr = malloc(PGM_MAX_SERIES_TERMS * sizeof(*arr));
+    double lg = pgm_lgamma(h);
     double a = (fabs(z) > 0 ? h * log(cosh(0.5 * z)) - 0.5 * z * z * x : 0) +
-               (h - 1) * PGM_LOG2 - pgm_lgamma(h);
-    double b = -PGM_LS2PI - 1.5 * log(x);
-    double logh = log(h);
-    double sum = 0;
+               (h - 1) * PGM_LOG2 - PGM_LS2PI - 1.5 * log(x) - lg;
+    double first = lg - 0.125 * h * h / x;
+    double sum = 1;
+    char sign = -1;
 
-    for (size_t n = 0; n < PGM_MAX_SERIES_TERMS; n++) {
+    for (size_t n = 1; n < PGM_MAX_SERIES_TERMS; n++, sign *= -1) {
         double t = 2 * n + h;
-        arr[n] = a + b + pgm_lgamma(n + h) - 0.125 * t * t / x - pgm_lgamma(n + 1);
-        sum += (n & 1 ? -1 : 1) * exp(arr[n] - arr[0]) * t / h;
+        double curr = pgm_lgamma(n + h) - 0.125 * t * t / x - pgm_lgamma(n + 1);
+        sum += sign * exp(curr - first) * t / h;
     }
 
-    logh += arr[0];
-    free(arr);
-    return logh + log(sum);
+    return a + (log(h) + first + log(sum));
 }
 
 /*
  * Struct to store arguments passed to the cdf functions.
- * `s2x` is  sqrt(2x) if z == 0, else sqrt(x)
- * `a` is (2n + h)
+ * `s2x` is sqrt(2x) if z == 0, else sqrt(x). `a` is (2n + h)
  */
 struct cdf_args {
     double s2x;
@@ -107,7 +112,7 @@ struct cdf_args {
  *      pp.
  */
 static NPY_INLINE double
-invgamma_logcdf(struct cdf_args* arg)
+invgamma_logcdf(struct cdf_args* const arg)
 {
     double x = 0.5 * arg->a / arg->s2x;
 
@@ -127,10 +132,10 @@ invgamma_logcdf(struct cdf_args* arg)
 /*
  * Compute the logarithm of the CDF of the standard normal distribution.
  *
- * Care is taken to minimize error when input in negative.
+ * Care is taken to prevent underflow when input in a large negative number.
  *
- * For x < -38 where the erfc(|x| / sqrt(2)) is guaranteed to underflow, we use
- * an approximation based on [1] to avoid log(0). We use the relation
+ * For x < -37.5 where the erfc(|x| / sqrt(2)) is guaranteed to underflow, we
+ * use an approximation based on [1] to avoid log(0). We use the relation
  * P[X < x] = P[X > |x|] for x < 0.
  *
  * References
@@ -170,10 +175,11 @@ norm_logcdf(double x)
 
 /*
  * CDF of the Inverse-Gaussian(0.5 * a / z, a^2 / 4) distribution, where
- * a = (2n + h). We use the method of Goknur & Smyth (2016) to minimize error.
+ * a = (2n + h). We use the method of Goknur & Smyth (2016) to prevent
+ * underflow/overflow when parameter values are either very small or large.
  */
 static NPY_INLINE double
-invgauss_logcdf(struct cdf_args* arg)
+invgauss_logcdf(struct cdf_args* const arg)
 {
     double qm = 2 * arg->x * arg->z / arg->a;
     double r = 2 * arg->s2x / arg->a;
@@ -184,10 +190,13 @@ invgauss_logcdf(struct cdf_args* arg)
 }
 
 
-typedef double (*logcdf_func)(struct cdf_args*);
+typedef double (*logcdf_func_t)(struct cdf_args*);
 
 /*
  * Approximate the distribution function of PG(h, z).
+ *
+ * Note: The first term of the sum is evaluated before the loop to avoid
+ * redundancy.
  */
 double
 pgm_polyagamma_cdf(double x, double h, double z)
@@ -200,21 +209,33 @@ pgm_polyagamma_cdf(double x, double h, double z)
     }
 
     z = fabs(z);
-    double sum = 0;
-    double c = (z > 0 ? h * log1p(exp(-z)) : h * PGM_LOG2) - pgm_lgamma(h);
-    logcdf_func logcdf = z > 0 ? invgauss_logcdf : invgamma_logcdf;
-    struct cdf_args arg = {
-        .s2x = (z > 0 ? sqrt(x) : sqrt(2 * x)),
-        .x = x,
-        .z = z,
-    };
+    double c, zn;
+    logcdf_func_t logcdf;
+    struct cdf_args arg = {.a = h, .x = x, .z = z};
 
-    for (size_t n = 0; n < PGM_MAX_SERIES_TERMS; n++) {
+    if (z > 0) {
+        logcdf = invgauss_logcdf;
+        c = h * log1p(exp(-z));
+        arg.s2x = sqrt(x);
+        zn = z;
+    }
+    else {
+        logcdf = invgamma_logcdf;
+        c = h * PGM_LOG2;
+        arg.s2x = sqrt(2 * x);
+        zn = 0;
+    }
+
+    double sum = exp(c + logcdf(&arg));
+    char sign = -1;
+
+    c -= pgm_lgamma(h);
+    for (size_t n = 1; n < PGM_MAX_SERIES_TERMS; n++, sign *= -1, zn = z * n) {
         arg.a = 2 * n + h;
-        double term = exp(c + pgm_lgamma(n + h) + logcdf(&arg) -
-                          pgm_lgamma(n + 1) - (z > 0 ? z * n : 0));
+        double term = exp(c + pgm_lgamma(n + h) + logcdf(&arg) - pgm_lgamma(n + 1) - zn);
         double prev_sum = sum;
-        sum += n & 1 ? -term : term;
+        sum += sign * term;
+
         if (is_close(sum, prev_sum, 0, DBL_EPSILON)) {
             break;
         }
@@ -226,8 +247,11 @@ pgm_polyagamma_cdf(double x, double h, double z)
 /*
  * Approximate the logarithm of the distribution function of PG(h, z).
  *
- * logsumexp is applied as an attempt to minimize numerical error. The sum of
- * terms is truncated at `PGM_MAX_SERIES_TERMS` terms. If an underflow is
+ * logsumexp is applied as an attempt to prevent underflow. The sum of
+ * terms is truncated at `PGM_MAX_SERIES_TERMS` terms.
+ *
+ * Note: The first term of the sum is evaluated before the loop to avoid
+ * redundancy.
  */
 double
 pgm_polyagamma_logcdf(double x, double h, double z)
@@ -240,24 +264,33 @@ pgm_polyagamma_logcdf(double x, double h, double z)
     }
 
     z = fabs(z);
-    double sum = 0;
-    double* arr = malloc(PGM_MAX_SERIES_TERMS * sizeof(*arr));
-    double c = (z > 0 ? h * log1p(exp(-z)) : h * PGM_LOG2) - pgm_lgamma(h);
-    logcdf_func logcdf = z > 0 ? invgauss_logcdf : invgamma_logcdf;
-    struct cdf_args arg = {
-        .s2x = (z > 0 ? sqrt(x) : sqrt(2 * x)),
-        .x = x,
-        .z = z
-    };
+    double c, zn;
+    logcdf_func_t logcdf;
+    double lg = pgm_lgamma(h);
+    struct cdf_args arg = {.a = h, .x = x, .z = z};
 
-    for (size_t n = 0; n < PGM_MAX_SERIES_TERMS; n++) {
-        arg.a = 2 * n + h;
-        arr[n] = pgm_lgamma(n + h) + logcdf(&arg) -
-                 pgm_lgamma(n + 1) - (z > 0 ? z * n : 0);
-        sum += (n & 1 ? -1 : 1) * exp(arr[n] - arr[0]);
+    if (z > 0) {
+        logcdf = invgauss_logcdf;
+        c = h * log1p(exp(-z)) - lg;
+        arg.s2x = sqrt(x);
+        zn = z;
+    }
+    else {
+        logcdf = invgamma_logcdf;
+        c = h * PGM_LOG2 - lg;
+        arg.s2x = sqrt(2 * x);
+        zn = 0;
     }
 
-    c += arr[0];
-    free(arr);
-    return c + log(sum);
+    double first = lg + logcdf(&arg);
+    double sum = 1;
+    char sign = -1;
+
+    for (size_t n = 1; n < PGM_MAX_SERIES_TERMS; n++, sign *= -1, zn = z * n) {
+        arg.a = 2 * n + h;
+        double curr = pgm_lgamma(n + h) + logcdf(&arg) - pgm_lgamma(n + 1) - zn;
+        sum += sign * exp(curr - first);
+    }
+
+    return c + (first + log(sum));
 }
