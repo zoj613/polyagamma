@@ -332,7 +332,7 @@ invgauss_logcdf(double x, double mu, double lambda)
 /*
  * Sample from PG(h, z) using the Saddle approximation method.
  */
-NPY_INLINE double
+double
 random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
 {
     struct config cfg;
@@ -350,9 +350,9 @@ random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
         pgm_gammaq(h, hrho_r * cfg.xc, false);
 
     ratio = p / (p + q);
+    double mu2 = one_srho_l * one_srho_l;
     do {
         if (next_double(bitgen_state) < ratio) {
-            double mu2 = one_srho_l * one_srho_l;
             do {
                 double y = random_standard_normal(bitgen_state);
                 double w = one_srho_l + 0.5 * mu2 * y * y / h;
