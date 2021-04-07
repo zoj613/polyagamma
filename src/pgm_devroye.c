@@ -144,11 +144,11 @@ random_jacobi(bitgen_t* bitgen_state, struct config* cfg)
     for (;;) {
         if (next_double(bitgen_state) < cfg->ratio) {
             cfg->x = random_right_bounded_invgauss(bitgen_state, cfg);
+            cfg->logx = log(cfg->x);
         }
         else {
             cfg->x = T + random_standard_exponential(bitgen_state) / cfg->k;
         }
-        cfg->logx = log(cfg->x);
         double s = piecewise_coef(0, cfg);
         double u = next_double(bitgen_state) * s;
         for (size_t i = 1;; ++i) {
@@ -170,8 +170,8 @@ random_jacobi(bitgen_t* bitgen_state, struct config* cfg)
  * Sample from Polya-Gamma PG(n, z) using the Devroye method, where n is a
  * positive integer.
  */
-NPY_INLINE double
-random_polyagamma_devroye(bitgen_t *bitgen_state, uint64_t n, double z)
+double
+random_polyagamma_devroye(bitgen_t* bitgen_state, size_t n, double z)
 {
     struct config cfg;
     double out = 0;
@@ -180,7 +180,6 @@ random_polyagamma_devroye(bitgen_t *bitgen_state, uint64_t n, double z)
     while (n--) {
         out += random_jacobi(bitgen_state, &cfg);
     }
-
     return 0.25 * out; 
 }
 

@@ -2,6 +2,6 @@
 #define PGM_DEVROYE_H
 #include <numpy/random/bitgen.h>
 
-double random_polyagamma_devroye(bitgen_t *bitgen_state, uint64_t n, double z);
+double random_polyagamma_devroye(bitgen_t *bitgen_state, size_t n, double z);
 
 #endif
