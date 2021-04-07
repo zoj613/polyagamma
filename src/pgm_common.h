@@ -14,6 +14,17 @@
 #define PGM_MAX_EXP 708.3964202663686  // maximum allowed exp() argument
 #define PGM_LOG2 0.6931471805599453  // log(2)
 
+/*
+ * Test if two numbers equal within the given absolute and relative tolerences
+ *
+ * `rtol` is the relative tolerance – it is the maximum allowed difference
+ * between a and b, relative to the larger absolute value of a or b.
+ *
+ * `atol` is the minimum absolute tolerance – useful for comparisons near zero.
+ */
+#define PGM_ISCLOSE(a, b, atol, rtol) \
+    fabs((a) - (b)) <= MAX((rtol) * MAX(fabs((a)), fabs((b))), (atol))
+
 
 /*
  * Compute the complementary error function.

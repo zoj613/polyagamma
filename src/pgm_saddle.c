@@ -152,20 +152,6 @@ select_starting_guess(double x)
 #define PGM_MAX_ITER 25
 #endif
 /*
- * Test if two numbers equal within the given absolute and relative tolerences
- *
- * `rtol` is the relative tolerance – it is the maximum allowed difference
- * between a and b, relative to the larger absolute value of a or b.
- *
- * `atol` is the minimum absolute tolerance – useful for comparisons near zero.
- */
-DECLDIR NPY_INLINE bool
-is_close(double a, double b, double atol, double rtol)
-{
-    return fabs(a - b) <= MAX(rtol * MAX(fabs(a), fabs(b)), atol);
-}
-
-/*
  * Solve for the root of f(u) = K'(t) - x using Newton's method.
  */
 static NPY_INLINE double
@@ -184,7 +170,7 @@ newton_raphson(double arg, double x0, struct func_return* value)
             break;
         }
         x = x0 - fval / value->fprime;
-        if (is_close(x, x0, atol, rtol)) {
+        if (PGM_ISCLOSE(x, x0, atol, rtol)) {
             return x;
         }
         x0 = x;

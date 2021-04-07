@@ -14,9 +14,6 @@
 #define PGM_MAX_SERIES_TERMS 200
 #endif
 
-DECLDIR bool
-is_close(double a, double b, double atol, double rtol);
-
 /*
  * Compute the density function of PG(h, z). PG(h, z) is written as an
  * infinite alternating-sign sum of Inverse-Gaussian densities when z > 0, or
@@ -49,7 +46,7 @@ pgm_polyagamma_pdf(double x, double h, double z)
         double prev_sum = sum;
         sum += sign * term;
 
-        if (is_close(sum, prev_sum, 0, DBL_EPSILON)) {
+        if (PGM_ISCLOSE(sum, prev_sum, 0, DBL_EPSILON)) {
             break;
         }
     }
@@ -236,7 +233,7 @@ pgm_polyagamma_cdf(double x, double h, double z)
         double prev_sum = sum;
         sum += sign * term;
 
-        if (is_close(sum, prev_sum, 0, DBL_EPSILON)) {
+        if (PGM_ISCLOSE(sum, prev_sum, 0, DBL_EPSILON)) {
             break;
         }
     }
