@@ -140,19 +140,22 @@ calculate_ratio(struct config* cfg)
 static NPY_INLINE void
 initialize_config(struct config* cfg, double h, double z)
 {
-    cfg->z = z;
-    cfg->z2 = z > 0 ? z * z : 0;
-    cfg->lambda_z = z > 0 ? PGM_PI2_8 + 0.5 * cfg->z2 : PGM_PI2_8;
-
     cfg->h = h;
     cfg->t = get_truncation_point(h);
     cfg->one_t = 1 / cfg->t;
     cfg->half_h2 = 0.5 * h * h;
     cfg->lgammah = pgm_lgamma(h);
     cfg->hlog2 = h * PGM_LOG2;
-    cfg->h_z = z > 0 ? h / z : 0;
-    cfg->h_z2 = z > 0 ? cfg->h_z * cfg->h_z : 0;
-
+    if (z > 0) {
+        cfg->z2 = z * z;
+        cfg->h_z = h / z;
+        cfg->h_z2 = cfg->h_z * cfg->h_z;
+        cfg->lambda_z = PGM_PI2_8 + 0.5 * cfg->z2;
+    }
+    else {
+        cfg->lambda_z = PGM_PI2_8;
+    }
+    cfg->z = z;
     calculate_ratio(cfg);
 }
 
@@ -201,7 +204,7 @@ random_right_bounded_invgauss(bitgen_t* bitgen_state, struct config* cfg)
     if (cfg->t < cfg->h_z) {
         do {
             cfg->x = 1 / random_left_bounded_gamma(bitgen_state, 0.5,
-                                              cfg->half_h2, cfg->one_t);
+                                                   cfg->half_h2, cfg->one_t);
         } while (log1p(-next_double(bitgen_state)) >= -0.5 * cfg->z2 * cfg->x);
         return;
     }
@@ -248,14 +251,13 @@ random_jacobi_alternate_bounded(bitgen_t* bitgen_state, struct config* cfg)
             double old_s = s;
             if (n & 1) {
                 s -= piecewise_coef(n, cfg);
-                if ((old_s >= s) && (u <= s))
+                if (isgreaterequal(old_s, s) && islessequal(u, s))
                     return cfg->x;
             }
             else {
                 s += piecewise_coef(n, cfg);
-                if ((old_s >= s) && (u > s)) {
+                if (isgreaterequal(old_s, s) && isgreater(u, s))
                     break;
-                }
             }
         }
     }
@@ -273,7 +275,7 @@ random_jacobi_alternate_bounded(bitgen_t* bitgen_state, struct config* cfg)
  * We pre-calculate all values dependant on h only once and avoid
  * unnecessary recalculation as long as h remains larger than 4.
  */
-NPY_INLINE double
+double
 random_polyagamma_alternate(bitgen_t *bitgen_state, double h, double z)
 {
     struct config cfg;
