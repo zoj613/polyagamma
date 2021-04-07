@@ -85,8 +85,7 @@ random_polyagamma_hybrid(bitgen_t* bitgen_state, double h, double z)
         return random_polyagamma_normal_approx(bitgen_state, h, 2 * z);
     }
     else if (z <= 2) {
-        bool is_integer = h == (size_t)h;
-        if (is_integer) {
+        if (h == (size_t)h) {
             return h >= 12 ? random_polyagamma_saddle(bitgen_state, h, z) :
                              random_polyagamma_devroye(bitgen_state, h, z);
         }
