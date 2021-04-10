@@ -45,10 +45,12 @@ def random_polyagamma(h: _ArrayLikeFloat_co, z: _ArrayLikeFloat_co) -> np.ndarra
 @overload
 def polyagamma_pdf(x: float) -> float: ...
 @overload
+def polyagamma_pdf(x: float, log: bool = ...) -> float: ...
+@overload
 def polyagamma_pdf(x: float, h: float = ..., z: float = ...) -> float: ...
 @overload
 def polyagamma_pdf(
-    x: float, h: float = ..., z: _ArrayLikeFloat_co = ...,
+    x: float, h: float = ..., z: _ArrayLikeFloat_co = ..., log: bool = ...,
 ) -> np.ndarray: ...
 @overload
 def polyagamma_pdf(
@@ -75,10 +77,12 @@ def polyagamma_pdf(
 @overload
 def polyagamma_cdf(x: float) -> float: ...
 @overload
+def polyagamma_cdf(x: float, log: bool = ...) -> float: ...
+@overload
 def polyagamma_cdf(x: float, h: float = ..., z: float = ...) -> float: ...
 @overload
 def polyagamma_cdf(
-    x: float, h: float = ..., z: _ArrayLikeFloat_co = ...,
+    x: float, h: float = ..., z: _ArrayLikeFloat_co = ..., log: bool = ...,
 ) -> np.ndarray: ...
 @overload
 def polyagamma_cdf(
@@ -98,65 +102,5 @@ def polyagamma_cdf(
 ) -> np.ndarray: ...
 @overload
 def polyagamma_cdf(
-    x: _ArrayLikeFloat_co, h: _ArrayLikeFloat_co = ..., z: _ArrayLikeFloat_co = ...,
-) -> np.ndarray: ...
-
-
-@overload
-def polyagamma_logpdf(x: float) -> float: ...
-@overload
-def polyagamma_logpdf(x: float, h: float = ..., z: float = ...) -> float: ...
-@overload
-def polyagamma_logpdf(
-    x: float, h: float = ..., z: _ArrayLikeFloat_co = ...,
-) -> np.ndarray: ...
-@overload
-def polyagamma_logpdf(
-    x: float, h: _ArrayLikeFloat_co = ..., z: float = ...,
-) -> np.ndarray: ...
-@overload
-def polyagamma_logpdf(
-    x: _ArrayLikeFloat_co, h: float = ..., z: float = ...,
-) -> np.ndarray: ...
-@overload
-def polyagamma_logpdf(
-    x: float, h: _ArrayLikeFloat_co = ..., z: _ArrayLikeFloat_co = ...,
-) -> np.ndarray: ...
-@overload
-def polyagamma_logpdf(
-    x: _ArrayLikeFloat_co, h: _ArrayLikeFloat_co = ..., z: float = ...,
-) -> np.ndarray: ...
-@overload
-def polyagamma_logpdf(
-    x: _ArrayLikeFloat_co, h: _ArrayLikeFloat_co = ..., z: _ArrayLikeFloat_co = ...,
-) -> np.ndarray: ...
-
-
-@overload
-def polyagamma_logcdf(x: float) -> float: ...
-@overload
-def polyagamma_logcdf(x: float, h: float = ..., z: float = ...) -> float: ...
-@overload
-def polyagamma_logcdf(
-    x: float, h: float = ..., z: _ArrayLikeFloat_co = ...,
-) -> np.ndarray: ...
-@overload
-def polyagamma_logcdf(
-    x: float, h: _ArrayLikeFloat_co = ..., z: float = ...,
-) -> np.ndarray: ...
-@overload
-def polyagamma_logcdf(
-    x: _ArrayLikeFloat_co, h: float = ..., z: float = ...,
-) -> np.ndarray: ...
-@overload
-def polyagamma_logcdf(
-    x: float, h: _ArrayLikeFloat_co = ..., z: _ArrayLikeFloat_co = ...,
-) -> np.ndarray: ...
-@overload
-def polyagamma_logcdf(
-    x: _ArrayLikeFloat_co, h: _ArrayLikeFloat_co = ..., z: float = ...,
-) -> np.ndarray: ...
-@overload
-def polyagamma_logcdf(
     x: _ArrayLikeFloat_co, h: _ArrayLikeFloat_co = ..., z: _ArrayLikeFloat_co = ...,
 ) -> np.ndarray: ...
