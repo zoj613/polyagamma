@@ -94,8 +94,8 @@ cdef inline int check_method(object h, str method, bint disable_checks,
 def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
                bint disable_checks=False, random_state=None):
     """
-    polyagamma(h=1, z=0, *, size=None, out=None, method=None,
-               disable_checks=False, random_state=None)
+    random_polyagamma(h=1, z=0, *, size=None, out=None, method=None,
+                      disable_checks=False, random_state=None)
 
     Draw samples from a Polya-Gamma distribution.
 
@@ -119,10 +119,11 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
         This parameter only applies if `h` and `z` are scalars.
     out : array_like, optional
         1d array_like object in which to store samples. This object must
-        implement the buffer protocol as described in [4]_. If given, then no
-        value is returned. when `h` and/or `z` is a sequence, then `out` needs
-        to have the same total size as the broadcasted result of the
-        parameters.
+        implement the buffer protocol as described in [4]_ or the array
+        protocol as described in [5]_. This object's elements must be of 64bit
+        float type, C-contiguous and aligned. If given, then no value is
+        returned. when `h` and/or `z` is a sequence, then `out` needs to have
+        the same total size as the broadcasted result of the parameters.
     method : str or None, optional
         The method to use when sampling. If None (default) then a hybrid
         sampler is used that picks a method based on the value of `h`.
@@ -168,6 +169,7 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
            related to Jacobi theta functions." Statistics & Probability Letters,
            Volume 79, Issue 21, (2009): 2251-2259.
     .. [4] https://www.python.org/dev/peps/pep-3118/
+    .. [5] https://numpy.org/doc/stable/reference/arrays.interface.html
 
     Examples
     --------
