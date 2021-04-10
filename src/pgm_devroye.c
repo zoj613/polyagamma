@@ -72,6 +72,7 @@ initialize_config(struct config* cfg, double z)
         cfg->z2 = 0;
     }
     cfg->z = z;
+    cfg->logx = 0;
 }
 
 /*
