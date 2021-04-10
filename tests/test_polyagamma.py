@@ -7,8 +7,6 @@ from polyagamma import (
     random_polyagamma,
     polyagamma_pdf,
     polyagamma_cdf,
-    polyagamma_logpdf,
-    polyagamma_logcdf
 )
 
 
@@ -143,20 +141,20 @@ def test_polyagamma_pdf_cdf(method, h, z):
     assert 0 == polyagamma_pdf(0)
     assert 0 == polyagamma_pdf(np.inf)
     assert 0 == polyagamma_pdf(-1)
-    assert -np.inf == polyagamma_logpdf(0)
-    assert -np.inf == polyagamma_logpdf(np.inf)
-    assert -np.inf == polyagamma_logpdf(-1)
+    assert -np.inf == polyagamma_pdf(0, log=True)
+    assert -np.inf == polyagamma_pdf(np.inf, log=True)
+    assert -np.inf == polyagamma_pdf(-1, log=True)
     assert 0 == polyagamma_cdf(0)
     assert 1 == polyagamma_cdf(np.inf)
     assert 0 == polyagamma_cdf(-1)
-    assert -np.inf == polyagamma_logcdf(0)
-    assert 0 == polyagamma_logcdf(np.inf)
-    assert -np.inf == polyagamma_logcdf(-1)
+    assert -np.inf == polyagamma_cdf(0, log=True)
+    assert 0 == polyagamma_cdf(np.inf, log=True)
+    assert -np.inf == polyagamma_cdf(-1, log=True)
 
     # test if log versions agree with the unlogged distribution functions
-    ld = np.exp(polyagamma_logpdf(x, h=h, z=z))
+    ld = np.exp(polyagamma_pdf(x, h=h, z=z, log=True))
     assert np.allclose(ld, d)
-    lc = np.exp(polyagamma_logcdf(xx, h=h, z=z))
+    lc = np.exp(polyagamma_cdf(xx, h=h, z=z, log=True))
     assert np.allclose(lc, cdf)
 
 
@@ -164,12 +162,12 @@ def test_log_extreme_value_behaviour():
     # test success of directly computing logcdf/logpdf instead of using log(*)
     with pytest.warns(RuntimeWarning, match="divide by zero encountered in log"):
         np.log(polyagamma_cdf(0.01, h=10, z=3))
-    assert np.isclose(polyagamma_logcdf(0.01, h=10, z=3), -1238.6998500970105)
+    assert np.isclose(polyagamma_cdf(0.01, h=10, z=3, log=True), -1238.6998500970105)
 
     with pytest.warns(RuntimeWarning, match="divide by zero encountered in log"):
         np.log(polyagamma_pdf(0.01, h=10, z=3))
     # test extremely small values for logcdf and logpdf
-    assert np.isclose(polyagamma_logcdf(1e-3, h=10, z=3), -12489.8793293567)
-    assert np.isclose(polyagamma_logpdf(1e-3, h=10, z=3), -12473.46649418656)
-    assert np.isclose(polyagamma_logcdf(1e-16), -1250000000000017.2)
-    assert np.isclose(polyagamma_logpdf(1e-16), -1249999999999945.8)
+    assert np.isclose(polyagamma_cdf(1e-3, h=10, z=3, log=True), -12489.8793293567)
+    assert np.isclose(polyagamma_pdf(1e-3, h=10, z=3, log=True), -12473.46649418656)
+    assert np.isclose(polyagamma_cdf(1e-16, log=True), -1250000000000017.2)
+    assert np.isclose(polyagamma_pdf(1e-16, log=True), -1249999999999945.8)

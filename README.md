@@ -94,19 +94,17 @@ o = random_polyagamma(large_h, disable_checks=True)
 ```
 Functions to compute the density and CDF are available. Broadcasting of input is supported.
 ```python
-from polyagamma import (
-    polyagamma_pdf, polyagamma_cdf, polyagamma_logpdf, polyagamma_logcdf
-)
+from polyagamma import polyagamma_pdf, polyagamma_cdf
 
 >>> polyagamma_pdf(0.1)
-3.613955566329298
+# 3.613955566329298
 >>> polyagamma_cdf([1, 2], h=2, z=1)
-array([0.95637847, 0.99963397])
->>> polyagamma_logpdf([2, 0.1], h=[[1, 2], [3, 4]])
-array([[   -8.03172733,  -489.17101125]
-       [   -3.82023942, -1987.09156971]])
->>> polyagamma_logcdf(4, z=[-100, 0, 2])
-array([ 3.72007598e-44, -3.40628215e-09, -1.25463528e-12])
+# array([0.95637847, 0.99963397])
+>>> polyagamma_pdf([2, 0.1], h=[[1, 2], [3, 4]], log=True)
+# array([[   -8.03172733,  -489.17101125]
+#        [   -3.82023942, -1987.09156971]])
+>>> polyagamma_cdf(4, z=[-100, 0, 2], log=True)
+# array([ 3.72007598e-44, -3.40628215e-09, -1.25463528e-12])
 ```
 
 ### Cython
