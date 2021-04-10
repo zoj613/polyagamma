@@ -99,20 +99,20 @@ random_polyagamma_hybrid(bitgen_t* bitgen_state, double h, double z)
 }
 
 
+typedef double (*pgm_func_t)(bitgen_t* bitgen_state, double h, double z);
+
+const pgm_func_t sampling_method_table[] = {
+    [ALTERNATE] = random_polyagamma_alternate,
+    [DEVROYE] = random_polyagamma_devroye,
+    [SADDLE] = random_polyagamma_saddle,
+    [HYBRID] = random_polyagamma_hybrid,
+    [GAMMA] = random_polyagamma_gamma_conv,
+};
+
+
 NPY_INLINE double
 pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z, sampler_t method)
 {
     z = z == 0 ? 0 : 0.5 * (z < 0 ? -z : z);
-    switch(method) {
-        case GAMMA:
-            return random_polyagamma_gamma_conv(bitgen_state, h, z);
-        case DEVROYE:
-            return random_polyagamma_devroye(bitgen_state, h, z);
-        case ALTERNATE:
-            return random_polyagamma_alternate(bitgen_state, h, z);
-        case SADDLE:
-            return random_polyagamma_saddle(bitgen_state, h, z);
-        default:
-            return random_polyagamma_hybrid(bitgen_state, h, z);
-    }
+    return sampling_method_table[method](bitgen_state, h, z);
 }
