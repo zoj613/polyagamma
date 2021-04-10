@@ -168,14 +168,15 @@ random_jacobi(bitgen_t* bitgen_state, struct config* cfg)
 }
 
 /*
- * Sample from Polya-Gamma PG(n, z) using the Devroye method, where n is a
- * positive integer.
+ * Sample from Polya-Gamma PG(h, z) using the Devroye method, where h is a
+ * positive whole number / integer.
  */
 double
-random_polyagamma_devroye(bitgen_t* bitgen_state, size_t n, double z)
+random_polyagamma_devroye(bitgen_t* bitgen_state, double h, double z)
 {
     struct config cfg;
     double out = 0;
+    size_t n = h;
 
     initialize_config(&cfg, z);
     while (n--) {
