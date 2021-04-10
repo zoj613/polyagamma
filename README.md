@@ -14,11 +14,14 @@ Efficiently generate samples from the Polya-Gamma distribution using a NumPy/Sci
 - `polyagamma` is written in C and optimized for performance.
 - Very light and easy to install (pre-built wheels).
 - It is flexible and allows the user to sample using one of 4 available methods.
+- Implements functions to compute the CDF and density of the distribution as well
+  as their logarithms.
 - Input parameters can be scalars, arrays or both; allowing for easy generation
 of multi-dimensional samples without specifying the size.
 - Random number generation is thread safe.
 - The functional API resembles that of common numpy/scipy functions, therefore making it easy to plugin to
 existing libraries.
+
 
 
 ## Dependencies
@@ -88,6 +91,22 @@ o = random_polyagamma(random_state=bit_gen)
 # validation checks can be disabled to avoid some overhead, which may boost performance.
 large_h = np.ones(1000000)
 o = random_polyagamma(large_h, disable_checks=True)
+```
+Functions to compute the density and CDF are available. Broadcasting of input is supported.
+```python
+from polyagamma import (
+    polyagamma_pdf, polyagamma_cdf, polyagamma_logpdf, polyagamma_logcdf
+)
+
+>>> polyagamma_pdf(0.1)
+3.613955566329298
+>>> polyagamma_cdf([1, 2], h=2, z=1)
+array([0.95637847, 0.99963397])
+>>> polyagamma_logpdf([2, 0.1], h=[[1, 2], [3, 4]])
+array([[   -8.03172733,  -489.17101125]
+       [   -3.82023942, -1987.09156971]])
+>>> polyagamma_logcdf(4, z=[-100, 0, 2])
+array([ 3.72007598e-44, -3.40628215e-09, -1.25463528e-12])
 ```
 
 ### Cython
@@ -181,13 +200,16 @@ Note that the runtimes may differ  than the ones reported here, depending on the
 is ran on.
 
 
-## Density Plots
-Below are density plots of the `PG(h, 0)` distribution using each of the available
-methods. A plot generated using the `pypolyagamma` package is used for comparison.
+## Distribution Plots
+Below is a visualization of the Cumulative distribution and density functions for
+various values of the parameters.
+![](./scripts/pdf.svg) | ![](./scripts/cdf.svg)
+| --- | --- |
 
-<p align="center">
-    <img src="./scripts/densities.svg">
-</p>
+We can compare these plots to the Kernel density estimate and empirical CDF plots
+generated from 20000 random samples using each of the available methods.
+![](./scripts/kde.svg) | ![](./scripts/ecdf.svg)
+| --- | --- |
 
 
 ## Contributing
