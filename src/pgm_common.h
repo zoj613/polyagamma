@@ -12,8 +12,15 @@
 #define PGM_PI2_8 1.233700550136169  // pi^2 / 8
 #define PGM_LOGPI_2 0.4515827052894548  // log(pi / 2)
 #define PGM_LS2PI 0.9189385332046727  // log(sqrt(2 * pi))
-#define PGM_MAX_EXP 708.3964202663686  // maximum allowed exp() argument
+#define PGM_MAX_EXP 88.7228f  // maximum allowed expf() argument
 #define PGM_LOG2 0.6931471805599453  // log(2)
+
+/*
+ * Generate a random single precision float in the range [0, 1). This macros is
+ * adapted from a private <numpy/random/distributions.h> function of a similar name
+ */
+#define next_float(rng) \
+    ((rng->next_uint32(rng->state) >> 9) * (1.0f / 8388608.0f))
 
 /*
  * Test if two numbers equal within the given absolute and relative tolerences
@@ -24,16 +31,13 @@
  * `atol` is the minimum absolute tolerance – useful for comparisons near zero.
  */
 #define PGM_ISCLOSE(a, b, atol, rtol) \
-    fabs((a) - (b)) <= MAX((rtol) * MAX(fabs((a)), fabs((b))), (atol))
-
+    (fabs((a) - (b)) <= MAX((rtol) * MAX(fabs((a)), fabs((b))), (atol)))
 
 /*
  * Compute the complementary error function.
  *
  * This implementation uses Rational Chebyshev Approximations for as described
  * in [1]. The polynomial coefficients are obtained from [2] and some from [3].
- * Maximum relative error compared to the standard library erfc function is
- * 1.077760e-09.
  *
  * References
  * ----------
@@ -44,67 +48,70 @@
  *     291-307. doi:10.1017/S0269964800003417.
  * [3] https://www.netlib.org/specfun/erf
  */
-NPY_INLINE double
-pgm_erfc(double x)
+NPY_INLINE float
+pgm_erfc(float x)
 {
-#define PGM_1_SQRTPI 0.5641895835477563   // 1 / sqrt(pi)
-#define PGM_BIG_VAL 26.615717509251258
-#define PGM_SMALL_VAL -6.003636680306125
+#define PGM_1_SQRTPI 0.5641895835477563f   // 1 / sqrt(pi)
+#define PGM_BIG_VAL 26.615717509251258f
+#define PGM_SMALL_VAL -6.003636680306125f
 
     if (x < PGM_SMALL_VAL) {
-        return 2;
+        return 2.0f;
     }
-    else if (x < -DBL_EPSILON) {
-        return 2 - pgm_erfc(-x);
+    else if (x < -FLT_EPSILON) {
+        return 2.0f - pgm_erfc(-x);
     }
-    else if (x < DBL_EPSILON) {
-       return 1;
+    else if (x < FLT_EPSILON) {
+       return 1.0f;
     }
-    else if (x < 0.5) {
-        static const double p0 = 3.20937758913846947e+03;
-        static const double p1 = 3.77485237685302021e+02;
-        static const double p2 = 1.13864154151050156e+02;
-        static const double p3 = 3.16112374387056560e+00;
-        static const double p4 = 1.85777706184603153e-01;
-        static const double q0 = 2.84423683343917062e+03;
-        static const double q1 = 1.28261652607737228e+03;
-        static const double q2 = 2.44024637934444173e+02;
-        static const double q3 = 2.36012909523441209e+01;
-        double z = x * x;
-        return 1 - x * ((((p4 * z + p3) * z + p2) * z + p1) * z + p0) /
+    else if (x < 0.5f) {
+        static const float
+            p0 = 3.20937758913846947e+03f,
+            p1 = 3.77485237685302021e+02f,
+            p2 = 1.13864154151050156e+02f,
+            p3 = 3.16112374387056560e+00f,
+            p4 = 1.85777706184603153e-01f,
+            q0 = 2.84423683343917062e+03f,
+            q1 = 1.28261652607737228e+03f,
+            q2 = 2.44024637934444173e+02f,
+            q3 = 2.36012909523441209e+01f;
+        float z = x * x;
+        return 1.0f - x * ((((p4 * z + p3) * z + p2) * z + p1) * z + p0) /
                         ((((z + q3) * z + q2) * z + q1) * z + q0);
     }
-    else if (x < 4) {
-        static const double p0 = 7.3738883116;
-        static const double p1 = 6.8650184849;
-        static const double p2 = 3.0317993362;
-        static const double p3 = 5.6316961891e-01;
-        static const double p4 = 4.3187787405e-05;
-        static const double q0 = 7.3739608908;
-        static const double q1 = 1.5184908190e+01;
-        static const double q2 = 1.2795529509e+01;
-        static const double q3 = 5.3542167949;
-        return exp(-x * x) * ((((p4 * x + p3) * x + p2) * x + p1) * x + p0) /
+    else if (x < 4.0f) {
+        static const float
+            p0 = 7.3738883116f,
+            p1 = 6.8650184849f,
+            p2 = 3.0317993362f,
+            p3 = 5.6316961891e-01f,
+            p4 = 4.3187787405e-05f,
+            q0 = 7.3739608908f,
+            q1 = 1.5184908190e+01f,
+            q2 = 1.2795529509e+01f,
+            q3 = 5.3542167949f;
+        return expf(-x * x) * ((((p4 * x + p3) * x + p2) * x + p1) * x + p0) /
                               ((((x + q3) * x + q2) * x + q1) * x + q0);
     }
     else if (x < PGM_BIG_VAL) {
-        double z = x * x;
-        double y = exp(-z);
+        float z = x * x;
+        float y = expf(-z);
 
-        if (x * DBL_MIN > y * PGM_1_SQRTPI) {
-            return 0;
+        if (x * FLT_MIN > y * PGM_1_SQRTPI) {
+            return 0.0f;
         }
-        static const double p0 = -4.25799643553e-02;
-        static const double p1 = -1.96068973726e-01;
-        static const double p2 = -5.16882262185e-02;
-        static const double q0 = 1.50942070545e-01;
-        static const double q1 = 9.21452411694e-01;
-        z = 1 / z;
+        static const float
+            p0 = -4.25799643553e-02f,
+            p1 = -1.96068973726e-01f,
+            p2 = -5.16882262185e-02f,
+            q0 = 1.50942070545e-01f,
+            q1 = 9.21452411694e-01f;
+        z = 1.0f / z;
         z *= ((p2 * z + p1) * z + p0) / ((z + q1) * z + q0);
         return y * (PGM_1_SQRTPI + z) / x;
     }
     else {
-        return 0;
+        return 0.0f;
     }
 #undef PGM_1_SQRTPI
 #undef PGM_BIG_VAL
@@ -140,74 +147,73 @@ pgm_lgamma(double z)
 {
     /* lookup table for integer values of log-gamma function where 1<=z<=200 */
     static const double logfactorial[200] = {
-        0.000000000000000, 0.0000000000000000, 0.69314718055994529,
-        1.791759469228055, 3.1780538303479458, 4.7874917427820458,
-        6.5792512120101012, 8.5251613610654147, 10.604602902745251,
-        12.801827480081469, 15.104412573075516, 17.502307845873887,
-        19.987214495661885, 22.552163853123425, 25.19122118273868,
-        27.89927138384089, 30.671860106080672, 33.505073450136891,
-        36.395445208033053, 39.339884187199495, 42.335616460753485,
-        45.380138898476908, 48.471181351835227, 51.606675567764377,
-        54.784729398112319, 58.003605222980518, 61.261701761002001,
-        64.557538627006338, 67.88974313718154, 71.257038967168015,
-        74.658236348830158, 78.092223553315307, 81.557959456115043,
-        85.054467017581516, 88.580827542197682, 92.136175603687093,
-        95.719694542143202, 99.330612454787428, 102.96819861451381,
-        106.63176026064346, 110.32063971475739, 114.03421178146171,
-        117.77188139974507, 121.53308151543864, 125.3172711493569,
-        129.12393363912722, 132.95257503561632, 136.80272263732635,
-        140.67392364823425, 144.5657439463449, 148.47776695177302,
-        152.40959258449735, 156.3608363030788, 160.3311282166309,
-        164.32011226319517, 168.32744544842765, 172.35279713916279,
-        176.39584840699735, 180.45629141754378, 184.53382886144948,
-        188.6281734236716, 192.7390472878449, 196.86618167289001,
-        201.00931639928152, 205.1681994826412, 209.34258675253685,
-        213.53224149456327, 217.73693411395422, 221.95644181913033,
-        226.1905483237276, 230.43904356577696, 234.70172344281826,
-        238.97838956183432, 243.26884900298271, 247.57291409618688,
-        251.89040220972319, 256.22113555000954, 260.56494097186322,
-        264.92164979855278, 269.29109765101981, 273.67312428569369,
-        278.06757344036612, 282.4742926876304, 286.89313329542699,
-        291.32395009427029, 295.76660135076065, 300.22094864701415,
-        304.68685676566872, 309.1641935801469, 313.65282994987905,
-        318.1526396202093, 322.66349912672615, 327.1852877037752,
-        331.71788719692847, 336.26118197919845, 340.81505887079902,
-        345.37940706226686, 349.95411804077025, 354.53908551944079,
-        359.1342053695754, 363.73937555556347, 368.35449607240474,
-        372.97946888568902, 377.61419787391867, 382.25858877306001,
-        386.91254912321756, 391.57598821732961, 396.24881705179155,
-        400.93094827891576, 405.6222961611449, 410.32277652693733,
-        415.03230672824964, 419.75080559954472, 424.47819341825709,
-        429.21439186665157, 433.95932399501481, 438.71291418612117,
-        443.47508812091894, 448.24577274538461, 453.02489623849613,
-        457.81238798127816, 462.60817852687489, 467.4121995716082,
-        472.22438392698058, 477.04466549258564, 481.87297922988796,
-        486.70926113683936, 491.55344822329801, 496.40547848721764,
-        501.26529089157924, 506.13282534203483, 511.00802266523596,
-        515.89082458782241, 520.78117371604412, 525.67901351599517,
-        530.58428829443358, 535.49694318016952, 540.41692410599762,
-        545.34417779115483, 550.27865172428551, 555.22029414689484,
-        560.16905403727310, 565.12488109487424, 570.08772572513419,
-        575.05753902471020, 580.03427276713080, 585.01787938883899,
-        590.00831197561786, 595.00552424938201, 600.00947055532743,
-        605.02010584942377, 610.03738568623862, 615.06126620708494,
-        620.09170412847732, 625.12865673089095, 630.17208184781020,
-        635.22193785505965, 640.27818366040810, 645.34077869343503,
-        650.40968289565524, 655.48485671088906, 660.56626107587351,
-        665.65385741110595, 670.74760761191271, 675.84747403973688,
-        680.95341951363753, 686.06540730199413, 691.18340111441080,
-        696.30736509381404, 701.43726380873704, 706.57306224578736,
-        711.71472580228999, 716.86222027910355, 722.01551187360133,
-        727.17456717281584, 732.33935314673920, 737.50983714177733,
-        742.68598687435122, 747.86777042464337, 753.05515623048404,
-        758.24811308137441, 763.44661011264009, 768.65061679971711,
-        773.86010295255835, 779.07503871016729, 784.29539453524569,
-        789.52114120895885, 794.75224982581346, 799.98869178864345,
-        805.23043880370301, 810.47746287586358, 815.72973630391016,
-        820.98723167593789, 826.24992186484292, 831.51778002390620,
-        836.79077958246978, 842.06889424170038, 847.35209797043842,
-        852.64036500113298, 857.93366982585735,
-    };
+    0.00000000000000000000L, 0.00000000000000000000L, 0.69314718055994530943L,
+    1.79175946922805500079L, 3.17805383034794561975L, 4.78749174278204599415L,
+    6.57925121201010099526L, 8.52516136106541430086L, 10.60460290274525022719L,
+    12.80182748008146961186L, 15.10441257307551529612L, 17.50230784587388584150L,
+    19.98721449566188614923L, 22.55216385312342288610L, 25.19122118273868150135L,
+    27.89927138384089156699L, 30.67186010608067280557L, 33.50507345013688888583L,
+    36.39544520803305357320L, 39.33988418719949403668L, 42.33561646075348502624L,
+    45.38013889847690802634L, 48.47118135183522388137L, 51.60667556776437357377L,
+    54.78472939811231919027L, 58.00360522298051993775L, 61.26170176100200198341L,
+    64.55753862700633105565L, 67.88974313718153497793L, 71.25703896716800901656L,
+    74.65823634883016438751L, 78.09222355331531063849L, 81.55795945611503718065L,
+    85.05446701758151741707L, 88.58082754219767880610L, 92.13617560368709247937L,
+    95.71969454214320249114L, 99.33061245478742692927L, 102.96819861451381269979L,
+    106.63176026064345913030L, 110.32063971475739543732L, 114.03421178146170323481L,
+    117.77188139974507154195L, 121.53308151543863396132L, 125.31727114935689513381L,
+    129.12393363912721488962L, 132.95257503561630989253L, 136.80272263732636846278L,
+    140.67392364823425940368L, 144.56574394634488600619L, 148.47776695177303207807L,
+    152.40959258449735784502L, 156.36083630307878519772L, 160.33112821663090702407L,
+    164.32011226319518140682L, 168.32744544842765233028L, 172.35279713916280155961L,
+    176.39584840699735171499L, 180.45629141754377104678L, 184.53382886144949050211L,
+    188.62817342367159119398L, 192.73904728784490243687L, 196.86618167288999400877L,
+    201.00931639928152667995L, 205.16819948264119853609L, 209.34258675253683563977L,
+    213.53224149456326118324L, 217.73693411395422725452L, 221.95644181913033395059L,
+    226.19054832372759332448L, 230.43904356577695233255L, 234.70172344281826774803L,
+    238.97838956183432307379L, 243.26884900298271419139L, 247.57291409618688395045L,
+    251.89040220972319437942L, 256.22113555000952545004L, 260.56494097186320932358L,
+    264.92164979855280104726L, 269.29109765101982254532L, 273.67312428569370413856L,
+    278.06757344036614290617L, 282.47429268763039605927L, 286.89313329542699396169L,
+    291.32395009427030757587L, 295.76660135076062402293L, 300.22094864701413177710L,
+    304.68685676566871547988L, 309.16419358014692195247L, 313.65282994987906178830L,
+    318.15263962020932683727L, 322.66349912672617686327L, 327.18528770377521719404L,
+    331.71788719692847316467L, 336.26118197919847702115L, 340.81505887079901787051L,
+    345.37940706226685413927L, 349.95411804077023693038L, 354.53908551944080887464L,
+    359.13420536957539877521L, 363.73937555556349016106L, 368.35449607240474959036L,
+    372.97946888568902071293L, 377.61419787391865648951L, 382.25858877306002911456L,
+    386.91254912321755249360L, 391.57598821732961960618L, 396.24881705179152582841L,
+    400.93094827891574549739L, 405.62229616114488922607L, 410.32277652693730540800L,
+    415.03230672824963956580L, 419.75080559954473413686L, 424.47819341825707464833L,
+    429.21439186665157011769L, 433.95932399501482021331L, 438.71291418612118484521L,
+    443.47508812091894095375L, 448.24577274538460572306L, 453.02489623849613509243L,
+    457.81238798127818109829L, 462.60817852687492218733L, 467.41219957160817877195L,
+    472.22438392698059622665L, 477.04466549258563309865L, 481.87297922988793424937L,
+    486.70926113683941224841L, 491.55344822329800347216L, 496.40547848721762064228L,
+    501.26529089157929280907L, 506.13282534203487522673L, 511.00802266523602676584L,
+    515.89082458782239759554L, 520.78117371604415142272L, 525.67901351599506276635L,
+    530.58428829443349222794L, 535.49694318016954425188L, 540.41692410599766910329L,
+    545.34417779115487379116L, 550.27865172428556556072L, 555.22029414689486986889L,
+    560.16905403727303813799L, 565.12488109487429888134L, 570.08772572513420617835L,
+    575.05753902471020677645L, 580.03427276713078114545L, 585.01787938883911766030L,
+    590.00831197561785385064L, 595.00552424938196893756L, 600.00947055532742813178L,
+    605.02010584942368387473L, 610.03738568623860821782L, 615.06126620708488456080L,
+    620.09170412847732001271L, 625.12865673089094925574L, 630.17208184781019580933L,
+    635.22193785505973290251L, 640.27818366040804093364L, 645.34077869343500771793L,
+    650.40968289565523929863L, 655.48485671088906617809L, 660.56626107587352919603L,
+    665.65385741110591327763L, 670.74760761191267560699L, 675.84747403973687401857L,
+    680.95341951363745458536L, 686.06540730199399785727L, 691.18340111441075296339L,
+    696.30736509381401183605L, 701.43726380873708536878L, 706.57306224578734715758L,
+    711.71472580229000698404L, 716.86222027910346005219L, 722.01551187360123895687L,
+    727.17456717281576800138L, 732.33935314673928201890L, 737.50983714177743377771L,
+    742.68598687435126293188L, 747.86777042464334813721L, 753.05515623048410311924L,
+    758.24811308137431348220L, 763.44661011264013927846L, 768.65061679971693459068L,
+    773.86010295255835550465L, 779.07503871016734109389L, 784.29539453524566594567L,
+    789.52114120895886717477L, 794.75224982581345378740L, 799.98869178864340312440L,
+    805.23043880370304542504L, 810.47746287586353153287L, 815.72973630391016147678L,
+    820.98723167593794297625L, 826.24992186484282852277L, 831.51778002390615662787L,
+    836.79077958246990348590L, 842.06889424170042068862L, 847.35209797043840918018L,
+    852.64036500113294436698L, 857.93366982585743685252L};
 
     if (z < 201 && z == (size_t)z) {
         return logfactorial[(size_t)z - 1];
@@ -289,37 +295,35 @@ pgm_lgamma(double z)
 NPY_INLINE double
 random_left_bounded_gamma(bitgen_t* bitgen_state, double a, double b, double t)
 {
+    double x;
+
     if (a > 1) {
         b = t * b;
-        double x, threshold;
-        const double amin1 = a - 1;
+        float threshold;
+        const float amin1 = a - 1;
         const double bmina = b - a;
         const double c0 = 0.5 * (bmina + sqrt((bmina * bmina) + 4 * b)) / b;
-        const double one_minus_c0 = 1 - c0;
-        const double log_m = amin1 * (log(amin1 / one_minus_c0) - 1);
+        const float one_minus_c0 = 1 - c0;
+        const float log_m = amin1 * (logf(amin1 / one_minus_c0) - 1.0f);
 
         do {
             x = b + random_standard_exponential(bitgen_state) / c0;
-            threshold = amin1 * log(x) - x * one_minus_c0 - log_m;
-        } while (log1p(-random_standard_uniform(bitgen_state)) > threshold);
+            threshold = amin1 * logf(x) - x * one_minus_c0 - log_m;
+        } while (log1pf(-next_float(bitgen_state)) > threshold);
         return t * (x / b);
     }
     else if (a == 1) {
         return t + random_standard_exponential(bitgen_state) / b;
     }
     else {
-        double x;
-        const double amin1 = a - 1;
+        const float amin1 = a - 1;
         const double tb = t * b;
         do {
             x = 1 + random_standard_exponential(bitgen_state) / tb;
-        } while (log1p(-random_standard_uniform(bitgen_state)) > amin1 * log(x));
+        } while (log1pf(-next_float(bitgen_state)) > amin1 * logf(x));
         return t * x;
     }
 }
-
-
-#define PGM_CONFLUENT_EPSILON 1e-07
 
 /*
  * Compute function G(p, x) (A confluent hypergeometric function ratio).
@@ -343,32 +347,32 @@ random_left_bounded_gamma(bitgen_t* bitgen_state, double a, double b, double t)
  *      incomplete gamma function, Rémy Abergel and Lionel Moisan, ACM
  *      Transactions on Mathematical Software (TOMS), 2020. DOI: 10.1145/3365983
  */
-static NPY_INLINE double
+static NPY_INLINE float
 confluent_x_smaller(double p, double x)
 {
     size_t n;
-    double f, c, d, delta;
-    double a = 1, b = p;
-    double r = -(p - 1) * x;
-    double s = 0.5 * x;
-    for (n = 2, f = a / b, c = a / DBL_MIN, d = 1 / b; n < 100; n++) {
+    float f, c, d, delta;
+    float a = 1.0f, b = p;
+    float r = -(p - 1.0f) * x;
+    float s = 0.5f * x;
+    for (n = 2, f = a / b, c = a / FLT_MIN, d = 1.0f / b; n < 100; ++n) {
         a =  n & 1 ? s * (n - 1) : r - s * n;
         b++;
 
         c = b + a / c;
-        if (c < DBL_MIN) {
-            c = DBL_MIN;
+        if (c < FLT_MIN) {
+            c = FLT_MIN;
         }
 
         d = a * d + b;
-        if (d < DBL_MIN) {
-            d = DBL_MIN;
+        if (d < FLT_MIN) {
+            d = FLT_MIN;
         }
 
-        d = 1 / d;
+        d = 1.0f / d;
         delta = c * d;
         f *= delta;
-        if (fabs(delta - 1) < PGM_CONFLUENT_EPSILON) {
+        if (fabsf(delta - 1.0f) < FLT_EPSILON) {
             break;
         }
     }
@@ -399,30 +403,30 @@ confluent_x_smaller(double p, double x)
  *      incomplete gamma function, Rémy Abergel and Lionel Moisan, ACM
  *      Transactions on Mathematical Software (TOMS), 2020. DOI: 10.1145/3365983
  */
-static NPY_INLINE double
+static NPY_INLINE float
 confluent_p_smaller(double p, double x)
 {
     size_t n;
-    double f, c, d, delta;
-    double a = 1, b = x - p + 1;
-    for (n = 1, f = a / b, c = a / DBL_MIN, d = 1 / b; n < 100; n++) {
+    float f, c, d, delta;
+    float a = 1.0f, b = x - p + 1.0f;
+    for (n = 1, f = a / b, c = a / FLT_MIN, d = 1.0f / b; n < 100; ++n) {
         a = n * (p - n);
-        b += 2;
+        b += 2.0f;
 
         c = b + a / c;
-        if (c < DBL_MIN) {
-            c = DBL_MIN;
+        if (c < FLT_MIN) {
+            c = FLT_MIN;
         }
 
         d = a * d + b;
-        if (d < DBL_MIN) {
-            d = DBL_MIN;
+        if (d < FLT_MIN) {
+            d = FLT_MIN;
         }
 
-        d = 1 / d;
+        d = 1.0f / d;
         delta = c * d;
         f *= delta;
-        if (fabs(delta - 1) < PGM_CONFLUENT_EPSILON) {
+        if (fabsf(delta - 1.0f) < FLT_EPSILON) {
             break;
         }
     }
@@ -453,42 +457,42 @@ confluent_p_smaller(double p, double x)
  *      Transactions on Mathematical Software (TOMS), 2020. DOI: 10.1145/3365983
  *  [2] https://www.boost.org/doc/libs/1_71_0/libs/math/doc/html/math_toolkit/sf_gamma/igamma.html
  */
-static NPY_INLINE double
-pgm_gammaq(double p, double x, bool normalized)
+static NPY_INLINE float
+pgm_gammaq(float p, float x, bool normalized)
 {
     if (normalized) {
         size_t p_int = (size_t)p;
         if (p == p_int && p < 30) {
-            size_t k;
-            double sum, r;
-            for (k = sum = r = 1; k < p_int; k++) {
+            float sum, r;
+            int k = 1;
+            for (sum = r = 1.f; k < p_int; ++k) {
                 sum += (r *= x / k);
             }
-            return exp(-x) * sum;
+            return expf(-x) * sum;
         }
         else if (p == (p_int + 0.5) && p < 30) {
-            size_t k;
-            double sum, r;
-            static const double one_sqrtpi = 0.5641895835477563;
-            double sqrt_x = sqrt(x);
-            for (k = r = 1, sum = 0; k < p_int + 1; k++) {
-                sum += (r *= x / (k - 0.5));
+            float sum, r;
+            int k = 1;
+            static const float one_sqrtpi = 0.5641895835477563f;
+            float sqrt_x = sqrtf(x);
+            for (r = 1.f, sum = 0; k < p_int + 1; ++k) {
+                sum += (r *= x / (k - 0.5f));
             }
-            return pgm_erfc(sqrt_x) + exp(-x) * one_sqrtpi * sum / sqrt_x;
+            return pgm_erfc(sqrt_x) + expf(-x) * one_sqrtpi * sum / sqrt_x;
         }
     }
 
     bool x_smaller = p >= x;
-    double f = x_smaller ? confluent_x_smaller(p, x) : confluent_p_smaller(p, x);
+    float f = x_smaller ? confluent_x_smaller(p, x) : confluent_p_smaller(p, x);
 
     if (normalized) {
-        double out = f * exp(-x + p * log(x) - pgm_lgamma(p));
-        return x_smaller ? 1 - out : out;
+        float out = f * expf(-x + p * logf(x) - pgm_lgamma(p));
+        return x_smaller ? 1.0f - out : out;
     }
     else if (x_smaller) {
-        double lgam = pgm_lgamma(p);
-        double exp_lgam = lgam >= PGM_MAX_EXP ? exp(PGM_MAX_EXP) : exp(lgam);
-        double arg = -x + p * log(x) - lgam;
+        float lgam = pgm_lgamma(p);
+        float exp_lgam = lgam >= PGM_MAX_EXP ? expf(PGM_MAX_EXP) : expf(lgam);
+        float arg = -x + p * logf(x) - lgam;
 
         if (arg >= PGM_MAX_EXP) {
             arg = PGM_MAX_EXP;
@@ -496,11 +500,11 @@ pgm_gammaq(double p, double x, bool normalized)
         else if (arg <= -PGM_MAX_EXP) {
             arg = -PGM_MAX_EXP;
         }
-        return (1 - f * exp(arg)) * exp_lgam;
+        return (1.0f - f * expf(arg)) * exp_lgam;
     }
     else {
-        double arg = -x + p * log(x);
-        return f * (arg >= PGM_MAX_EXP ? exp(PGM_MAX_EXP) : exp(arg));
+        float arg = -x + p * logf(x);
+        return f * (arg >= PGM_MAX_EXP ? expf(PGM_MAX_EXP) : expf(arg));
     }
 }
 

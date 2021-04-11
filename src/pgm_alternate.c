@@ -8,22 +8,28 @@
 /* a struct to store frequently used values. This avoids unnecessary
  * recalculation of these values during a single call to the sampler.
  */
-struct config {
-    double h;
-    double t;
-    double z;
-    double z2;
-    double x;
-    double logx;  
-    double ratio;
-    double h_z;  // h / z
-    double h_z2;
-    double lgammah;  // loggamma(h)
-    double lambda_z;  // pi^2 / 8 + 0.5 * z * z
-    double hlog2;  // h * log(2)
+typedef struct {
+    // q / (p + q)
+    float proposal_probability;
+    double log_lambda_z;
+    // pi^2 / 8 + 0.5 * z * z
+    double lambda_z;
     double half_h2;
-    double one_t;  // 1 / t;
-};
+    // loggamma(h)
+    double lgammah;
+    double hlog2;
+    // 1 / t;
+    double t_inv;
+    double logx;
+    // (h / z) ** 2
+    double h_z2;
+    double h_z;
+    double z2;
+    double h;
+    double z;
+    double x;
+    double t;
+} parameter_t;
 
 /* 
  * Return the optimal truncation point for a given value of h in the range
@@ -33,147 +39,141 @@ struct config {
 static NPY_INLINE double
 get_truncation_point(double h)
 {
-    if (h <= 1)
+    if (h <= 1) {
         return pgm_f[0];
-
-    if (h == pgm_maxh)
-        return pgm_f[pgm_table_size - 1];
-
-    // start binary search
-    size_t index, offset = 0, len = pgm_table_size - 1;
-
-    while (len > 0) {
-        index = offset + len / 2;
-        if (pgm_h[index] < h) {
-            len = len - (index + 1 - offset);
-            offset = index + 1;
-            continue;
-        }
-        else if (offset < index && pgm_h[index] > h) {
-            len = index - offset;
-            continue;
-        }
-        break;
     }
-    double x0 = pgm_h[index - 1];
-    double f0 = pgm_f[index - 1];
-    double x1 = pgm_h[index + 1];
-    double f1 = pgm_f[index + 1];
-    return f0 + (f1 - f0) * (pgm_h[index] - x0) / (x1 - x0);
+    else if (h == pgm_maxh) {
+        return pgm_f[pgm_table_size - 1];
+    }
+    else {
+        // start binary search
+        size_t index, offset = 0, len = pgm_table_size - 1;
+
+        while (len > 0) {
+            index = offset + len / 2;
+            if (pgm_h[index] < h) {
+                len = len - (index + 1 - offset);
+                offset = index + 1;
+                continue;
+            }
+            else if (offset < index && pgm_h[index] > h) {
+                len = index - offset;
+                continue;
+            }
+            break;
+        }
+        double x0 = pgm_h[index - 1];
+        double f0 = pgm_f[index - 1];
+        double x1 = pgm_h[index + 1];
+        double f1 = pgm_f[index + 1];
+        return f0 + (f1 - f0) * (pgm_h[index] - x0) / (x1 - x0);
+    }
 }
 
 /*
  * Compute a^L(x|h), the n'th coefficient for the alternating sum S^L(x|h)
  */
-static NPY_INLINE double
-piecewise_coef(size_t n, struct config* cfg)
+static NPY_INLINE float
+piecewise_coef(unsigned int n, parameter_t const* pr)
 {
-    double a = 2 * n + cfg->h;
-    double b = n ? pgm_lgamma(n + cfg->h) - cfg->lgammah : 0;
+    double a = 2 * n + pr->h;
+    double b = n ? pgm_lgamma(n + pr->h) - pr->lgammah : 0;
 
-    return a * exp(cfg->hlog2 + b - pgm_lgamma(n + 1) - PGM_LS2PI -
-                   1.5 * cfg->logx - 0.5 * a * a / cfg->x);
+    return expf(pr->hlog2 + b - pgm_lgamma(n + 1) - PGM_LS2PI -
+                1.5 * pr->logx - 0.5 * a * a / pr->x) * (float)a;
 }
 
-
 // compute: k(x|h)
-static NPY_INLINE double
-bounding_kernel(struct config* cfg)
+static NPY_INLINE float
+bounding_kernel(parameter_t const* pr)
 {
-    if (cfg->x > cfg->t) {
-        // log(sqrt(pi / 2))
-        static const double lsp_2 = 0.22579135264472733;
-        return exp(cfg->h * lsp_2 + (cfg->h - 1) * cfg->logx -
-                   PGM_PI2_8 * cfg->x - cfg->lgammah);
+    if (pr->x > pr->t) {
+        static const double a = 0.22579135264472733;  // log(sqrt(pi / 2))
+        return expf(pr->h * a + (pr->h - 1.) * pr->logx -
+                    PGM_PI2_8 * pr->x - pr->lgammah);
     }
-    else if (cfg->x > 0) {
-        return cfg->h * exp(cfg->hlog2 - cfg->half_h2 / cfg->x -
-                            1.5 * cfg->logx - PGM_LS2PI);
+    else if (pr->x > 0) {
+        return expf(pr->hlog2 - pr->half_h2 / pr->x -
+                    1.5 * pr->logx - PGM_LS2PI) * (float)pr->h;
     }
-    return 0;
+    return 0.f;
 }
 
 /*
  * Compute the cdf of the inverse-gaussian distribution.
  */
-static NPY_INLINE double
-invgauss_cdf(struct config* cfg)
+static NPY_INLINE float
+invgauss_cdf(parameter_t const* pr)
 {
-    static const double one_s2 = 0.7071067811865475;
-    double st = sqrt(cfg->t);
-    double a = one_s2 * cfg->h / st;
-    double b = cfg->z * st * one_s2;
-    double ez = exp(cfg->h * cfg->z);
+    static const double sqrt2_inv = 0.7071067811865475f;
+    double st = sqrt(pr->t);
+    double a = sqrt2_inv * pr->h / st;
+    double b = pr->z * st * sqrt2_inv;
+    float ez = expf(pr->h * pr->z);
 
-    return 0.5 * (pgm_erfc(a - b) + ez * pgm_erfc(b + a) * ez);
-}
-
-/*
- * Calculate the probability of sampling on either side of the truncation point
- *
- * UpperIncompleteGamma(0.5, x) == sqrt(pi) * erfc(sqrt(x)), the
- * regularized version of the function, which is what we want, can be
- * written as erfc(sqrt(x)) since the denominator of the regularized
- * version cancels with the sqrt(pi). This simplifies the calculation of `p`.
- */
-static NPY_INLINE void
-calculate_ratio(struct config* cfg)
-{
-    double p, q;
-
-    if (cfg->z > 0) {
-        p = exp(cfg->hlog2 - cfg->h * cfg->z) * invgauss_cdf(cfg);
-    }
-    else {
-        p = exp(cfg->hlog2) * pgm_erfc(cfg->h / sqrt(2 * cfg->t));
-    }
-    q = exp(cfg->h * (PGM_LOGPI_2 - log(cfg->lambda_z))) *
-            pgm_gammaq(cfg->h, cfg->lambda_z * cfg->t, true);
-
-    cfg->ratio = q / (p + q);
+    return 0.5f * (pgm_erfc(a - b) + ez * pgm_erfc(b + a) * ez);
 }
 
 /*
  * Initialize the values used frequently during sampling and store them in
  * the config struct
+ *
+ * Parameters
+ * ----------
+ *  pr : parameter_t*
+ *      Pointer to a `config` struct that strores sampling parameters.
+ *  h : double
+ *      shape parameter of the distribution.
+ *  update_params : bool
+ *      Whether to update a previously initialized set of parameters with a
+ *      new `h` value.
+ *
+ * Notes
+ * -----
+ * To calculate the probability of sampling on either side of the truncation,
+ * point we note that:
+ * - UpperIncompleteGamma(0.5, x) == sqrt(pi) * erfc(sqrt(x)), the regularized
+ *   version of the function, can be written as erfc(sqrt(x)) since the
+ *   denominator of the regularized version cancels with the sqrt(pi).
+ *   This simplifies the calculation of `p` in the ratio = p / (p + q).
  */
 static NPY_INLINE void
-initialize_config(struct config* cfg, double h, double z)
+set_sampling_parameters(parameter_t* const pr, double h, bool update_params)
 {
-    cfg->h = h;
-    cfg->t = get_truncation_point(h);
-    cfg->one_t = 1 / cfg->t;
-    cfg->half_h2 = 0.5 * h * h;
-    cfg->lgammah = pgm_lgamma(h);
-    cfg->hlog2 = h * PGM_LOG2;
-    if (z > 0) {
-        cfg->z2 = z * z;
-        cfg->h_z = h / z;
-        cfg->h_z2 = cfg->h_z * cfg->h_z;
-        cfg->lambda_z = PGM_PI2_8 + 0.5 * cfg->z2;
+    float p, q;
+
+    pr->h = h;
+    pr->t = get_truncation_point(h);
+    pr->t_inv = 1. / pr->t;
+    pr->half_h2 = 0.5 * h * h;
+    pr->lgammah = pgm_lgamma(h);
+    pr->hlog2 = h * PGM_LOG2;
+
+    if (!update_params && pr->z > 0) {
+        pr->h_z = h / pr->z;
+        pr->z2 = pr->z * pr->z;
+        pr->h_z2 = pr->h_z * pr->h_z;
+        pr->lambda_z = PGM_PI2_8 + 0.5 * pr->z2;
+        pr->log_lambda_z = logf(pr->lambda_z);
+        p = expf(pr->hlog2 - h * pr->z) * invgauss_cdf(pr);
+    }
+    else if (pr->z > 0) {
+        pr->h_z = h / pr->z;
+        pr->h_z2 = pr->h_z * pr->h_z;
+        p = expf(pr->hlog2 - h * pr->z) * invgauss_cdf(pr);
+    }
+    else if (!update_params) {
+        pr->lambda_z = PGM_PI2_8;
+        pr->log_lambda_z = logf(pr->lambda_z);
+        p = expf(pr->hlog2) * pgm_erfc(h / sqrt(2. * pr->t));
     }
     else {
-        cfg->lambda_z = PGM_PI2_8;
+        p = expf(pr->hlog2) * pgm_erfc(h / sqrt(2. * pr->t));
     }
-    cfg->z = z;
-    calculate_ratio(cfg);
-}
+    q = expf(h * (PGM_LOGPI_2 - pr->log_lambda_z)) *
+        pgm_gammaq(h, pr->lambda_z * pr->t, true);
 
-
-static NPY_INLINE void
-update_config(struct config* cfg, double h)
-{
-    cfg->h = h;
-    cfg->t = get_truncation_point(h);
-    cfg->one_t = 1 / cfg->t;
-    cfg->half_h2 = 0.5 * h * h;
-    cfg->lgammah = pgm_lgamma(h);
-    cfg->hlog2 = h * PGM_LOG2;
-    if (cfg->z > 0) {
-        cfg->h_z = h / cfg->z;
-        cfg->h_z2 = cfg->h_z * cfg->h_z;
-    }
-    calculate_ratio(cfg);
+    pr->proposal_probability = q / (p + q);
 }
 
 /*
@@ -199,23 +199,23 @@ update_config(struct config* cfg, double h)
  *      http://hdl.handle.net/2152/21842
  */
 static NPY_INLINE void
-random_right_bounded_invgauss(bitgen_t* bitgen_state, struct config* cfg)
+random_right_bounded_invgauss(bitgen_t* bitgen_state, parameter_t* const pr)
 {
-    if (cfg->t < cfg->h_z) {
+    if (pr->t < pr->h_z) {
         do {
-            cfg->x = 1 / random_left_bounded_gamma(bitgen_state, 0.5,
-                                                   cfg->half_h2, cfg->one_t);
-        } while (log1p(-next_double(bitgen_state)) >= -0.5 * cfg->z2 * cfg->x);
+            pr->x = 1. / random_left_bounded_gamma(bitgen_state, 0.5,
+                                                   pr->half_h2, pr->t_inv);
+        } while (log1pf(-next_float(bitgen_state)) >= -0.5 * pr->z2 * pr->x);
         return;
     }
     do {
         double y = random_standard_normal(bitgen_state);
-        double w = cfg->h_z + 0.5 * y * y / cfg->z2;
-        cfg->x = w - sqrt(w * w - cfg->h_z2);
-        if (next_double(bitgen_state) * (cfg->h_z + cfg->x) > cfg->h_z) {
-            cfg->x = cfg->h_z2 / cfg->x;
+        double w = pr->h_z + 0.5 * y * y / pr->z2;
+        pr->x = w - sqrt(w * w - pr->h_z2);
+        if (next_double(bitgen_state) * (pr->h_z + pr->x) > pr->h_z) {
+            pr->x = pr->h_z2 / pr->x;
         }
-    } while (cfg->x >= cfg->t);
+    } while (pr->x >= pr->t);
 }
 
 /* 
@@ -228,34 +228,34 @@ random_right_bounded_invgauss(bitgen_t* bitgen_state, struct config* cfg)
  * Gamma right truncated at t. Which is what we want.
  */
 static NPY_INLINE double
-random_jacobi_alternate_bounded(bitgen_t* bitgen_state, struct config* cfg)
+random_jacobi_star(bitgen_t* bitgen_state, parameter_t* const pr)
 {
     for (;;) {
-        if (next_double(bitgen_state) <= cfg->ratio) {
-            cfg->x = random_left_bounded_gamma(bitgen_state, cfg->h,
-                                               cfg->lambda_z, cfg->t);
+        if (next_float(bitgen_state) <= pr->proposal_probability) {
+            pr->x = random_left_bounded_gamma(bitgen_state, pr->h,
+                                              pr->lambda_z, pr->t);
         }
-        else if (cfg->z > 0) {
-            random_right_bounded_invgauss(bitgen_state, cfg);
+        else if (pr->z > 0) {
+            random_right_bounded_invgauss(bitgen_state, pr);
         }
         else {
-            cfg->x = 1 / random_left_bounded_gamma(bitgen_state, 0.5,
-                                                   cfg->half_h2, cfg->one_t);
+            pr->x = 1. / random_left_bounded_gamma(bitgen_state, 0.5,
+                                                   pr->half_h2, pr->t_inv);
         }
 
-        cfg->logx = log(cfg->x);
-        double u = next_double(bitgen_state) * bounding_kernel(cfg);
-        double s = piecewise_coef(0, cfg);
+        pr->logx = logf(pr->x);
+        float u = next_float(bitgen_state) * bounding_kernel(pr);
+        float s = piecewise_coef(0, pr);
 
-        for (size_t n = 1;; ++n) {
-            double old_s = s;
+        for (unsigned int n = 1;; ++n) {
+            float old_s = s;
             if (n & 1) {
-                s -= piecewise_coef(n, cfg);
+                s -= piecewise_coef(n, pr);
                 if (isgreaterequal(old_s, s) && islessequal(u, s))
-                    return cfg->x;
+                    return pr->x;
             }
             else {
-                s += piecewise_coef(n, cfg);
+                s += piecewise_coef(n, pr);
                 if (isgreaterequal(old_s, s) && isgreater(u, s))
                     break;
             }
@@ -278,20 +278,22 @@ random_jacobi_alternate_bounded(bitgen_t* bitgen_state, struct config* cfg)
 double
 random_polyagamma_alternate(bitgen_t *bitgen_state, double h, double z)
 {
-    struct config cfg;
+    parameter_t pr = {.z = z};
 
     if (h > pgm_maxh) {
         double out = 0;
         size_t chunk = h >= (pgm_maxh + 1) ? pgm_maxh : pgm_maxh - 1;
-        initialize_config(&cfg, chunk, z);
+
+        set_sampling_parameters(&pr, chunk, false);
         while (h > pgm_maxh) {
-            out += random_jacobi_alternate_bounded(bitgen_state, &cfg);
+            out += random_jacobi_star(bitgen_state, &pr);
             h -= chunk;
         }
-        update_config(&cfg, h);
-        out += random_jacobi_alternate_bounded(bitgen_state, &cfg);
+
+        set_sampling_parameters(&pr, h, true);
+        out += random_jacobi_star(bitgen_state, &pr);
         return 0.25 * out;
     }
-    initialize_config(&cfg, h, z);
-    return 0.25 * random_jacobi_alternate_bounded(bitgen_state, &cfg);
+    set_sampling_parameters(&pr, h, false);
+    return 0.25 * random_jacobi_star(bitgen_state, &pr);
 }
