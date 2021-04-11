@@ -7,6 +7,7 @@
 #pragma once
 #include <numpy/random/distributions.h>
 #include <float.h>
+#include <math.h>
 
 #define PGM_PI2_8 1.233700550136169  // pi^2 / 8
 #define PGM_LOGPI_2 0.4515827052894548  // log(pi / 2)

@@ -28,7 +28,7 @@ extensions = [
         source_files,
         include_dirs=[include_path, "./include"],
         library_dirs=[join(include_path, '..', '..', 'random', 'lib')],
-        libraries=['npyrandom'],
+        libraries=['npyrandom', 'm'],
         define_macros=macros,
         extra_compile_args=['-std=c99']
     ),

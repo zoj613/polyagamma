@@ -2,6 +2,7 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause */
 #include <numpy/random/distributions.h>
+#include <math.h>
 #include "pgm_devroye.h"
 #include "pgm_alternate.h"
 #include "pgm_saddle.h"
@@ -56,13 +57,11 @@ static NPY_INLINE double
 random_polyagamma_gamma_conv(bitgen_t* bitgen_state, double h, double z)
 {
     static const double pi2 = 9.869604401089358;
-    const double z2 = z * z;
-    double c, out = 0;
+    double out = 0, n = 0.5, z2 = z * z;
 
-    for (size_t n = PGM_GAMMA_LIMIT; n--; ) {
-        c = n + 0.5;
-        out += random_standard_gamma(bitgen_state, h) / (pi2 * c * c + z2);
-    }
+    do {
+        out += random_standard_gamma(bitgen_state, h) / (pi2 * n * n + z2);
+    } while (++n < PGM_GAMMA_LIMIT);
     return 0.5 * out;
 }
 
@@ -75,26 +74,17 @@ random_polyagamma_gamma_conv(bitgen_t* bitgen_state, double h, double z)
 static NPY_INLINE double
 random_polyagamma_hybrid(bitgen_t* bitgen_state, double h, double z)
 {
-    if (h < 1) {
-        return random_polyagamma_alternate(bitgen_state, h, z);
-    }
-    if (h == 1) {
-        return random_polyagamma_devroye(bitgen_state, h, z);
-    }
-    else if (h > 50) {
+    if (h > 50) {
         return random_polyagamma_normal_approx(bitgen_state, h, 2 * z);
     }
-    else if (z <= 2) {
-        if (h == (size_t)h) {
-            return h >= 12 ? random_polyagamma_saddle(bitgen_state, h, z) :
-                             random_polyagamma_devroye(bitgen_state, h, z);
-        }
-        return h >= 9 ? random_polyagamma_saddle(bitgen_state, h, z) :
-                        random_polyagamma_alternate(bitgen_state, h, z);
+    else if (h >= 25 || (((h > 12 && h == (size_t)h) || h >= 8) && z < 1)) {
+        return random_polyagamma_saddle(bitgen_state, h, z);
+    }
+    else if (h == 1 || (h == (size_t)h && z < 1)) {
+        return random_polyagamma_devroye(bitgen_state, h, z);
     }
     else {
-        return h >= 25 ? random_polyagamma_saddle(bitgen_state, h, z) :
-                         random_polyagamma_alternate(bitgen_state, h, z);
+       return random_polyagamma_alternate(bitgen_state, h, z);
     }
 }
 
@@ -113,6 +103,5 @@ const pgm_func_t sampling_method_table[] = {
 NPY_INLINE double
 pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z, sampler_t method)
 {
-    z = z == 0 ? 0 : 0.5 * (z < 0 ? -z : z);
-    return sampling_method_table[method](bitgen_state, h, z);
+    return sampling_method_table[method](bitgen_state, h, 0.5 * fabs(z));
 }
