@@ -36,10 +36,10 @@ pgm_polyagamma_pdf(double x, double h, double z)
     double a = (fabs(z) > 0 ? h * log(cosh(0.5 * z)) - 0.5 * z * z * x : 0) +
                (h - 1) * PGM_LOG2;
     double sum = exp(a - 0.125 * h * h / x) * h;
-    char sign = -1;
+    int sign = -1;
 
     a -= pgm_lgamma(h);
-    for (size_t n = 1; n < PGM_MAX_SERIES_TERMS; n++, sign *= -1) {
+    for (unsigned int n = 1; n < PGM_MAX_SERIES_TERMS; n++, sign *= -1) {
         double twonh = 2 * n + h;
         double term = exp(a + pgm_lgamma(n + h) - 0.125 * twonh * twonh / x -
                           pgm_lgamma(n + 1)) * twonh;
@@ -71,9 +71,9 @@ pgm_polyagamma_logpdf(double x, double h, double z)
                (h - 1) * PGM_LOG2 - PGM_LS2PI - 1.5 * log(x) - lg;
     double first = lg - 0.125 * h * h / x;
     double sum = 1;
-    char sign = -1;
+    int sign = -1;
 
-    for (size_t n = 1; n < PGM_MAX_SERIES_TERMS; n++, sign *= -1) {
+    for (unsigned int n = 1; n < PGM_MAX_SERIES_TERMS; n++, sign *= -1) {
         double t = 2 * n + h;
         double curr = pgm_lgamma(n + h) - 0.125 * t * t / x - pgm_lgamma(n + 1);
         sum += sign * exp(curr - first) * t / h;
@@ -224,10 +224,10 @@ pgm_polyagamma_cdf(double x, double h, double z)
     }
 
     double sum = exp(c + logcdf(&arg));
-    char sign = -1;
+    int sign = -1;
 
     c -= pgm_lgamma(h);
-    for (size_t n = 1; n < PGM_MAX_SERIES_TERMS; n++, sign *= -1, zn = z * n) {
+    for (unsigned int n = 1; n < PGM_MAX_SERIES_TERMS; n++, sign *= -1, zn = z * n) {
         arg.a = 2 * n + h;
         double term = exp(c + pgm_lgamma(n + h) + logcdf(&arg) - pgm_lgamma(n + 1) - zn);
         double prev_sum = sum;
@@ -281,9 +281,9 @@ pgm_polyagamma_logcdf(double x, double h, double z)
 
     double first = lg + logcdf(&arg);
     double sum = 1;
-    char sign = -1;
+    int sign = -1;
 
-    for (size_t n = 1; n < PGM_MAX_SERIES_TERMS; n++, sign *= -1, zn = z * n) {
+    for (unsigned int n = 1; n < PGM_MAX_SERIES_TERMS; n++, sign *= -1, zn = z * n) {
         arg.a = 2 * n + h;
         double curr = pgm_lgamma(n + h) + logcdf(&arg) - pgm_lgamma(n + 1) - zn;
         sum += sign * exp(curr - first);
