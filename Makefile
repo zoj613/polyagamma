@@ -6,7 +6,7 @@ DOCKER_IMAGES=quay.io/pypa/manylinux2010_x86_64 \
 define make_wheels
 	docker pull $(1)
 	docker container run -t --rm -e PLAT=$(strip $(subst quay.io/pypa/,,$(1))) \
-		-v $(shell pwd):/io $(1) /io/build_wheels.sh
+		-e BUILD_WHEEL=1 -v $(shell pwd):/io $(1) /io/build_wheels.sh
 endef
 
 
