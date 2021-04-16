@@ -63,9 +63,9 @@ o = random_polyagamma()
 o = random_polyagamma(z=2, size=(5, 10))
 
 # Pass sequences as input. Numpy's broadcasting rules apply here.
-h = [[1.5, 2, 0.75, 4, 5],
-     [9.5, 8, 7, 6, 0.9]]
-o = random_polyagamma(h, -2.5)
+z = [[1.5, 2, -0.75, 4, 5],
+     [9.5, =8, 7, 6, -0.9]]
+o = random_polyagamma(1, z)
 
 # Pass an output array
 out = np.empty(5)
@@ -73,8 +73,8 @@ random_polyagamma(out=out)
 print(out)
 
 # one can choose a sampling method from {devroye, alternate, gamma, saddle}.
-# If not given, the default behaviour is a hybrid sampler that picks a method
-# based on the parameter values.
+# If not given, the default behaviour is a hybrid sampler that picks the most
+# efficient method based on the input values.
 o = random_polyagamma(method="saddle")
 
 # one can also use an existing instance of `numpy.random.Generator` as a parameter.
@@ -88,7 +88,8 @@ bit_gen = np.random.RandomState(12345)._bit_generator
 o = random_polyagamma(random_state=bit_gen)
 
 # When passing a large input array for the shape parameter `h`, parameter value
-# validation checks can be disabled to avoid some overhead, which may boost performance.
+# validation checks can be disabled if the values are guaranteed to be positive
+# to avoid some overhead, which may boost performance.
 large_h = np.ones(1000000)
 o = random_polyagamma(large_h, disable_checks=True)
 ```
@@ -100,10 +101,10 @@ from polyagamma import polyagamma_pdf, polyagamma_cdf
 # 3.613955566329298
 >>> polyagamma_cdf([1, 2], h=2, z=1)
 # array([0.95637847, 0.99963397])
->>> polyagamma_pdf([2, 0.1], h=[[1, 2], [3, 4]], log=True)
+>>> polyagamma_pdf([2, 0.1], h=[[1, 2], [3, 4]], return_log=True)
 # array([[   -8.03172733,  -489.17101125]
 #        [   -3.82023942, -1987.09156971]])
->>> polyagamma_cdf(4, z=[-100, 0, 2], log=True)
+>>> polyagamma_cdf(4, z=[-100, 0, 2], return_log=True)
 # array([ 3.72007598e-44, -3.40628215e-09, -1.25463528e-12])
 ```
 
@@ -119,11 +120,11 @@ function signatures. Below is an example of how these functions can be used.
 ```cython
 from cpython.pycapsule cimport PyCapsule_GetPointer
 from polyagamma cimport random_polyagamma_fill, DEVROYE
-from numpy.random cimport bitgen_t, BitGenerator
+from numpy.random cimport bitgen_t
 import numpy as np
 
 # assuming there exists an instance of the Generator class called `rng`.
-cdef BitGenerator bitgenerator = rng._bit_generator
+bitgenerator = rng._bit_generator
 # get pointer to the underlying bitgenerator struct
 cdef bitgen_t* bitgen = <bitgen_t*>PyCapsule_GetPointer(bitgenerator.capsule, "BitGenerator")
 # set distribution parameters
@@ -131,7 +132,7 @@ cdef double h = 1, z = 0
 # get a memory view of the array to store samples in
 cdef double[:] out = np.empty(300)
 with nogil:  # you probably want to acquire a thread lock here as well for thread safety.
-    random_polyagamma_fill(bitgen, h, z, DEVROYE, <int>out.shape[0], &out[0])
+    random_polyagamma_fill(bitgen, h, z, DEVROYE, <size_t>out.shape[0], &out[0])
 print(out.base)
 ...
 ```
@@ -145,12 +146,12 @@ For an example of how to use `polyagamma` in a C program, see [here][1].
 Below are runtime plots of 20000 samples generated for various values of `h` 
 and `z`, using each method. We restrict `h` to integer values to accomodate the 
 `devroye` method, which cannot be used for non-integer `h`. The version of the
-package used to generate them is `v1.1.1`.
+package used to generate them is `v1.3.0-rc3`.
 
-![](./scripts/perf_methods_0.0.svg) | ![](./scripts/perf_methods_2.5.svg)
+![](./scripts/img/perf_methods_0.0.svg) | ![](./scripts/img/perf_methods_2.5.svg)
 | --- | --- |
 
-![](./scripts/perf_methods_5.0.svg) | ![](./scripts/perf_methods_10.0.svg)
+![](./scripts/img/perf_methods_5.0.svg) | ![](./scripts/img/perf_methods_10.0.svg)
 | --- | --- |
 
 Generally:
@@ -168,10 +169,10 @@ We also benchmark the hybrid sampler runtime with the sampler found in the `pypo
 package (version `1.2.3`). The version of NumPy we use is `1.19.0`. We use the `pgdrawv`
 function which takes arrays as input. Below are runtime plots of 20000 samples for each 
 value of `h` and `z`. Values of `h` range from 0.1 to 60, while `z` is set to 0, 2.5, 5, and 10.
-![](./scripts/perf_samplers_0.0.svg) | ![](./scripts/perf_samplers_2.5.svg)
+![](./scripts/img/perf_samplers_0.0.svg) | ![](./scripts/img/perf_samplers_2.5.svg)
 | --- | --- |
 
-![](./scripts/perf_samplers_5.0.svg) | ![](./scripts/perf_samplers_10.0.svg)
+![](./scripts/img/perf_samplers_5.0.svg) | ![](./scripts/img/perf_samplers_10.0.svg)
 | --- | --- |
 
 It can be seen that when generating many samples at once for any given combination of 
@@ -181,16 +182,17 @@ generating exactly one sample from the distribution. This is mainly due to the
 overhead introduced by creating the bitgenerator + acquiring/releasing the thread lock + 
 doing parameter validation checks at every call to the function. This overhead can 
 somewhat be mitigated by passing in a random generator instance at every call to 
-the `polyagamma` function. For example, on an `iPython` session:
+the `polyagamma` function. To eliminate this overhead, it is best to use the Cython
+functions directly. Below is a timing example to demonstrate the benefit of passing
+a generator explicitly:
 ```ipynb
+In [3]: rng = np.random.SFC64(1)
+
 In [4]: %timeit random_polyagamma()
-83.2 µs ± 1.02 µs per loop (mean ± std. dev. of 7 runs, 10000 loops each)
+90 µs ± 1.65 µs per loop (mean ± std. dev. of 7 runs, 10000 loops each)
 
 In [5]: %timeit random_polyagamma(random_state=rng)
-2.68 µs ± 29.7 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
-
-In [6]: %timeit random_polyagamma(random_state=rng, disable_checks=True)
-2.58 µs ± 22.3 ns per loop (mean ± std. dev. of 7 runs, 100000 loops each)
+1.69 µs ± 6.96 ns per loop (mean ± std. dev. of 7 runs, 1000000 loops each)
 ```
 
 To generate the above plots locally, run `python scripts/benchmark.py --size=<some size> --z=<z value>`.
@@ -201,12 +203,12 @@ is ran on.
 ## Distribution Plots
 Below is a visualization of the Cumulative distribution and density functions for
 various values of the parameters.
-![](./scripts/pdf.svg) | ![](./scripts/cdf.svg)
+![](./scripts/img/pdf.svg) | ![](./scripts/img/cdf.svg)
 | --- | --- |
 
 We can compare these plots to the Kernel density estimate and empirical CDF plots
 generated from 20000 random samples using each of the available methods.
-![](./scripts/kde.svg) | ![](./scripts/ecdf.svg)
+![](./scripts/img/kde.svg) | ![](./scripts/img/ecdf.svg)
 | --- | --- |
 
 

@@ -4,8 +4,8 @@
 #include "pgm_common.h"
 
 
-DECLDIR NPY_INLINE double
-pgm_erfc(double x);
+DECLDIR NPY_INLINE float
+pgm_erfc(float x);
 
 DECLDIR NPY_INLINE double
 pgm_lgamma(double z);

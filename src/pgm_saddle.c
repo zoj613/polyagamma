@@ -5,40 +5,34 @@
 #include "pgm_saddle.h"
 
 
-struct config {
-    // shape parameter
-    double h;
-    // exponential tilting parameter
-    double z;
-    // a sample from the proposal distribution
-    double x;
-    // center point
-    double xc;
-    // log of center point
-    double logxc;
-    // derivative of the line to xl
-    double Lprime_l;
-    // derivative of the line to xr
-    double Lprime_r;
-    // sqrt(1 / alpha_l) constant
-    double sqrt_alpha_l;
-    // y intercept of tangent line to xl.
-    double intercept_l;
+typedef struct {
     // y intercept of tangent line to xr.
-    double intercept_r;
+    double right_tangent_intercept;
+    // y intercept of tangent line to xl.
+    double left_tangent_intercept;
+    // derivative of the line to xr
+    double right_tangent_slope;
+    // derivative of the line to xl
+    double left_tangent_slope;
+    // config->sqrt_h2pi * config->sqrt_alpha_r
+    float right_kernel_coef;
+    // config->sqrt_h2pi * config->sqrt_alpha
+    float left_kernel_coef;
+    // sqrt(1 / alpha_l) constant
+    float sqrt_alpha;
+    // log(cosh(z))
+    float log_cosh_z;
     // the constant sqrt(h / (2 * pi))
-    double sqrt_h_2pi;
-    // config->sqrt_h_2pi * config->sqrt_alpha_l
-    double coef_l;
-    // config->sqrt_h_2pi * config->sqrt_alpha_r
-    double coef_r;
-    // h / 2
-    double half_h;
-    // 0.5 * h / xc
-    double hh_xc;
+    float sqrt_h2pi;
     // 0.5 * z * z
     double half_z2;
-};
+    // log of center point
+    double logxc;
+    double xc;
+    double h;
+    double z;
+    double x;
+} parameter_t;
 
 /*
  * Compute f(x) = tanh(x) / x in the range [0, infinity).
@@ -64,7 +58,7 @@ static NPY_INLINE double
 tanh_x(double x)
 {
     if (x > 4.95) {
-        return 1 / x;
+        return 1. / x;
     }
     static const double p0 = -0.16134119023996228053e+04;
     static const double p1 = -0.99225929672236083313e+02;
@@ -73,36 +67,41 @@ tanh_x(double x)
     static const double q1 = 0.22337720718962312926e+04;
     static const double q2 = 0.11274474380534949335e+03;
     double x2 = x * x;
-    return 1 + x2 * ((p2 * x2 + p1) * x2 + p0) / (((x2 + q2) * x2 + q1) * x2 + q0);
+    return 1. + x2 * ((p2 * x2 + p1) * x2 + p0) / (((x2 + q2) * x2 + q1) * x2 + q0);
+}
+
+
+static inline float
+__attribute__((always_inline))
+tan_x(float x)
+{
+    return tanf(x) / x;
 }
 
 /*
  * A struct to store a function's value and derivative at a point.
  */
-struct func_return {
-    double f;
-    double fprime;
-};
+struct func_return_value {double f, fprime;};
 
 /*
- * Compute K'(u), the derivative of the Cumulant Generating Function (CGF) of x.
+ * compute K(t), the cumulant generating function of X
+ */
+#define cumulant(u, v)                                           \
+    ((u) < 0 ? (v)->log_cosh_z - logf(coshf(sqrtf(-2. * (u)))) : \
+     (u) > 0 ? (v)->log_cosh_z - logf(cosf(sqrtf(2. * (u)))) :   \
+     (v)->log_cosh_z)                                            \
+
+
+/*
+ * Compute K'(t), the derivative of the Cumulant Generating Function (CGF) of X.
  */
 static NPY_INLINE void
-cgf_prime(double u, struct func_return* ret)
+cumulant_prime(double u, struct func_return_value* rv)
 {
-    double s = 2 * u;
+    double s = 2. * u;
 
-    if (s == 0) {
-        ret->f = 1;
-    }
-    else if (s < 0) {
-        ret->f = tanh_x(sqrt(-s));
-    }
-    else {
-        double ss = sqrt(s);
-        ret->f = tan(ss) / ss;
-    }
-    ret->fprime = ret->f * ret->f + (1 - ret->f) / s;
+    rv->f = s < 0 ? tanh_x(sqrt(-s)) : s > 0 ? tan_x(sqrtf(s)) : 1.;
+    rv->fprime = rv->f * rv->f + (1. - rv->f) / s;
 }
 
 /*
@@ -115,94 +114,52 @@ cgf_prime(double u, struct func_return* ret)
  *
  * Page 16 of Windle et al. (2014) shows that the upper bound of `u` is pi^2/8.
  */
-static NPY_INLINE double
-select_starting_guess(double x)
-{
-    if (x >= 7.5)
-        return 1.1;
-    else if (x >= 5.5)
-        return 1.05;
-    else if (x >= 5)
-        return 1.02;
-    else if (x >= 4.5)
-        return 1;
-    else if (x >= 4)
-        return 0.98;
-    else if (x >= 3.5)
-        return 0.95;
-    else if (x >= 3)
-        return 0.92;
-    else if (x >= 2.5)
-        return 0.81;
-    else if (x >= 2)
-        return 0.72;
-    else if (x >= 1.5)
-        return 0.58;
-    else if (x >= 1)
-        return 0.345;
-    else if (x > 0.5)
-        return -0.147;
-    else if (x > 0.25)
-        return -1.78;
-    else return -9;
-}
+#define select_starting_guess(x) \
+    ((x) <= 0.25 ? -9 :          \
+     (x) <= 0.5 ? -1.78 :        \
+     (x) <= 1.0 ? -0.147 :       \
+     (x) <= 1.5 ? 0.345 :        \
+     (x) <= 2.5 ? 0.72 :         \
+     (x) <= 4.0 ? 0.95 : 1.15)   \
 
 
 #ifndef PGM_MAX_ITER
 #define PGM_MAX_ITER 25
 #endif
 /*
- * Solve for the root of f(u) = K'(t) - x using Newton's method.
+ * Solve for the root of (f(u) = K'(t) - arg) using Newton's method.
+ *
+ * NOTE
+ * ----
+ * if the function value `fval` is equal to zero up to a specified absolute
+ * tolerance or the derivative is too small, then we stop and return the
+ * current value `x0` as the root's coarse estimate.
  */
 static NPY_INLINE double
-newton_raphson(double arg, double x0, struct func_return* value)
+newton_raphson(double arg, double x0, struct func_return_value* value)
 {
-    static const double atol = 1e-20, rtol = 1e-05;
-    double x = 0;
+    static const double atol = 1e-05, rtol = 1e-05;
+    double x = x0;
+    unsigned int n = 0;
 
-    for (size_t i = 0; i < PGM_MAX_ITER; i++) {
-        cgf_prime(x0, value);
+    do {
+        x0 = x;
+        cumulant_prime(x0, value);
         double fval = value->f - arg;
-        if (fabs(fval) <= rtol) {
+        if (fabs(fval) <= atol || value->fprime <= atol) {
             return x0;
         }
-        if (value->fprime <= atol) {
-            break;
-        }
         x = x0 - fval / value->fprime;
-        if (PGM_ISCLOSE(x, x0, atol, rtol)) {
-            return x;
-        }
-        x0 = x;
-    }
+    } while (!PGM_ISCLOSE(x, x0, atol, rtol) && ++n < PGM_MAX_ITER);
+
     return x;
-}
-
-/*
- * K(t), the cumulant generating function of X
- */
-static NPY_INLINE double
-cgf(double u, double z)
-{
-    double out = z > 0 ? log(cosh(z)) : 0;
-
-    if (u == 0) {
-        return out;
-    }
-    else if (u > 0) {
-        out -= log(cos(sqrt(2 * u)));
-    }
-    else {
-        out -= log(cosh(sqrt(-2 * u)));
-    }
-    return out; 
 }
 
 /*
  * Configure some constants to be used during sampling.
  *
- * Notes
- * -----
+ * NOTE
+ * ----
  * Note that unlike the recommendations of Windle et al (2014) to use
  * xc = 1.1 * xl and xr = 1.2 * xl, we found that using xc = 2.75 * xl and
  * xr = 3 * xl provides the best envelope for the target density function and
@@ -211,86 +168,107 @@ cgf(double u, double z)
  * exceeds the target by too much in height and has a narrower variance, thus
  * leading to many rejected proposal samples. Tests show that the latter
  * selection results in the saddle approximation being over twice as fast as
- * when using the former.
+ * when using the former. Also note that log(xr) and log(xc) need not be
+ * computed directly. Since both xr and xc depend on xl, then their logs can
+ * be written as log(xr) = log(3) + log(xl) and log(xc) = log(2.75) + log(xl).
+ * Thus the log() function can be called once on xl and then the constants
+ * be precalculated at compile time, making the calculation of the logs a
+ * little more efficient.
  */
 static NPY_INLINE void
-initialize_config(struct config* cfg, double h, double z)
+set_sampling_parameters(parameter_t* pr, double h, double z)
 {
-    bool is_zero = z > 0 ? false : true;
-    double xl = is_zero ? 1 : tanh_x(z);
-    cfg->xc = 2.75 * xl;
-    double xr = 3 * xl;
-    cfg->h = h;
-    cfg->z = z;
+    static const float log275 = 1.0116009116784799f;
+    static const float log3 = 1.0986122886681098f;
+    float logxl;
+    double xl;
 
-    cfg->half_h = 0.5 * h;
-    double one_xc = 1 / cfg->xc;
-    cfg->hh_xc = cfg->half_h * one_xc;
-    double one_xl = 1 / xl;
-    cfg->half_z2 = is_zero ? 0 : 0.5 * (z * z);
-    double ul = -cfg->half_z2;
+    if (z > 0) {
+        xl = tanh_x(z);
+        logxl = logf(xl);
+        pr->half_z2 = 0.5 * (z * z);
+        pr->log_cosh_z = logf(coshf(z));
+    }
+    else {
+        xl = 1.;
+        logxl = 0;
+        pr->half_z2 = 0.;
+        pr->log_cosh_z = 0.f;
+    }
 
-    struct func_return f;
-    double ur = newton_raphson(xr, select_starting_guess(xr), &f);
-    newton_raphson(cfg->xc, select_starting_guess(cfg->xc), &f);
-    double tr = ur + cfg->half_z2;
+    pr->xc = 2.75 * xl;
+    double xr = 3. * xl;
+    pr->h = h;
+    pr->z = z;
+
+    double xc_inv = 1. / pr->xc;
+    double xl_inv = 1. / xl;
+    double ul = -pr->half_z2;
+
+    struct func_return_value rv;
+    double ur = newton_raphson(xr, select_starting_guess(xr), &rv);
+    newton_raphson(pr->xc, select_starting_guess(pr->xc), &rv);
+    double tr = ur + pr->half_z2;
 
     // t = 0 at x = m, since K'(0) = m when t(x) = 0
-    cfg->Lprime_l = -0.5 * (one_xl * one_xl);
-    cfg->Lprime_r = -tr - 1 / xr;
+    pr->left_tangent_slope = -0.5 * (xl_inv * xl_inv);
+    pr->left_tangent_intercept = cumulant(ul, pr) - 0.5 * xc_inv + xl_inv;
+    pr->logxc = log275 + logxl;
+    pr->right_tangent_slope = -tr - 1. / xr;
+    pr->right_tangent_intercept = cumulant(ur, pr) + 1.0f - log3 - logxl + pr->logxc;
 
-    cfg->logxc = log(cfg->xc);
+    double alpha_r = rv.fprime * (xc_inv * xc_inv);  // K''(t(xc)) / xc^2
+    double alpha_l = xc_inv * alpha_r;  // K''(t(xc)) / xc^3
 
-    cfg->intercept_l = cgf(ul, z) - 0.5 * one_xc + one_xl;
-    cfg->intercept_r = cgf(ur, z) + 1 - log(xr) + cfg->logxc;
+    pr->sqrt_alpha = 1.0f / sqrtf(alpha_l);
 
-    double alpha_r = f.fprime * (one_xc * one_xc);  // K''(t(xc)) / xc^2
-    double alpha_l = one_xc * alpha_r;  // K''(t(xc)) / xc^3
-
-    cfg->sqrt_alpha_l = 1 / sqrt(alpha_l);
-
-    cfg->sqrt_h_2pi = sqrt(h / 6.283185307179586);
-    cfg->coef_l = cfg->sqrt_h_2pi * cfg->sqrt_alpha_l;
-    cfg->coef_r = cfg->sqrt_h_2pi / sqrt(alpha_r);
+    pr->sqrt_h2pi = sqrtf((float)h / 6.283185307179586f);
+    pr->left_kernel_coef = pr->sqrt_h2pi * pr->sqrt_alpha;
+    pr->right_kernel_coef = pr->sqrt_h2pi / sqrtf(alpha_r);
 }
 
 /*
  * Compute the saddle point estimate at x.
  */
-static NPY_INLINE double
-saddle_point(struct config* cfg)//double x, double h, double z, double coef)
+static NPY_INLINE float
+saddle_point(parameter_t const* pr)
 {
-    struct func_return f;
-    double u = newton_raphson(cfg->x, select_starting_guess(cfg->x), &f);
-    double t = u + cfg->half_z2; 
+    struct func_return_value rv;
+    double u = newton_raphson(pr->x, select_starting_guess(pr->x), &rv);
+    double t = u + pr->half_z2; 
 
-    return cfg->sqrt_h_2pi * exp(cfg->h * (cgf(u, cfg->z) - t * cfg->x)) / sqrt(f.fprime);
+    return expf(pr->h * (cumulant(u, pr) - t * pr->x)) *
+           pr->sqrt_h2pi / sqrt(rv.fprime);
 }
 
 /*
- * k(x|h,z): The bounding kernel of the saddle point approximation.
+ * k(x|h,z): The bounding kernel of the saddle point approximation. See
+ * Proposition 17 of Windle et al (2014).
  */
-static NPY_INLINE double
-bounding_kernel(struct config* cfg)
+static NPY_INLINE float
+bounding_kernel(parameter_t const* pr)
 {
-    if (cfg->x > cfg->xc) {
-        double tanline_at_x = cfg->Lprime_r * cfg->x + cfg->intercept_r;
-        return cfg->coef_r * exp(cfg->h * (cfg->logxc + tanline_at_x) +
-                                 (cfg->h - 1) * log(cfg->x));
+    double point;
+
+    if (pr->x > pr->xc) {
+        point = pr->right_tangent_slope * pr->x + pr->right_tangent_intercept;
+        return expf(pr->h * (pr->logxc + point) + (pr->h - 1.) * logf(pr->x)) *
+               pr->right_kernel_coef;
     }
-    double tanline_at_x = cfg->Lprime_l * cfg->x + cfg->intercept_l;
-    return cfg->coef_l * exp(-cfg->half_h / cfg->x + cfg->h * tanline_at_x +
-                             cfg->hh_xc - 1.5 * log(cfg->x));
+    point = pr->left_tangent_slope * pr->x + pr->left_tangent_intercept;
+    return expf(0.5 * pr->h * (1. / pr->xc - 1. / pr->x) +
+                pr->h * point - 1.5 * logf(pr->x)) * pr->left_kernel_coef;
 }
 
 /*
  * Compute the logarithm of the standard normal distribution function (cdf).
+ *
+ * NOTE
+ * ----
+ *  The switch to using erf() when x is very close to zero is done implicitly
+ *  inside `pgm_erfc`.
  */
-static NPY_INLINE double
-log_norm_cdf(double x)
-{
-    return log1p(-0.5 * pgm_erfc(x / 1.4142135623730951));
-}
+#define log_norm_cdf(x) (log1pf(-0.5f * pgm_erfc((x) / 1.4142135623730951f)))
 
 /*
  * Calculate the logarithm of the cumulative distribution function of an
@@ -308,11 +286,12 @@ static NPY_INLINE double
 invgauss_logcdf(double x, double mu, double lambda)
 {
     double qm = x / mu;
-    double t_m =  mu / lambda;
+    double tm =  mu / lambda;
     double r = sqrt(x / lambda);
-    double a = log_norm_cdf((qm - 1) / r);
-    double b = 2 / t_m + log_norm_cdf(-(qm + 1) / r);
-    return a + log1p(exp(b - a));
+    float a = log_norm_cdf((qm - 1.) / r);
+    float b = 2. / tm + log_norm_cdf(-(qm + 1.) / r);
+
+    return a + log1pf(expf(b - a));
 }
 
 /*
@@ -321,37 +300,39 @@ invgauss_logcdf(double x, double mu, double lambda)
 double
 random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
 {
-    struct config cfg;
-    double p, q, ratio, sqrt_rho_l, one_srho_l, hrho_r;
+    double sqrt_rho, sqrt_rho_inv, hrho;
+    float proposal_probability, p, q;
+    parameter_t pr;
 
-    initialize_config(&cfg, h, z);
+    set_sampling_parameters(&pr, h, z);
 
-    sqrt_rho_l = sqrt(-2 * cfg.Lprime_l);
-    one_srho_l = 1 / sqrt_rho_l;
-    p = cfg.sqrt_alpha_l * exp(h * (0.5 / cfg.xc + cfg.intercept_l - sqrt_rho_l) +
-        invgauss_logcdf(cfg.xc, one_srho_l, h));
+    sqrt_rho = sqrt(-2. * pr.left_tangent_slope);
+    sqrt_rho_inv = 1. / sqrt_rho;
+    p = expf(h * (0.5 / pr.xc + pr.left_tangent_intercept - sqrt_rho) +
+             invgauss_logcdf(pr.xc, sqrt_rho_inv, h)) * pr.sqrt_alpha;
 
-    hrho_r = -(h * cfg.Lprime_r);
-    q = cfg.coef_r * exp(h * (cfg.intercept_r - log(hrho_r))) *
-        pgm_gammaq(h, hrho_r * cfg.xc, false);
+    hrho = -h * pr.right_tangent_slope;
+    q = pgm_gammaq(h, hrho * pr.xc, false) * pr.right_kernel_coef *
+        expf(h * (pr.right_tangent_intercept - logf(hrho)));
 
-    ratio = p / (p + q);
-    double mu2 = one_srho_l * one_srho_l;
+    proposal_probability = p / (p + q);
+
+    double mu2 = sqrt_rho_inv * sqrt_rho_inv;
     do {
-        if (next_double(bitgen_state) < ratio) {
+        if (next_float(bitgen_state) < proposal_probability) {
             do {
                 double y = random_standard_normal(bitgen_state);
-                double w = one_srho_l + 0.5 * mu2 * y * y / h;
-                cfg.x = w - sqrt(w * w - mu2);
-                if (next_double(bitgen_state) * (1 + cfg.x * sqrt_rho_l) > 1) {
-                    cfg.x = mu2 / cfg.x;
+                double w = sqrt_rho_inv + 0.5 * mu2 * y * y / h;
+                pr.x = w - sqrt(w * w - mu2);
+                if (next_double(bitgen_state) * (1. + pr.x * sqrt_rho) > 1.) {
+                    pr.x = mu2 / pr.x;
                 }
-            } while (cfg.x >= cfg.xc);
+            } while (pr.x >= pr.xc);
         }
         else {
-            cfg.x = random_left_bounded_gamma(bitgen_state, h, hrho_r, cfg.xc);
+            pr.x = random_left_bounded_gamma(bitgen_state, h, hrho, pr.xc);
         }
-    } while (next_double(bitgen_state) * bounding_kernel(&cfg) > saddle_point(&cfg));
+    } while (next_float(bitgen_state) * bounding_kernel(&pr) > saddle_point(&pr));
 
-    return 0.25 * h * cfg.x;
+    return 0.25 * h * pr.x;
 }

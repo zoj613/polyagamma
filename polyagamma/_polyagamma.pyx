@@ -9,7 +9,6 @@ Copyright (c) 2020-2021, Zolisa Bleki
 SPDX-License-Identifier: BSD-3-Clause
 """
 from cpython.float cimport PyFloat_Check
-from cpython.int cimport PyInt_Check
 from cpython.long cimport PyLong_Check
 from cpython.number cimport PyNumber_Long
 from cpython.object cimport PyObject_RichCompareBool, Py_LE, Py_LT, Py_NE
@@ -61,7 +60,7 @@ cdef const char* BITGEN_NAME = "BitGenerator"
 
 
 cdef inline bint is_a_number(object o):
-    return PyFloat_Check(o) or PyLong_Check(o) or PyInt_Check(o)
+    return PyFloat_Check(o) or PyLong_Check(o)
 
 
 cdef inline bint params_are_scalars(object a, object b):
@@ -81,7 +80,7 @@ cdef inline int check_method(object h, str method, bint disable_checks,
             raise_error = PyObject_RichCompareBool(PyNumber_Long(h), h, Py_NE)
         else:
             o = np.PyArray_FROM_OT(h, np.NPY_LONG) != np.PyArray_FROM_O(h)
-            raise_error = np.PyArray_Any(o, np.NPY_MAXDIMS, <np.ndarray>NULL)
+            raise_error = any(np.PyArray_Ravel(o, np.NPY_CORDER))
         if raise_error:
             raise ValueError("devroye method must have integer values for h")
         sampler[0] = DEVROYE
@@ -91,10 +90,10 @@ cdef inline int check_method(object h, str method, bint disable_checks,
     return 1
 
 
-def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
+def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
                bint disable_checks=False, random_state=None):
     """
-    random_polyagamma(h=1, z=0, *, size=None, out=None, method=None,
+    random_polyagamma(h=1., z=0., *, size=None, out=None, method=None,
                       disable_checks=False, random_state=None)
 
     Draw samples from a Polya-Gamma distribution.
@@ -212,11 +211,15 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
         if not disable_checks and PyObject_RichCompareBool(h, zero, Py_LE):
             raise ValueError("`h` must be positive")
         ch, cz = h, z
-        if has_out:
+        if not has_out and size is None:
+            with bitgenerator.lock, nogil:
+                cz = random_polyagamma(bitgen, ch, cz, stype)
+            return cz
+        elif has_out:
             with bitgenerator.lock, nogil:
                 random_polyagamma_fill(bitgen, ch, cz, stype, out.shape[0], &out[0])
             return
-        elif size is not None:
+        else:
             if PyTuple_CheckExact(size):
                 shape = np.PyArray_FROM_OT(size, np.NPY_INTP)
                 arr = np.PyArray_EMPTY(
@@ -234,14 +237,10 @@ def polyagamma(h=1, z=0, *, size=None, double[:] out=None, method=None,
             with bitgenerator.lock, nogil:
                 random_polyagamma_fill(bitgen, ch, cz, stype, arr_len, arr_ptr)
             return arr
-        else:
-            with bitgenerator.lock, nogil:
-                cz = random_polyagamma(bitgen, ch, cz, stype)
-            return cz
 
     h = np.PyArray_FROM_OT(h, np.NPY_DOUBLE)
-    if not disable_checks and np.PyArray_Any(np.PyArray_FROM_OT(h <= zero, np.NPY_LONG),
-                                             np.NPY_MAXDIMS, <np.ndarray>NULL):
+    if not disable_checks and any(np.PyArray_Ravel(np.PyArray_FROM_O(h <= zero),
+                                                   np.NPY_CORDER)):
         raise ValueError("values of `h` must be positive")
     z = np.PyArray_FROM_OT(z, np.NPY_DOUBLE)
 
@@ -321,9 +320,9 @@ cdef object dispatch(dist_func f, object x, object h, object z):
     return arr
 
 
-def polyagamma_pdf(x, h=1, z=0, bint log=False):
+def polyagamma_pdf(x, h=1., z=0., bint return_log=False):
     """
-    polyagamma_pdf(x, h=1, z=0, log=True)
+    polyagamma_pdf(x, h=1., z=0., return_log=False)
 
     Calculate the density of PG(h, z) at `x`.
 
@@ -337,11 +336,12 @@ def polyagamma_pdf(x, h=1, z=0, bint log=False):
     z : scalar or sequence, optional
         The exponential tilting parameter as described in [1]_. The value(s)
         must be finite. Defaults to 0.
-    log : bool, optional
+    return_log : bool, optional
         Whether to return the logarithm of the density. This option uses a
         specialized function to accurately compute the log of the pdf and thus
         is better than explicitly calling ``log()`` on the result since this
-        won't suffer from underflow if the result is nearly-zero.
+        won't suffer from underflow if the result is nearly-zero. Defaults to
+        False.
 
     Returns
     -------
@@ -377,17 +377,17 @@ def polyagamma_pdf(x, h=1, z=0, bint log=False):
            5.32845353e-01])
     >>> polyagamma_pdf(0.75, h=[4, 3, 1])
     array([1.08247188, 1.1022302 , 0.15517146])
-    >>> polyagamma_pdf(0.75, h=[4, 3, 1], log=True)
+    >>> polyagamma_pdf(0.75, h=[4, 3, 1], return_log=True)
     array([ 0.07924721,  0.09733558, -1.86322458])
 
     """
-    cdef dist_func f = pgm_polyagamma_logpdf if log else pgm_polyagamma_pdf
+    cdef dist_func f = pgm_polyagamma_logpdf if return_log else pgm_polyagamma_pdf
     return dispatch(f, x, h, z)
 
 
-def polyagamma_cdf(x, h=1, z=0, bint log=False):
+def polyagamma_cdf(x, h=1., z=0., bint return_log=False):
     """
-    polyagamma_cdf(x, h=1, z=0, log=False)
+    polyagamma_cdf(x, h=1., z=0., return_log=False)
 
     Calculate the cumulative distribution function of PG(h, z) at `x`.
 
@@ -401,11 +401,12 @@ def polyagamma_cdf(x, h=1, z=0, bint log=False):
     z : scalar or sequence, optional
         The exponential tilting parameter as described in [1]_. The value(s)
         must be finite. Defaults to 0.
-    log : bool, optional
+    return_log : bool, optional
         Whether to return the logarithm of the CDF. This option uses a
         specialized function to accurately compute the log of the CDF and thus
         is better than explicitly calling ``log()`` on the result since this
-        won't suffer from underflow if the result is nearly-zero.
+        won't suffer from underflow if the result is nearly-zero. Defaults to
+        False.
 
     Notes
     -----
@@ -433,9 +434,9 @@ def polyagamma_cdf(x, h=1, z=0, bint log=False):
            9.90843160e-01])
     >>> polyagamma_cdf(0.75, h=[4, 3, 1])
     array([0.30130807, 0.57523169, 0.96855568])
-    >>> polyagamma_cdf(0.75, h=[4, 3, 1], log=True)
+    >>> polyagamma_cdf(0.75, h=[4, 3, 1], return_log=True)
     array([-1.19962205, -0.55298237, -0.0319493 ])
 
     """
-    cdef dist_func f = pgm_polyagamma_logcdf if log else pgm_polyagamma_cdf
+    cdef dist_func f = pgm_polyagamma_logcdf if return_log else pgm_polyagamma_cdf
     return dispatch(f, x, h, z)
