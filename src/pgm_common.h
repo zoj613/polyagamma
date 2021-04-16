@@ -461,7 +461,7 @@ static NPY_INLINE float
 pgm_gammaq(float p, float x, bool normalized)
 {
     if (normalized) {
-        size_t p_int = (size_t)p;
+        int p_int = (int)p;
         if (p == p_int && p < 30) {
             float sum, r;
             int k = 1;
