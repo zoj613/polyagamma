@@ -1,52 +1,49 @@
-# polya-gamma
+# Polya-Gamma
 [![PyPI - Wheel][4]](https://pypi.org/project/polyagamma/#files)
 [![PyPI][5]](https://pypi.org/project/polyagamma/#history)
 [![PyPI - License][6]](https://github.com/zoj613/polyagamma/blob/main/LICENSE)
 [![CircleCI][7]](https://circleci.com/gh/zoj613/polyagamma/)
 [![Codecov][8]](https://codecov.io/gh/zoj613/polyagamma/)
-[![PyPI - Downloads][9]](https://pypistats.org/packages/polyagamma)
 
 
 Efficiently generate samples from the Polya-Gamma distribution using a NumPy/SciPy compatible interface.
 
+## Why?
+
+If you are reading this, you probably have already used the [pypolyagamma][9] before. It is
+a great package and I have used it myself in the past. However I encountered several issues:
+- Generating an array of samples is awkward because it requires using a list comprehension
+  if parameter values are scalars or have pre-allocated arrays of a known size to pass for both
+  the parameters and the output array. Moreover, broadcasting of input is not supported and thus
+  requiring the user to write another layer to support it.
+- It requires extra effort to be used in multiprocessing because pickling of the
+  sampler is not supported.
+- There is no parameter validation supported meaning it is easy to get the wrong samples if
+  you do not check the inputs manually.
+- The sampling API is very different from the ones used by popular packages like numpy/scipy,
+  making it harder to just "plug-n-play" in existing code bases.
+- It does not allow passing in an instance of a `np.random.RandomState` or `np.random.Generator`
+  for seeding, requiring extra effort when changing the seed if used in a larger code base.
+- The C++ code wrapped by the package is GPLv3 licensed, making it difficult to
+  use the source code in a project that prefers licenses like MIT/Apache/BSD.
+
+The above issues are the reason why this package exists. And the aim of `polyagamma` is to "fix" them.
+
 
 ## Features
-- `polyagamma` is written in C and optimized for performance.
-- Very light and easy to install (pre-built wheels).
-- It is flexible and allows the user to sample using one of 4 available methods.
-- Implements functions to compute the CDF and density of the distribution as well
-  as their logarithms.
 - Input parameters can be scalars, arrays or both; allowing for easy generation
 of multi-dimensional samples without specifying the size.
+- Input validation is done internally with clear error messages upon failure.
+- It is flexible and allows the user to sample using one of 4 available algorithms.
+- Implements functions to compute the CDF and density of the distribution as well
+  as their logarithms.
 - Random number generation is thread safe.
 - The functional API resembles that of common numpy/scipy functions, therefore making it easy to plugin to
 existing libraries.
+- `polyagamma` is optimized for performance and tests show that it is faster
+  than other implementations.
+- Pre-built wheels are provided for easy installation.
 
-
-
-## Dependencies
-- Numpy >= 1.19.0
-
-
-## Installation
-To get the latest version of the package, one can install it by downloading the wheel/source distribution 
-from the [releases][3] page, or using `pip` with the following shell command:
-```shell
-$ pip install polyagamma
-```
-To install the latest pre-release version, use:
-```shell
-$ pip install --pre -U polyagamma
-```
-Alternatively, once can install from source by cloning the repo. This requires an installation of [poetry][2]
-and the following shell commands:
-```shell
-$ git clone https://github.com/zoj613/polya-gamma.git
-$ cd polya-gamma/
-$ poetry install
-# add package to python's path
-$ export PYTHONPATH=$PWD:$PYTHONPATH 
-```
 
 ## Examples
 
@@ -64,7 +61,7 @@ o = random_polyagamma(z=2, size=(5, 10))
 
 # Pass sequences as input. Numpy's broadcasting rules apply here.
 z = [[1.5, 2, -0.75, 4, 5],
-     [9.5, =8, 7, 6, -0.9]]
+     [9.5, -8, 7, 6, -0.9]]
 o = random_polyagamma(1, z)
 
 # Pass an output array
@@ -139,6 +136,31 @@ print(out.base)
 
 ### C
 For an example of how to use `polyagamma` in a C program, see [here][1].
+
+
+## Dependencies
+- Numpy >= 1.19.0
+
+
+## Installation
+To get the latest version of the package, one can install it by downloading the wheel/source distribution 
+from the [releases][3] page, or using `pip` with the following shell command:
+```shell
+$ pip install polyagamma
+```
+To install the latest pre-release version, use:
+```shell
+$ pip install --pre -U polyagamma
+```
+Alternatively, once can install from source by cloning the repo. This requires an installation of [poetry][2]
+and the following shell commands:
+```shell
+$ git clone https://github.com/zoj613/polya-gamma.git
+$ cd polya-gamma/
+$ poetry install
+# add package to python's path
+$ export PYTHONPATH=$PWD:$PYTHONPATH 
+```
 
 
 ## Benchmarks
@@ -240,4 +262,4 @@ To submit a PR, follow the steps below:
 [6]: https://img.shields.io/pypi/l/polyagamma?style=flat-square
 [7]: https://img.shields.io/circleci/build/github/zoj613/polyagamma/main?style=flat-square
 [8]: https://img.shields.io/codecov/c/github/zoj613/polyagamma?style=flat-square
-[9]: https://img.shields.io/pypi/dm/polyagamma?style=flat-square
+[9]: https://github.com/slinderman/pypolyagamma
