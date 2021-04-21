@@ -21,6 +21,12 @@ typedef struct {
 
 /* 
  * Compute a_n(x|t), the nth term of the alternating sum S_n(x|t)
+ *
+ * NOTE
+ * ----
+ *  pr->x is guaranteed to be always positive due to proposal support so no
+ *  need for extra checks other than to test if its greater than the truncation
+ *  point.
  */
 static NPY_INLINE float
 piecewise_coef(int n, parameter_t const* pr)
@@ -29,12 +35,9 @@ piecewise_coef(int n, parameter_t const* pr)
         double b = NPY_PI * (n + 0.5);
         return (float)b * expf(-0.5 * pr->x * b * b);
     }
-    else if (pr->x > 0) {
-        double a = n + 0.5;
-        return expf(-1.5 * (PGM_LOGPI_2 + pr->logx) - 2. * a * a / pr->x) *
-               (float)(NPY_PI * a);
-    }
-    return 0;
+    double a = n + 0.5;
+    return expf(-1.5 * (PGM_LOGPI_2 + pr->logx) - 2. * a * a / pr->x) *
+           (float)(NPY_PI * a);
 }
 
 /*
@@ -139,6 +142,16 @@ random_right_bounded_invgauss(bitgen_t* bitgen_state, parameter_t* const pr)
  *
  * Here we use S_n(x|t) instead of S_n(x|z,t) as explained in page 13 of
  * Polson et al.(2013) and page 14 of Windle et al. (2014).
+ *
+ * NOTE
+ * ----
+ *  We perform the convergence test of S_1(x|t) manually before entering the
+ *  loop. This is because Devroye (2009) and Polson et al (2013) note that
+ *  it rarely takes more than n = 1 before deciding to accept or reject a
+ *  proposal. In fact, Devroye (2009) [page 8] shows that for z=0, the upper
+ *  bound of the expected number of iterations needed to reject/accept is n=3.
+ *  This gives opportunity to avoid the branching in the loop almost always if
+ *  we perform the first iternation manually.
  */
 static NPY_INLINE double
 random_jacobi_star(bitgen_t* bitgen_state, parameter_t* const pr)
@@ -153,16 +166,20 @@ random_jacobi_star(bitgen_t* bitgen_state, parameter_t* const pr)
         }
         float s = piecewise_coef(0, pr);
         float u = next_float(bitgen_state) * s;
-        for (int i = 1;; ++i) {
-            if (i & 1) {
-                s -= piecewise_coef(i, pr);
-                if (u <= s)
-                    return pr->x;
+
+        s -= piecewise_coef(1, pr);
+        if (u <= s) {
+            return pr->x;
+        }
+        // rarely do we need to go past this line.
+        float sign = 1.0f;
+        for (int i = 2;; ++i, sign = -sign) {
+            s += sign * piecewise_coef(i, pr);
+            if (u <= s && signbit(sign)) {
+                return pr->x;
             }
-            else {
-                s += piecewise_coef(i, pr);
-                if (u > s)
-                    break;
+            else if (u > s && !signbit(sign)) {
+                break;
             }
         }
     }
