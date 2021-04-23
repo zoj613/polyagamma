@@ -1,6 +1,7 @@
 #ifndef PGM_DEVROYE_H
 #define PGM_DEVROYE_H
-#include <numpy/random/bitgen.h>
+
+typedef struct bitgen bitgen_t;
 
 double random_polyagamma_devroye(bitgen_t *bitgen_state, double h, double z);
 

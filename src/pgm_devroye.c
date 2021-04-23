@@ -1,8 +1,17 @@
 /* Copyright (c) 2020-2021, Zolisa Bleki
  *
  * SPDX-License-Identifier: BSD-3-Clause */
-#include "pgm_common.h"
+#include "pgm_macros.h"
 #include "pgm_devroye.h"
+
+/* numpy c-api declarations */
+PGM_EXTERN double
+random_standard_normal(bitgen_t* bitgen_state);
+PGM_EXTERN double
+random_standard_exponential(bitgen_t* bitgen_state);
+
+PGM_EXTERN float
+pgm_erfc(float x);
 
 // the truncation point
 #define T 0.64
@@ -28,24 +37,21 @@ typedef struct {
  *  need for extra checks other than to test if its greater than the truncation
  *  point.
  */
-static NPY_INLINE float
+static PGM_INLINE float
 piecewise_coef(int n, parameter_t const* pr)
 {
     if (pr->x > T) {
-        double b = NPY_PI * (n + 0.5);
+        double b = PGM_PI * (n + 0.5);
         return (float)b * expf(-0.5 * pr->x * b * b);
     }
     double a = n + 0.5;
     return expf(-1.5 * (PGM_LOGPI_2 + pr->logx) - 2. * a * a / pr->x) *
-           (float)(NPY_PI * a);
+           (float)(PGM_PI * a);
 }
 
 /*
  * Initialize constants used during sampling. The values for z = 0 are obtained
  * from the J*(1, 0) sampler  described in Devroye(2009), page 7.
- *
- * Setting mu=Inf if z=0 ensures that sampling from a truncated inverse-gaussian
- * uses most efficient sampling algorithm in `random_right_bounded_inverse_gaussian`.
  *
  * NOTE
  * ----
@@ -56,7 +62,7 @@ piecewise_coef(int n, parameter_t const* pr)
  *      p = erfc(a - b) / exp(z) + exp(z) * erfc(a + b),
  * where a = 1 / sqrt(2 * T) and b = z * sqrt(T/2).
  */
-static NPY_INLINE void
+static PGM_INLINE void
 set_sampling_parameters(parameter_t* const pr, double z)
 {
     if (z > 0) {
@@ -69,7 +75,7 @@ set_sampling_parameters(parameter_t* const pr, double z)
         p = pgm_erfc(a - b) / ez + pgm_erfc(a + b) * ez;
         pr->z2 = z * z;
         pr->k = PGM_PI2_8 + 0.5 * pr->z2;
-        q = NPY_PI_2 * expf(-pr->k * T) / pr->k;
+        q = PGM_PI_2 * expf(-pr->k * T) / pr->k;
         pr->proposal_probability = p / (p + q);
     }
     else {
@@ -109,7 +115,7 @@ set_sampling_parameters(parameter_t* const pr, double z)
  *      logistic likelihoods.(PhD thesis). Retrieved from
  *      http://hdl.handle.net/2152/21842
  */
-static NPY_INLINE double
+static PGM_INLINE double
 random_right_bounded_invgauss(bitgen_t* bitgen_state, parameter_t* const pr)
 {
     double x;
@@ -121,9 +127,9 @@ random_right_bounded_invgauss(bitgen_t* bitgen_state, parameter_t* const pr)
                 e1 = random_standard_exponential(bitgen_state);
                 e2 = random_standard_exponential(bitgen_state);
             } while (e1 * e1 > 3.125 * e2);  // 2 / T = 3.125
-            x = (1 + T * e1);
+            x = (1. + T * e1);
             x = T / (x * x);
-        } while (pr->z > 0 && log1pf(-next_float(bitgen_state)) >= -0.5 * pr->z2 * x);
+        } while (pr->z > 0. && log1pf(-next_float(bitgen_state)) >= -0.5 * pr->z2 * x);
         return x;
     }
     do {
@@ -153,7 +159,7 @@ random_right_bounded_invgauss(bitgen_t* bitgen_state, parameter_t* const pr)
  *  This gives opportunity to avoid the branching in the loop almost always if
  *  we perform the first iternation manually.
  */
-static NPY_INLINE double
+static PGM_INLINE double
 random_jacobi_star(bitgen_t* bitgen_state, parameter_t* const pr)
 {
     for (;;) {
@@ -194,7 +200,7 @@ random_polyagamma_devroye(bitgen_t* bitgen_state, double h, double z)
 {
     parameter_t pr;
     int n = h;
-    double out = 0;
+    double out = 0.;
 
     set_sampling_parameters(&pr, z);
     while (n--) {

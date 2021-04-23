@@ -1,22 +1,32 @@
 /* Copyright (c) 2020-2021, Zolisa Bleki
  *
  * SPDX-License-Identifier: BSD-3-Clause */
-#include <numpy/random/distributions.h>
 #include <math.h>
 #include "pgm_devroye.h"
 #include "pgm_alternate.h"
 #include "pgm_saddle.h"
 #include "../include/pgm_random.h"
 
+#if defined(__GNUC__) || defined(__clang__)
+    #define PGM_EXTERN extern
+#else
+    #define PGM_EXTERN
+#endif
 
-DECLDIR NPY_INLINE void
+PGM_EXTERN PGM_INLINE void
 pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
                            sampler_t method, size_t n, double* out);
 
-DECLDIR NPY_INLINE void
+PGM_EXTERN PGM_INLINE void
 pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h,
                             const double* z, sampler_t method, size_t n,
                             double* restrict out);
+
+/* numpy c-api declarations */
+PGM_EXTERN double
+random_standard_normal(bitgen_t *bitgen_state);
+PGM_EXTERN double
+random_standard_gamma(bitgen_t *bitgen_state, double shape);
 
 /*
  * Sample from a PG(h. z) using a Normal Approximation. For sufficiently large
@@ -28,19 +38,19 @@ pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h,
  *   approaches 0. The formula can be easily generated using any online math
  *   equation calculator.
  */
-static NPY_INLINE double
+static PGM_INLINE double
 random_polyagamma_normal_approx(bitgen_t* bitgen_state, double h, double z)
 {
     double x, mean, variance;
 
-    if (z == 0) {
+    if (z == 0.) {
         mean = 0.25 * h;
         variance = 0.041666688 * h;
     }
     else {
         x = tanh(0.5 * z);
         mean = 0.5 * h * x / z;
-        variance = 0.25 * h * (sinh(z) - z) * (1 - x * x) / (z * z * z);
+        variance = 0.25 * h * (sinh(z) - z) * (1. - x * x) / (z * z * z);
     }
     return mean + random_standard_normal(bitgen_state) * sqrt(variance);
 }
@@ -53,11 +63,11 @@ random_polyagamma_normal_approx(bitgen_t* bitgen_state, double h, double z)
  *
  * The infinite sum is truncated to 200 terms.
  */
-static NPY_INLINE double
+static PGM_INLINE double
 random_polyagamma_gamma_conv(bitgen_t* bitgen_state, double h, double z)
 {
     static const double pi2 = 9.869604401089358;
-    double out = 0, n = 0.5, z2 = z * z;
+    double out = 0., n = 0.5, z2 = z * z;
 
     do {
         out += random_standard_gamma(bitgen_state, h) / (pi2 * n * n + z2);
@@ -71,16 +81,16 @@ random_polyagamma_gamma_conv(bitgen_t* bitgen_state, double h, double z)
  *
  * Refer to README.md file for more details.
  */
-static NPY_INLINE double
+static PGM_INLINE double
 random_polyagamma_hybrid(bitgen_t* bitgen_state, double h, double z)
 {
-    if (h > 50) {
-        return random_polyagamma_normal_approx(bitgen_state, h, 2 * z);
+    if (h > 50.) {
+        return random_polyagamma_normal_approx(bitgen_state, h, 2. * z);
     }
-    else if (h >= 25 || (((h > 12 && h == (size_t)h) || h >= 8) && z < 1)) {
+    else if (h >= 25. || (((h > 12. && h == (size_t)h) || h >= 8.) && z < 1.)) {
         return random_polyagamma_saddle(bitgen_state, h, z);
     }
-    else if (h == 1 || (h == (size_t)h && z < 1)) {
+    else if (h == 1. || (h == (size_t)h && z < 1.)) {
         return random_polyagamma_devroye(bitgen_state, h, z);
     }
     else {
@@ -100,7 +110,7 @@ const pgm_func_t sampling_method_table[] = {
 };
 
 
-NPY_INLINE double
+PGM_INLINE double
 pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z, sampler_t method)
 {
     return sampling_method_table[method](bitgen_state, h, 0.5 * fabs(z));
