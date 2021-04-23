@@ -1,9 +1,13 @@
 #ifndef PGM_RANDOM_H
 #define PGM_RANDOM_H
 
-#include <numpy/npy_common.h>
 #include <numpy/random/bitgen.h>
 
+#if defined(__GNUC__) || defined(__clang__)
+    #define PGM_INLINE inline
+#else
+    #define PGM_INLINE
+#endif
 
 typedef enum {GAMMA, DEVROYE, ALTERNATE, SADDLE, HYBRID} sampler_t;
 
@@ -39,7 +43,8 @@ typedef enum {GAMMA, DEVROYE, ALTERNATE, SADDLE, HYBRID} sampler_t;
  *     techniques." arXiv preprint arXiv:1405.0506 (2014)
  *
  */
-double pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z, sampler_t method);
+double
+pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z, sampler_t method);
 
 /*
  * Generate n samples from a PG(h, z) distribution.
@@ -52,7 +57,7 @@ double pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z, sampler
  *      The array to place the generated samples. Only the first n elements
  *      will be populated.
  */
-NPY_INLINE void
+PGM_INLINE void
 pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
                            sampler_t method, size_t n, double* out)
 {
@@ -68,7 +73,7 @@ pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
  * h, z and out must be at least `n` in length. Only the first n elements of
  * `out` will be filled.
  */
-NPY_INLINE void
+PGM_INLINE void
 pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h,
                             const double* z, sampler_t method, size_t n,
                             double* restrict out)

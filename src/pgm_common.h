@@ -4,34 +4,30 @@
 #ifndef PGM_COMMON_H
 #define PGM_COMMON_H
 
-#pragma once
-#include <numpy/random/distributions.h>
-#include <float.h>
-#include <math.h>
+#include "pgm_macros.h"
 
-#define PGM_PI2_8 1.233700550136169  // pi^2 / 8
-#define PGM_LOGPI_2 0.4515827052894548  // log(pi / 2)
-#define PGM_LS2PI 0.9189385332046727  // log(sqrt(2 * pi))
-#define PGM_MAX_EXP 88.7228f  // maximum allowed expf() argument
-#define PGM_LOG2 0.6931471805599453  // log(2)
+/* numpy c-api declarations */
+PGM_EXTERN double
+random_standard_normal(bitgen_t* bitgen_state);
+PGM_EXTERN double
+random_standard_exponential(bitgen_t* bitgen_state);
+PGM_EXTERN double
+random_standard_gamma(bitgen_t* bitgen_state, double shape);
 
-/*
- * Generate a random single precision float in the range [0, 1). This macros is
- * adapted from a private <numpy/random/distributions.h> function of a similar name
- */
-#define next_float(rng) \
-    ((rng->next_uint32(rng->state) >> 9) * (1.0f / 8388608.0f))
-
-/*
- * Test if two numbers equal within the given absolute and relative tolerences
- *
- * `rtol` is the relative tolerance – it is the maximum allowed difference
- * between a and b, relative to the larger absolute value of a or b.
- *
- * `atol` is the minimum absolute tolerance – useful for comparisons near zero.
- */
-#define PGM_ISCLOSE(a, b, atol, rtol) \
-    (fabs((a) - (b)) <= MAX((rtol) * MAX(fabs((a)), fabs((b))), (atol)))
+/* useful float constants */
+#ifndef DBL_EPSILON
+#define DBL_EPSILON 2.22045e-16
+#endif
+#ifndef DBL_MIN
+#define DBL_MIN 2.22507e-308
+#endif
+#ifndef FLT_EPSILON
+#define FLT_EPSILON 1.19209e-07f
+#endif
+#ifndef FLT_MIN
+#define FLT_MIN 1.17549e-38f
+#endif
+#define PGM_MAX_EXP 88.7228f    // maximum allowed expf() argument
 
 /*
  * Compute the complementary error function.
@@ -48,7 +44,7 @@
  *     291-307. doi:10.1017/S0269964800003417.
  * [3] https://www.netlib.org/specfun/erf
  */
-NPY_INLINE float
+PGM_INLINE float
 pgm_erfc(float x)
 {
 #define PGM_1_SQRTPI 0.5641895835477563f   // 1 / sqrt(pi)
@@ -142,7 +138,7 @@ pgm_erfc(float x)
  *      Probability in the Engineering and Informational Sciences, 8(2),
  *      291-307. doi:10.1017/S0269964800003417.
  */
-NPY_INLINE double
+PGM_INLINE double
 pgm_lgamma(double z)
 {
     /* lookup table for integer values of log-gamma function where 1<=z<=200 */
@@ -215,10 +211,10 @@ pgm_lgamma(double z)
     836.79077958246990348590L, 842.06889424170042068862L, 847.35209797043840918018L,
     852.64036500113294436698L, 857.93366982585743685252L};
 
-    if (z < 201 && z == (size_t)z) {
+    if (z < 201. && z == (size_t)z) {
         return logfactorial[(size_t)z - 1];
     }
-    else if (z > 12) {
+    else if (z > 12.) {
         static const double a1 = 0.08333333333333333;  // 1 / 12
         static const double a2 = 0.002777777777777778;  // 1/360
         static const double a3 = 0.0007936507936507937;  // 1/1260
@@ -228,7 +224,7 @@ pgm_lgamma(double z)
         out += a1 / z - a2 / (z2 * z) + a3 / (z2 * z2 * z);
         return out;
     }
-    else if (z >= 4) {
+    else if (z >= 4.) {
         static const double p0 = -2.12159572323e+05;
         static const double p1 = 2.30661510616e+05;
         static const double p2 = 2.74647644705e+04;
@@ -253,7 +249,7 @@ pgm_lgamma(double z)
         static const double q2 = 2.63505074721e+02;
         static const double q3 = 4.33400022514e+01;
 
-        return (z - 2) * ((((p4 * z + p3) * z + p2) * z + p1) * z + p0) /
+        return (z - 2.) * ((((p4 * z + p3) * z + p2) * z + p1) * z + p0) /
                           ((((z + q3) * z + q2) * z + q1) * z + q0);
     }
     else {
@@ -268,11 +264,11 @@ pgm_lgamma(double z)
         static const double q3 = 1.52346874070e+01;
 
         if (z >= 0.5) {
-            return (z - 1) * ((((p4 * z + p3) * z + p2) * z + p1) * z + p0) /
+            return (z - 1.) * ((((p4 * z + p3) * z + p2) * z + p1) * z + p0) /
                               ((((z + q3) * z + q2) * z + q1) * z + q0);
         }
         else if (z > DBL_EPSILON) {
-            double x = z + 1;
+            double x = z + 1.;
             return z * ((((p4 * x + p3) * x + p2) * x + p1) * x + p0) /
                         ((((x + q3) * x + q2) * x + q1) * x + q0) - log(z);
         }
@@ -292,18 +288,18 @@ pgm_lgamma(double z)
  * For a == 1, we truncate an Exponential of rate=b.
  * For a < 1, we use algorithm [A4] described in Philippe (1997)
  */
-NPY_INLINE double
+PGM_INLINE double
 random_left_bounded_gamma(bitgen_t* bitgen_state, double a, double b, double t)
 {
     double x;
 
-    if (a > 1) {
+    if (a > 1.) {
         b = t * b;
         float threshold;
-        const float amin1 = a - 1;
+        const float amin1 = a - 1.;
         const double bmina = b - a;
-        const double c0 = 0.5 * (bmina + sqrt((bmina * bmina) + 4 * b)) / b;
-        const float one_minus_c0 = 1 - c0;
+        const double c0 = 0.5 * (bmina + sqrt((bmina * bmina) + 4. * b)) / b;
+        const float one_minus_c0 = 1. - c0;
         const float log_m = amin1 * (logf(amin1 / one_minus_c0) - 1.0f);
 
         do {
@@ -312,14 +308,14 @@ random_left_bounded_gamma(bitgen_t* bitgen_state, double a, double b, double t)
         } while (log1pf(-next_float(bitgen_state)) > threshold);
         return t * (x / b);
     }
-    else if (a == 1) {
+    else if (a == 1.) {
         return t + random_standard_exponential(bitgen_state) / b;
     }
     else {
-        const float amin1 = a - 1;
+        const float amin1 = a - 1.;
         const double tb = t * b;
         do {
-            x = 1 + random_standard_exponential(bitgen_state) / tb;
+            x = 1. + random_standard_exponential(bitgen_state) / tb;
         } while (log1pf(-next_float(bitgen_state)) > amin1 * logf(x));
         return t * x;
     }
@@ -347,10 +343,10 @@ random_left_bounded_gamma(bitgen_t* bitgen_state, double a, double b, double t)
  *      incomplete gamma function, Rémy Abergel and Lionel Moisan, ACM
  *      Transactions on Mathematical Software (TOMS), 2020. DOI: 10.1145/3365983
  */
-static NPY_INLINE float
+static PGM_INLINE float
 confluent_x_smaller(double p, double x)
 {
-    size_t n;
+    int n;
     float f, c, d, delta;
     float a = 1.0f, b = p;
     float r = -(p - 1.0f) * x;
@@ -403,10 +399,10 @@ confluent_x_smaller(double p, double x)
  *      incomplete gamma function, Rémy Abergel and Lionel Moisan, ACM
  *      Transactions on Mathematical Software (TOMS), 2020. DOI: 10.1145/3365983
  */
-static NPY_INLINE float
+static PGM_INLINE float
 confluent_p_smaller(double p, double x)
 {
-    size_t n;
+    int n;
     float f, c, d, delta;
     float a = 1.0f, b = x - p + 1.0f;
     for (n = 1, f = a / b, c = a / FLT_MIN, d = 1.0f / b; n < 100; ++n) {
@@ -457,12 +453,12 @@ confluent_p_smaller(double p, double x)
  *      Transactions on Mathematical Software (TOMS), 2020. DOI: 10.1145/3365983
  *  [2] https://www.boost.org/doc/libs/1_71_0/libs/math/doc/html/math_toolkit/sf_gamma/igamma.html
  */
-static NPY_INLINE float
-pgm_gammaq(float p, float x, bool normalized)
+static PGM_INLINE float
+upper_incomplete_gamma(float p, float x, bool normalized)
 {
     if (normalized) {
         int p_int = (int)p;
-        if (p == p_int && p < 30) {
+        if (p == p_int && p < 30.f) {
             float sum, r;
             int k = 1;
             for (sum = r = 1.f; k < p_int; ++k) {
@@ -470,12 +466,12 @@ pgm_gammaq(float p, float x, bool normalized)
             }
             return expf(-x) * sum;
         }
-        else if (p == (p_int + 0.5) && p < 30) {
+        else if (p == (p_int + 0.5f) && p < 30.f) {
             float sum, r;
             int k = 1;
             static const float one_sqrtpi = 0.5641895835477563f;
             float sqrt_x = sqrtf(x);
-            for (r = 1.f, sum = 0; k < p_int + 1; ++k) {
+            for (r = 1.f, sum = 0.f; k < p_int + 1; ++k) {
                 sum += (r *= x / (k - 0.5f));
             }
             return pgm_erfc(sqrt_x) + expf(-x) * one_sqrtpi * sum / sqrt_x;

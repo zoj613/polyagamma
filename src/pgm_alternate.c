@@ -36,7 +36,7 @@ typedef struct {
  * [1, 4]. Values are retrieved from a lookup table using binary search, then
  * the final value is calculated using linear interpolation.
  */
-static NPY_INLINE double
+static PGM_INLINE double
 get_truncation_point(double h)
 {
     if (h <= 1) {
@@ -73,18 +73,18 @@ get_truncation_point(double h)
 /*
  * Compute a^L(x|h), the n'th coefficient for the alternating sum S^L(x|h)
  */
-static NPY_INLINE float
+static PGM_INLINE float
 piecewise_coef(unsigned int n, parameter_t const* pr)
 {
     double a = 2 * n + pr->h;
-    double b = n ? pgm_lgamma(n + pr->h) - pr->lgammah : 0;
+    double b = n ? pgm_lgamma(n + pr->h) - pr->lgammah : 0.;
 
     return expf(pr->hlog2 + b - pgm_lgamma(n + 1) - PGM_LS2PI -
                 1.5 * pr->logx - 0.5 * a * a / pr->x) * (float)a;
 }
 
 // compute: k(x|h)
-static NPY_INLINE float
+static PGM_INLINE float
 bounding_kernel(parameter_t const* pr)
 {
     if (pr->x > pr->t) {
@@ -92,7 +92,7 @@ bounding_kernel(parameter_t const* pr)
         return expf(pr->h * a + (pr->h - 1.) * pr->logx -
                     PGM_PI2_8 * pr->x - pr->lgammah);
     }
-    else if (pr->x > 0) {
+    else if (pr->x > 0.) {
         return expf(pr->hlog2 - pr->half_h2 / pr->x -
                     1.5 * pr->logx - PGM_LS2PI) * (float)pr->h;
     }
@@ -102,7 +102,7 @@ bounding_kernel(parameter_t const* pr)
 /*
  * Compute the cdf of the inverse-gaussian distribution.
  */
-static NPY_INLINE float
+static PGM_INLINE float
 invgauss_cdf(parameter_t const* pr)
 {
     static const double sqrt2_inv = 0.7071067811865475f;
@@ -137,7 +137,7 @@ invgauss_cdf(parameter_t const* pr)
  *   denominator of the regularized version cancels with the sqrt(pi).
  *   This simplifies the calculation of `p` in the ratio = p / (p + q).
  */
-static NPY_INLINE void
+static PGM_INLINE void
 set_sampling_parameters(parameter_t* const pr, double h, bool update_params)
 {
     float p, q;
@@ -149,7 +149,7 @@ set_sampling_parameters(parameter_t* const pr, double h, bool update_params)
     pr->lgammah = pgm_lgamma(h);
     pr->hlog2 = h * PGM_LOG2;
 
-    if (!update_params && pr->z > 0) {
+    if (!update_params && pr->z > 0.) {
         pr->h_z = h / pr->z;
         pr->z2 = pr->z * pr->z;
         pr->h_z2 = pr->h_z * pr->h_z;
@@ -157,7 +157,7 @@ set_sampling_parameters(parameter_t* const pr, double h, bool update_params)
         pr->log_lambda_z = logf(pr->lambda_z);
         p = expf(pr->hlog2 - h * pr->z) * invgauss_cdf(pr);
     }
-    else if (pr->z > 0) {
+    else if (pr->z > 0.) {
         pr->h_z = h / pr->z;
         pr->h_z2 = pr->h_z * pr->h_z;
         p = expf(pr->hlog2 - h * pr->z) * invgauss_cdf(pr);
@@ -171,7 +171,7 @@ set_sampling_parameters(parameter_t* const pr, double h, bool update_params)
         p = expf(pr->hlog2) * pgm_erfc(h / sqrt(2. * pr->t));
     }
     q = expf(h * (PGM_LOGPI_2 - pr->log_lambda_z)) *
-        pgm_gammaq(h, pr->lambda_z * pr->t, true);
+        upper_incomplete_gamma(h, pr->lambda_z * pr->t, true);
 
     pr->proposal_probability = q / (p + q);
 }
@@ -198,7 +198,7 @@ set_sampling_parameters(parameter_t* const pr, double h, bool update_params)
  *      logistic likelihoods.(PhD thesis). Retrieved from
  *      http://hdl.handle.net/2152/21842
  */
-static NPY_INLINE void
+static PGM_INLINE void
 random_right_bounded_invgauss(bitgen_t* bitgen_state, parameter_t* const pr)
 {
     if (pr->t < pr->h_z) {
@@ -227,7 +227,7 @@ random_right_bounded_invgauss(bitgen_t* bitgen_state, parameter_t* const pr)
  * truncated at 1/t (i.e X > 1/t). Then 1/X < t is an Inverse-
  * Gamma right truncated at t. Which is what we want.
  */
-static NPY_INLINE double
+static PGM_INLINE double
 random_jacobi_star(bitgen_t* bitgen_state, parameter_t* const pr)
 {
     for (;;) {
@@ -235,7 +235,7 @@ random_jacobi_star(bitgen_t* bitgen_state, parameter_t* const pr)
             pr->x = random_left_bounded_gamma(bitgen_state, pr->h,
                                               pr->lambda_z, pr->t);
         }
-        else if (pr->z > 0) {
+        else if (pr->z > 0.) {
             random_right_bounded_invgauss(bitgen_state, pr);
         }
         else {
@@ -281,7 +281,7 @@ random_polyagamma_alternate(bitgen_t *bitgen_state, double h, double z)
     parameter_t pr = {.z = z};
 
     if (h > pgm_maxh) {
-        double out = 0;
+        double out = 0.;
         size_t chunk = h >= (pgm_maxh + 1) ? pgm_maxh : pgm_maxh - 1;
 
         set_sampling_parameters(&pr, chunk, false);

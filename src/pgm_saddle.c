@@ -46,7 +46,7 @@ typedef struct {
  *
  * References
  * ---------
- * [1] Beebe, Nelson H. F.. (1993). Accurate hyperbolic tangent computation.
+ * [1] Beebe, Nelson H. F. (1993). Accurate hyperbolic tangent computation.
  *     Technical report, Center for Scientific Computing, Department of
  *     Mathematics, University ofUtah, Salt Lake City, UT 84112, USA, April 20
  *    1993.
@@ -54,20 +54,24 @@ typedef struct {
  *     Functions. Prentice-Hall, Upper Saddle River, NJ 07458, USA, 1980.
  *     ISBN 0-13-822064-6. x + 269 pp. LCCN QA331 .C635 1980.
  */
-static NPY_INLINE double
+static PGM_INLINE double
 tanh_x(double x)
 {
     if (x > 4.95) {
         return 1. / x;
     }
-    static const double p0 = -0.16134119023996228053e+04;
-    static const double p1 = -0.99225929672236083313e+02;
-    static const double p2 = -0.96437492777225469787e+00;
-    static const double q0 = 0.48402357071988688686e+04;
-    static const double q1 = 0.22337720718962312926e+04;
-    static const double q2 = 0.11274474380534949335e+03;
+    static const double
+        p0 = -0.16134119023996228053e+04,
+        p1 = -0.99225929672236083313e+02,
+        p2 = -0.96437492777225469787e+00,
+        /* denominator coefficients */
+        q0 = 0.48402357071988688686e+04,
+        q1 = 0.22337720718962312926e+04,
+        q2 = 0.11274474380534949335e+03;
     double x2 = x * x;
-    return 1. + x2 * ((p2 * x2 + p1) * x2 + p0) / (((x2 + q2) * x2 + q1) * x2 + q0);
+
+    return 1. + x2 * ((p2 * x2 + p1) * x2 + p0) /
+                     (((x2 + q2) * x2 + q1) * x2 + q0);
 }
 
 
@@ -86,21 +90,21 @@ struct func_return_value {double f, fprime;};
 /*
  * compute K(t), the cumulant generating function of X
  */
-#define cumulant(u, v)                                           \
-    ((u) < 0 ? (v)->log_cosh_z - logf(coshf(sqrtf(-2. * (u)))) : \
-     (u) > 0 ? (v)->log_cosh_z - logf(cosf(sqrtf(2. * (u)))) :   \
-     (v)->log_cosh_z)                                            \
+#define cumulant(u, v)                                              \
+    ((u) < 0. ? (v)->log_cosh_z - logf(coshf(sqrtf(-2. * (u)))) :   \
+     (u) > 0. ? (v)->log_cosh_z - logf(cosf(sqrtf(2. * (u)))) :     \
+     (v)->log_cosh_z)                                               \
 
 
 /*
  * Compute K'(t), the derivative of the Cumulant Generating Function (CGF) of X.
  */
-static NPY_INLINE void
+static PGM_INLINE void
 cumulant_prime(double u, struct func_return_value* rv)
 {
     double s = 2. * u;
 
-    rv->f = s < 0 ? tanh_x(sqrt(-s)) : s > 0 ? tan_x(sqrtf(s)) : 1.;
+    rv->f = s < 0. ? tanh_x(sqrt(-s)) : s > 0. ? tan_x(sqrtf(s)) : 1.;
     rv->fprime = rv->f * rv->f + (1. - rv->f) / s;
 }
 
@@ -114,13 +118,13 @@ cumulant_prime(double u, struct func_return_value* rv)
  *
  * Page 16 of Windle et al. (2014) shows that the upper bound of `u` is pi^2/8.
  */
-#define select_starting_guess(x) \
-    ((x) <= 0.25 ? -9 :          \
-     (x) <= 0.5 ? -1.78 :        \
-     (x) <= 1.0 ? -0.147 :       \
-     (x) <= 1.5 ? 0.345 :        \
-     (x) <= 2.5 ? 0.72 :         \
-     (x) <= 4.0 ? 0.95 : 1.15)   \
+#define select_starting_guess(x)    \
+    ((x) <= 0.25 ? -9. :            \
+     (x) <= 0.5 ? -1.78 :           \
+     (x) <= 1.0 ? -0.147 :          \
+     (x) <= 1.5 ? 0.345 :           \
+     (x) <= 2.5 ? 0.72 :            \
+     (x) <= 4.0 ? 0.95 : 1.15)      \
 
 
 #ifndef PGM_MAX_ITER
@@ -135,12 +139,12 @@ cumulant_prime(double u, struct func_return_value* rv)
  * tolerance or the derivative is too small, then we stop and return the
  * current value `x0` as the root's coarse estimate.
  */
-static NPY_INLINE double
+static PGM_INLINE double
 newton_raphson(double arg, double x0, struct func_return_value* value)
 {
     static const double atol = 1e-05, rtol = 1e-05;
-    double x = x0;
     unsigned int n = 0;
+    double x = x0;
 
     do {
         x0 = x;
@@ -175,7 +179,7 @@ newton_raphson(double arg, double x0, struct func_return_value* value)
  * be precalculated at compile time, making the calculation of the logs a
  * little more efficient.
  */
-static NPY_INLINE void
+static PGM_INLINE void
 set_sampling_parameters(parameter_t* pr, double h, double z)
 {
     static const float log275 = 1.0116009116784799f;
@@ -183,7 +187,7 @@ set_sampling_parameters(parameter_t* pr, double h, double z)
     float logxl;
     double xl;
 
-    if (z > 0) {
+    if (z > 0.) {
         xl = tanh_x(z);
         logxl = logf(xl);
         pr->half_z2 = 0.5 * (z * z);
@@ -191,7 +195,7 @@ set_sampling_parameters(parameter_t* pr, double h, double z)
     }
     else {
         xl = 1.;
-        logxl = 0;
+        logxl = 0.f;
         pr->half_z2 = 0.;
         pr->log_cosh_z = 0.f;
     }
@@ -230,7 +234,7 @@ set_sampling_parameters(parameter_t* pr, double h, double z)
 /*
  * Compute the saddle point estimate at x.
  */
-static NPY_INLINE float
+static PGM_INLINE float
 saddle_point(parameter_t const* pr)
 {
     struct func_return_value rv;
@@ -245,7 +249,7 @@ saddle_point(parameter_t const* pr)
  * k(x|h,z): The bounding kernel of the saddle point approximation. See
  * Proposition 17 of Windle et al (2014).
  */
-static NPY_INLINE float
+static PGM_INLINE float
 bounding_kernel(parameter_t const* pr)
 {
     double point;
@@ -282,7 +286,7 @@ bounding_kernel(parameter_t const* pr)
  *  [1] Giner, Goknur and G. Smyth. “statmod: Probability Calculations for the
  *      Inverse Gaussian Distribution.” R J. 8 (2016): 339.
  */
-static NPY_INLINE double
+static PGM_INLINE double
 invgauss_logcdf(double x, double mu, double lambda)
 {
     double qm = x / mu;
@@ -312,7 +316,7 @@ random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
              invgauss_logcdf(pr.xc, sqrt_rho_inv, h)) * pr.sqrt_alpha;
 
     hrho = -h * pr.right_tangent_slope;
-    q = pgm_gammaq(h, hrho * pr.xc, false) * pr.right_kernel_coef *
+    q = upper_incomplete_gamma(h, hrho * pr.xc, false) * pr.right_kernel_coef *
         expf(h * (pr.right_tangent_intercept - logf(hrho)));
 
     proposal_probability = p / (p + q);

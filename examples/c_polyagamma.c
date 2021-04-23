@@ -16,12 +16,10 @@
  *
  * gcc examples/c_polyagamma.c src/*.c -I./include -I$(python -c "import numpy; print(numpy.get_include())") \
  *  -I/usr/include/python3.9 -L$(python -c "import numpy; print(numpy.get_include())")/../../random/lib \
- *  -lm -lnpyrandom -O2 -march=native
+ *  -lm -lnpyrandom -O2 -march=native -std=c99
  */
 #include "../include/pgm_random.h"
-
 #include <stdlib.h>
-#include <stdint.h>
 #include <stdio.h>
 
 typedef struct {uint64_t s[2]; uint32_t s2[4];} xrs128p_random_t;
@@ -97,13 +95,13 @@ main(void)
     xrs128p_random_t xrs = {
         .s = {12132233, 1959324}, .s2 = {25343, 98549, 78230, 91821}
     };
-    bitgen_t bitgen;
-
-    bitgen.state = &xrs;
-    bitgen.next_double = xrs128p_next_double;
-    bitgen.next_uint64 = xrs128p_next64;
-    bitgen.next_uint32 = xrs128p_next32;
-    pgm_random_polyagamma_fill(&bitgen, 1, 1.5, ALTERNATE, n, out);
+    bitgen_t bitgen = {
+        .state = &xrs,
+        .next_double = xrs128p_next_double,
+        .next_uint64 = xrs128p_next64,
+        .next_uint32 = xrs128p_next32
+    };
+    pgm_random_polyagamma_fill(&bitgen, 10.1, 1.5, ALTERNATE, n, out);
 
     puts("Samples: [ ");
     for (size_t i = 0; i < n; i++)
