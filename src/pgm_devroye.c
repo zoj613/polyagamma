@@ -63,17 +63,17 @@ piecewise_coef(int n, parameter_t const* pr)
  * where a = 1 / sqrt(2 * T) and b = z * sqrt(T/2).
  */
 static PGM_INLINE void
-set_sampling_parameters(parameter_t* const pr, double z)
+set_sampling_parameters(parameter_t* const pr)
 {
-    if (z > 0) {
+    if (pr->z > 0) {
         static const float a = 0.8838834764831844f;  // 1 / sqrt(2 * T)
         static const float t_two = 0.565685424949238f;  // sqrt(T/2)
         double p, q;
-        float b = z * t_two;
-        float ez = expf(z);
+        float b = pr->z * t_two;
+        float ez = expf(pr->z);
 
         p = pgm_erfc(a - b) / ez + pgm_erfc(a + b) * ez;
-        pr->z2 = z * z;
+        pr->z2 = pr->z * pr->z;
         pr->k = PGM_PI2_8 + 0.5 * pr->z2;
         q = PGM_PI_2 * expf(-pr->k * T) / pr->k;
         pr->proposal_probability = p / (p + q);
@@ -84,7 +84,6 @@ set_sampling_parameters(parameter_t* const pr, double z)
         pr->z2 = 0.;
     }
     pr->logx = 0.;
-    pr->z = z;
 }
 
 /*
@@ -198,11 +197,11 @@ random_jacobi_star(bitgen_t* bitgen_state, parameter_t* const pr)
 double
 random_polyagamma_devroye(bitgen_t* bitgen_state, double h, double z)
 {
-    parameter_t pr;
+    parameter_t pr = {.z = 0.5 * fabs(z)};
     size_t n = h;
     double out = 0.;
 
-    set_sampling_parameters(&pr, z);
+    set_sampling_parameters(&pr);
     while (n--) {
         out += random_jacobi_star(bitgen_state, &pr);
     }

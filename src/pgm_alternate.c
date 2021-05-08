@@ -278,7 +278,7 @@ random_jacobi_star(bitgen_t* bitgen_state, parameter_t* const pr)
 double
 random_polyagamma_alternate(bitgen_t *bitgen_state, double h, double z)
 {
-    parameter_t pr = {.z = z};
+    parameter_t pr = {.z = 0.5 * fabs(z)};
 
     if (h > pgm_maxh) {
         double out = 0.;
