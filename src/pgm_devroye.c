@@ -4,7 +4,7 @@
 #include "pgm_macros.h"
 #include "pgm_devroye.h"
 
-/* numpy c-api declarations */
+/* numpy random c-api forward declarations */
 PGM_EXTERN double
 random_standard_normal(bitgen_t* bitgen_state);
 PGM_EXTERN double
@@ -103,9 +103,9 @@ set_sampling_parameters(parameter_t* const pr, double z)
  * An efficient algorithm to sample from the tail of a normal distribution
  * using a pair of exponential variates is shown in Devroye (1986) [page 382]
  * & Devroye (2009) [page 7]. This sample becomes our proposal. We accept the
- * sample only if we sample a uniform less than the acceptance porbability.
- * The probability is exp(-0.5 * z2 * x) (Refer to Appendix 1 of [1] for a
- * derivation of this probablity).
+ * sample only if we sample a standard uniform value less than the acceptance
+ * probability. The probability is exp(-0.5 * z2 * x) (Refer to Appendix 1 of
+ * [1] for its derivation).
  *
  * References
  * ----------
@@ -157,7 +157,7 @@ random_right_bounded_invgauss(bitgen_t* bitgen_state, parameter_t* const pr)
  *  proposal. In fact, Devroye (2009) [page 8] shows that for z=0, the upper
  *  bound of the expected number of iterations needed to reject/accept is n=3.
  *  This gives opportunity to avoid the branching in the loop almost always if
- *  we perform the first iternation manually.
+ *  we perform the first iteration manually.
  */
 static PGM_INLINE double
 random_jacobi_star(bitgen_t* bitgen_state, parameter_t* const pr)
@@ -199,7 +199,7 @@ double
 random_polyagamma_devroye(bitgen_t* bitgen_state, double h, double z)
 {
     parameter_t pr;
-    int n = h;
+    size_t n = h;
     double out = 0.;
 
     set_sampling_parameters(&pr, z);

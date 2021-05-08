@@ -1,10 +1,40 @@
 /* Copyright (c) 2021, Zolisa Bleki
  *
- * This file is part of the polyagamma python package.
- *
  * SPDX-License-Identifier: BSD-3-Clause
+ *
+ * This file is part of the polyagamma python package.
+ * See: https://github.com/zoj613/polyagamma
+ *
+ * NOTE
+ * ----
+ * This module provides functions to compute the Polya-Gamma distribution's
+ * density function, its cumulative distribution function and their logarithms.
+ *
+ * Polson et. al (2013) [Page 5 & 6] shows an expression of the distribution's
+ * density function as an infinite alternating sum. A bit of algebraic
+ * manipulation shows that when z=0, the density function can be re-written as:
+ *
+ *  f(x|h) = 2^h / gamma(h) * \Sigma^{\infty}_{n=0}
+ *          ((-1)^n * gamma(n + h) / gamma(n + 1) * g(x| 0.5, 0.125 * (2n + h)^2))
+ *  where g() is the density function of an Inverse-Gamma distribution with
+ *  shape parameter 0.5 and scale parameter (2n + h)^2 / 8.
+ *
+ * Similarly, for |z| > 0 the density can be written more conveniently as:
+ *
+ *  f(x|h, z) = (1 + exp(-|z|))^h / gamma(h) * \Sigma^{\infty}_{n=0}
+ *              ((-1)^n * gamma(n + h) / gamma(n + 1) * exp(-|z| * n) *
+ *              g(x| 0.5 * (2n + h) / |z|, 0.25 * (2n + h)^2))
+ *  where g() is the density function of an Inverse-Gaussian distribution with
+ *  mean = 0.5 * (2n + h) / |z| and shape parameter (2n + h)^2 / 4.
+ *
+ * The coefficients of the infinite sum are eventually decreasing, and this
+ * property together with the above expressions form the basis of this
+ * implementation. The infinite sum is terminated once a new term is too small
+ * to be significant.
+ *
+ * The above expressions for f(x) are central to the implementation used to
+ * approximate the CDF of the Polya-Gamma distribution.
  */
-#include <math.h>
 #include "pgm_macros.h"
 #include "../include/pgm_density.h"
 
@@ -179,7 +209,7 @@ norm_logcdf(double x)
 }
 
 /*
- * CDF of the Inverse-Gaussian(0.5 * a / z, a^2 / 4) distribution, where
+ * CDF of the Inverse-Gaussian(0.5 * a / |z|, a^2 / 4) distribution, where
  * a = (2n + h). We use the method of Goknur & Smyth (2016) to prevent
  * underflow/overflow when parameter values are either very small or large.
  */

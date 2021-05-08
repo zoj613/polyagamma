@@ -10,8 +10,8 @@ Efficiently generate samples from the Polya-Gamma distribution using a NumPy/Sci
 
 ## Why?
 
-If you are reading this, you probably have already used the [pypolyagamma][9] before. It is
-a great package and I have used it myself in the past. However I encountered several issues:
+If you are reading this, you probably have already used the [pypolyagamma][9] package before. It is
+a great package that I have also used in the past, however I encountered several issues:
 - Generating an array of samples is awkward because it requires using a list comprehension
   if parameter values are scalars or have pre-allocated arrays of a known size to pass for both
   the parameters and the output array. Moreover, broadcasting of input is not supported and thus
@@ -42,7 +42,7 @@ of multi-dimensional samples without specifying the size.
 existing libraries.
 - `polyagamma` is optimized for performance and tests show that it is faster
   than other implementations.
-- Pre-built wheels are provided for easy installation.
+- Pre-built wheels are provided for easy installation on `x86_64` linux systems.
 
 
 ## Examples
@@ -50,6 +50,7 @@ existing libraries.
 ### Python
 
 ```python
+import array
 import numpy as np
 from polyagamma import random_polyagamma
 
@@ -64,10 +65,15 @@ z = [[1.5, 2, -0.75, 4, 5],
      [9.5, -8, 7, 6, -0.9]]
 o = random_polyagamma(1, z)
 
-# Pass an output array
-out = np.empty(5)
-random_polyagamma(out=out)
-print(out)
+# We can pass an output array using the `out` parameter. It does not have to be
+# a numpy array. it can be any object that implements the array or buffer protocols.
+# As long as its type is 64bit float, contiguous in memory and aligned (e.g. Python's array object).
+numpy_out = np.empty(5)
+array_out = array.array('d', [0] * 5)
+random_polyagamma(out=numpy_out)
+print(numpy_out)
+random_polyagamma(out=array_out)
+print(array_out)
 
 # one can choose a sampling method from {devroye, alternate, gamma, saddle}.
 # If not given, the default behaviour is a hybrid sampler that picks the most
