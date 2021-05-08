@@ -66,6 +66,7 @@ random_polyagamma_normal_approx(bitgen_t* bitgen_state, double h, double z)
 static PGM_INLINE double
 random_polyagamma_gamma_conv(bitgen_t* bitgen_state, double h, double z)
 {
+    z = 0.5 * fabs(z);
     static const double pi2 = 9.869604401089358;
     double out = 0., n = 0.5, z2 = z * z;
 
@@ -85,12 +86,12 @@ static PGM_INLINE double
 random_polyagamma_hybrid(bitgen_t* bitgen_state, double h, double z)
 {
     if (h > 50.) {
-        return random_polyagamma_normal_approx(bitgen_state, h, 2. * z);
+        return random_polyagamma_normal_approx(bitgen_state, h, z);
     }
-    else if (h >= 25. || (((h > 12. && h == (size_t)h) || h >= 8.) && z < 1.)) {
+    else if (h >= 25. || (((h > 12. && h == (size_t)h) || h >= 8.) && z < 2.)) {
         return random_polyagamma_saddle(bitgen_state, h, z);
     }
-    else if (h == 1. || (h == (size_t)h && z < 1.)) {
+    else if (h == 1. || (h == (size_t)h && z < 2.)) {
         return random_polyagamma_devroye(bitgen_state, h, z);
     }
     else {
@@ -113,5 +114,5 @@ const pgm_func_t sampling_method_table[] = {
 PGM_INLINE double
 pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z, sampler_t method)
 {
-    return sampling_method_table[method](bitgen_state, h, 0.5 * fabs(z));
+    return sampling_method_table[method](bitgen_state, h, z);
 }

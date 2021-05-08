@@ -308,7 +308,7 @@ random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
     float proposal_probability, p, q;
     parameter_t pr;
 
-    set_sampling_parameters(&pr, h, z);
+    set_sampling_parameters(&pr, h, 0.5 * fabs(z));
 
     sqrt_rho = sqrt(-2. * pr.left_tangent_slope);
     sqrt_rho_inv = 1. / sqrt_rho;

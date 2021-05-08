@@ -59,19 +59,19 @@ static inline uint32_t
 xrs128p_next32(void* rng)
 {
     xrs128p_random_t* xrs = rng;
-	const uint32_t result = xrs->s2[0] + xrs->s2[3];
-	const uint32_t t = xrs->s2[1] << 9;
+    const uint32_t result = xrs->s2[0] + xrs->s2[3];
+    const uint32_t t = xrs->s2[1] << 9;
 
-	xrs->s2[2] ^= xrs->s2[0];
-	xrs->s2[3] ^= xrs->s2[1];
-	xrs->s2[1] ^= xrs->s2[2];
-	xrs->s2[0] ^= xrs->s2[3];
+    xrs->s2[2] ^= xrs->s2[0];
+    xrs->s2[3] ^= xrs->s2[1];
+    xrs->s2[1] ^= xrs->s2[2];
+    xrs->s2[0] ^= xrs->s2[3];
 
-	xrs->s2[2] ^= t;
+    xrs->s2[2] ^= t;
 
-	xrs->s2[3] = rotl32(xrs->s2[3], 11);
+    xrs->s2[3] = rotl32(xrs->s2[3], 11);
 
-	return result;
+    return result;
 }
 
 
@@ -83,7 +83,7 @@ xrs128p_next_double(void* rng)
 }
 
 /*
- * Generate 100 samples from a PG(1, 1.5) distribution using the alternate
+ * Generate 100 samples from a PG(10.5, 1.5) distribution using the alternate
  * method.
  */
 int
@@ -101,7 +101,7 @@ main(void)
         .next_uint64 = xrs128p_next64,
         .next_uint32 = xrs128p_next32
     };
-    pgm_random_polyagamma_fill(&bitgen, 10.1, 1.5, ALTERNATE, n, out);
+    pgm_random_polyagamma_fill(&bitgen, 10.5, 1.5, ALTERNATE, n, out);
 
     puts("Samples: [ ");
     for (size_t i = 0; i < n; i++)

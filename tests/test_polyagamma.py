@@ -1,3 +1,4 @@
+import array
 import functools
 
 import numpy as np
@@ -62,6 +63,16 @@ def test_polyagamma():
     # test size of output array when a parameter is a sequence
     with pytest.raises(ValueError, match="`out` must have the same total"):
         rng_polyagamma(h, out=out)
+    # test if it works on non-numpy objects that implement the buffer/array protocols
+    out3 = array.array('d', [0] * 5)
+    assert not all(out3)
+    rng_polyagamma(out=out3)
+    assert all(out3)  # check if all elements are filled with a sample.
+    # raise error when passed output array is not 64bit float type.
+    out4 = array.array('f', [0] * 5)
+    with pytest.raises(ValueError, match="Buffer dtype mismatch,"):
+        rng_polyagamma(out=out4)
+
 
     # raise an error when output array with dim > 1 is passed as an arg
     with pytest.raises(ValueError):

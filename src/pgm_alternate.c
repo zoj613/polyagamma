@@ -130,12 +130,12 @@ invgauss_cdf(parameter_t const* pr)
  *
  * Notes
  * -----
- * To calculate the probability of sampling on either side of the truncation,
+ * To calculate the probability of sampling on either side of the truncation
  * point we note that:
  * - UpperIncompleteGamma(0.5, x) == sqrt(pi) * erfc(sqrt(x)), the regularized
  *   version of the function, can be written as erfc(sqrt(x)) since the
  *   denominator of the regularized version cancels with the sqrt(pi).
- *   This simplifies the calculation of `p` in the ratio = p / (p + q).
+ *   This simplifies the calculation of `p` when computing p / (p + q).
  */
 static PGM_INLINE void
 set_sampling_parameters(parameter_t* const pr, double h, bool update_params)
@@ -187,8 +187,8 @@ set_sampling_parameters(parameter_t* const pr, double h, bool update_params)
  * When mu > t, we use a Scaled-Inverse-Chi-square distribution as a proposal,
  * as explained in [1], page 134. This is equivalent to an Inverse-Gamma with
  * shape=0.5 and scale=lambda/2. We accept the sample only if we sample a
- * uniform less than the acceptance porbability. The probability is
- * exp(-0.5 * z^2 * z). (Refer to Appendix 1 of [1] for a derivation of this probablity).
+ * uniform less than the acceptance probability. The probability is
+ * exp(-0.5 * z^2 * x). (Refer to Appendix 1 of [1] for its derivation).
  *
  * References
  * ----------
@@ -278,7 +278,7 @@ random_jacobi_star(bitgen_t* bitgen_state, parameter_t* const pr)
 double
 random_polyagamma_alternate(bitgen_t *bitgen_state, double h, double z)
 {
-    parameter_t pr = {.z = z};
+    parameter_t pr = {.z = 0.5 * fabs(z)};
 
     if (h > pgm_maxh) {
         double out = 0.;

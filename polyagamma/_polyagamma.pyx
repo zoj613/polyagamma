@@ -90,6 +90,8 @@ cdef inline int check_method(object h, str method, bint disable_checks,
     return 1
 
 
+# intentionally named `polyagamma` instead of `random_polyagamma` in this file
+# to avoid name clashing with the cython function of the same name.
 def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
                bint disable_checks=False, random_state=None):
     """
@@ -125,8 +127,18 @@ def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
         the same total size as the broadcasted result of the parameters.
     method : str or None, optional
         The method to use when sampling. If None (default) then a hybrid
-        sampler is used that picks a method based on the value of `h`.
-        A legal value must be one of {"gamma", "devroye", "alternate", "saddle"}.
+        sampler is used that picks the most efficient method based on the value
+        of `h`. A legal value must be one of {"gamma", "devroye", "alternate", "saddle"}.
+        - "gamma" method generates a sample using a convolution of gamma random
+          variates.
+        - "devroye" method generates a sample using an accept-rejection scheme
+          introduced by [3]_.
+        - "alternate" method is an accept-rejection scheme that addresses the
+          inefficiencies of the "devroye" method when `h` is greater than 1.
+        - "saddle" method uses a saddle point approximation of the target
+          distribution's density as an envelope in order to speed up the
+          accept-rejection scheme. It is mainly suitable for large values of `h`
+          (e.g. h > 20).
         If the "devroye" method is used, the `h` must be a positive integer.
     disable_checks : bool, optional
         Whether to check that the `h` parameter contains only positive
@@ -229,11 +241,11 @@ def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
                     0
                 )
                 arr_len = np.PyArray_SIZE(arr)
-                arr_ptr = <double*>np.PyArray_DATA(arr)
             else:
                 arr_len = <np.npy_intp>size
                 arr = np.PyArray_EMPTY(1, &arr_len, np.NPY_DOUBLE, 0)
-                arr_ptr = <double*>np.PyArray_DATA(arr)
+
+            arr_ptr = <double*>np.PyArray_DATA(arr)
             with bitgenerator.lock, nogil:
                 random_polyagamma_fill(bitgen, ch, cz, stype, arr_len, arr_ptr)
             return arr
@@ -350,6 +362,9 @@ def polyagamma_pdf(x, h=1., z=0., bint return_log=False):
 
     Notes
     -----
+
+    .. versionadded:: 1.3.0
+
     This function implements the density function as shown in page 6 of [1]_.
     The infinite sum is truncated at a maximum of 200 terms. Convergence of
     the series is tested after each term is calculated so that if the
@@ -410,6 +425,9 @@ def polyagamma_cdf(x, h=1., z=0., bint return_log=False):
 
     Notes
     -----
+
+    .. versionadded:: 1.3.0
+
     This function implements the distribution function as shown in page 6 of
     [1]_. The infinite sum is truncated at a maximum of 200 terms.
 
