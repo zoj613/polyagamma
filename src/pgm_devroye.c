@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 #include "pgm_macros.h"
 #include "pgm_devroye.h"
+#include <string.h>
 
 /* numpy random c-api forward declarations */
 PGM_EXTERN double
@@ -191,21 +192,38 @@ random_jacobi_star(bitgen_t* bitgen_state, parameter_t* const pr)
 }
 
 /*
- * Sample from Polya-Gamma PG(h, z) using the Devroye method, where h is a
- * positive whole number / integer.
+ * Sample from Polya-Gamma PG(h, z) distribution using the Devroye method.
+ *
+ *  Parameters
+ *  ----------
+ *  h : double
+ *      The shape parameter of the distribution. The value must be a positive
+ *      whole number / integer. If not, the value will be truncated to the
+ *      nearest integer smaller than h.
+ *  z : double
+ *      The exponential tilting parameter of the distributon.
+ *  n : size_t
+ *      The number of samples to generate.
+ *  out: array of type double
+ *      The array to place the generated samples. Only the first `n` elements
+ *      will be populated.
  */
-double
-random_polyagamma_devroye(bitgen_t* bitgen_state, double h, double z)
+void
+random_polyagamma_devroye(bitgen_t* bitgen_state, double h, double z,
+                          size_t n, double* out)
 {
     parameter_t pr = {.z = 0.5 * fabs(z)};
-    size_t n = h;
-    double out = 0.;
 
     set_sampling_parameters(&pr);
-    while (n--) {
-        out += random_jacobi_star(bitgen_state, &pr);
+    memset(out, 0, n * sizeof(*out));
+
+    for (size_t i = 0; i < n; ++i) {
+        size_t hi = h;
+        while (hi--) {
+            out[i] += random_jacobi_star(bitgen_state, &pr);
+        }
+        out[i] *= 0.25;
     }
-    return 0.25 * out; 
 }
 
 #undef T

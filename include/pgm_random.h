@@ -57,14 +57,9 @@ pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z, sampler_t meth
  *      The array to place the generated samples. Only the first n elements
  *      will be populated.
  */
-PGM_INLINE void
+void
 pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
-                           sampler_t method, size_t n, double* out)
-{
-    while (n--) {
-        out[n] = pgm_random_polyagamma(bitgen_state, h, z, method);
-    }
-}
+                           sampler_t method, size_t n, double* out);
 
 /*
  * Generate n samples from a PG(h[i], z[i]) distribution, where h and z are
@@ -73,14 +68,8 @@ pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
  * h, z and out must be at least `n` in length. Only the first n elements of
  * `out` will be filled.
  */
-PGM_INLINE void
-pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h,
-                            const double* z, sampler_t method, size_t n,
-                            double* restrict out)
-{
-    while (n--) {
-        out[n] = pgm_random_polyagamma(bitgen_state, h[n], z[n], method);
-    }
-}
+void
+pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h, const double* z,
+                            sampler_t method, size_t n, double* restrict out);
 
 #endif
