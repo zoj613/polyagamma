@@ -300,9 +300,22 @@ invgauss_logcdf(double x, double mu, double lambda)
 
 /*
  * Sample from PG(h, z) using the Saddle approximation method.
+ *
+ *  Parameters
+ *  ----------
+ *  h : double
+ *      The shape parameter of the distribution. The value must be a positive.
+ *  z : double
+ *      The exponential tilting parameter of the distributon.
+ *  n : size_t
+ *      The number of samples to generate.
+ *  out: array of type double
+ *      The array to place the generated samples. Only the first `n` elements
+ *      will be populated.
  */
-double
-random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
+void
+random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z,
+                         size_t n, double* out)
 {
     double sqrt_rho, sqrt_rho_inv, hrho;
     float proposal_probability, p, q;
@@ -322,21 +335,23 @@ random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z)
     proposal_probability = p / (p + q);
 
     double mu2 = sqrt_rho_inv * sqrt_rho_inv;
-    do {
-        if (next_float(bitgen_state) < proposal_probability) {
-            do {
-                double y = random_standard_normal(bitgen_state);
-                double w = sqrt_rho_inv + 0.5 * mu2 * y * y / h;
-                pr.x = w - sqrt(w * w - mu2);
-                if (next_double(bitgen_state) * (1. + pr.x * sqrt_rho) > 1.) {
-                    pr.x = mu2 / pr.x;
-                }
-            } while (pr.x >= pr.xc);
-        }
-        else {
-            pr.x = random_left_bounded_gamma(bitgen_state, h, hrho, pr.xc);
-        }
-    } while (next_float(bitgen_state) * bounding_kernel(&pr) > saddle_point(&pr));
+    while (n--) {
+        do {
+            if (next_float(bitgen_state) < proposal_probability) {
+                do {
+                    double y = random_standard_normal(bitgen_state);
+                    double w = sqrt_rho_inv + 0.5 * mu2 * y * y / h;
+                    pr.x = w - sqrt(w * w - mu2);
+                    if (next_double(bitgen_state) * (1. + pr.x * sqrt_rho) > 1.) {
+                        pr.x = mu2 / pr.x;
+                    }
+                } while (pr.x >= pr.xc);
+            }
+            else {
+                pr.x = random_left_bounded_gamma(bitgen_state, h, hrho, pr.xc);
+            }
+        } while (next_float(bitgen_state) * bounding_kernel(&pr) > saddle_point(&pr));
 
-    return 0.25 * h * pr.x;
+        out[n] = 0.25 * h * pr.x;
+    }
 }

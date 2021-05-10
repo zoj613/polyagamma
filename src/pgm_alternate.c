@@ -4,6 +4,7 @@
 #include "pgm_common.h"
 #include "pgm_alternate.h"
 #include "pgm_alternate_trunc_points.h"
+#include <string.h>
 
 /* a struct to store frequently used values. This avoids unnecessary
  * recalculation of these values during a single call to the sampler.
@@ -266,34 +267,57 @@ random_jacobi_star(bitgen_t* bitgen_state, parameter_t* const pr)
 /*
  * Sample from PG(h, z) using the alternate method, for h >= 1.
  *
- * For values of h >= 4, we sample J*(h, z/2) = sum(J*(b_i, z/2)) samples such
- * that sum(b_i) = h. Then use the relation PG(h, z) = J*(h, z/2) / 4, to get a
- * sample from the Polya-Gamma distribution.
+ *  Parameters
+ *  ----------
+ *  h : double
+ *      The shape parameter of the distribution. The value must be a positive.
+ *  z : double
+ *      The exponential tilting parameter of the distributon.
+ *  n : size_t
+ *      The number of samples to generate.
+ *  out: array of type double
+ *      The array to place the generated samples. Only the first `n` elements
+ *      will be populated.
  *
- * See: Section 4.3 of Windle et al. (2014)
+ *  Notes
+ *  -----
+ *  For values of h >= 4, we sample J*(h, z/2) = sum(J*(b_i, z/2)) samples such
+ *  that sum(b_i) = h. Then use the relation PG(h, z) = J*(h, z/2) / 4, to get a
+ *  sample from the Polya-Gamma distribution.
  *
- * We pre-calculate all values dependant on h only once and avoid
- * unnecessary recalculation as long as h remains larger than 4.
+ *  See: Section 4.3 of Windle et al. (2014)
+ *
+ *  We pre-calculate all values dependant on h only once and avoid
+ *  unnecessary recalculation as long as h remains larger than 4.
+ *
  */
-double
-random_polyagamma_alternate(bitgen_t *bitgen_state, double h, double z)
+void
+random_polyagamma_alternate(bitgen_t* bitgen_state, double h, double z,
+                            size_t n, double* out)
 {
     parameter_t pr = {.z = 0.5 * fabs(z)};
+    memset(out, 0, n * sizeof(*out));
 
     if (h > pgm_maxh) {
-        double out = 0.;
         size_t chunk = h >= (pgm_maxh + 1) ? pgm_maxh : pgm_maxh - 1;
-
         set_sampling_parameters(&pr, chunk, false);
+
         while (h > pgm_maxh) {
-            out += random_jacobi_star(bitgen_state, &pr);
+            for (size_t i = 0; i < n; ++i) {
+                out[i] += 0.25 * random_jacobi_star(bitgen_state, &pr);
+            }
             h -= chunk;
         }
 
         set_sampling_parameters(&pr, h, true);
-        out += random_jacobi_star(bitgen_state, &pr);
-        return 0.25 * out;
+        for (size_t i = 0; i < n; ++i) {
+            out[i] += 0.25 * random_jacobi_star(bitgen_state, &pr);
+        }
+        return;
     }
+
     set_sampling_parameters(&pr, h, false);
-    return 0.25 * random_jacobi_star(bitgen_state, &pr);
+    while (n--) {
+        out[n] += 0.25 * random_jacobi_star(bitgen_state, &pr);
+    }
 }
