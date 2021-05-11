@@ -5,7 +5,7 @@ version: 2
 jobs:
   build-and-test:
     docker:
-      - image: cimg/python:3.7
+      - image: cimg/python:3.6
     steps:
       - checkout
       # if the text key `deps-{{ checksum "poetry.lock" }}` changes (and it WILL

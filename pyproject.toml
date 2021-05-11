@@ -28,7 +28,7 @@ include = [
 ]
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.6"
 numpy = "^1.19.0"
 
 [tool.poetry.dev-dependencies]
@@ -37,7 +37,6 @@ numpy = "1.19.0"
 pytest = "^6.2.1"
 toml = "^0.10.2"
 pytest-cov = "^2.11.1"
-coverage = {extras = ["toml"], version = "^5.4"}
 codecov = "^2.1.11"
 
 [tool.poetry.build]
