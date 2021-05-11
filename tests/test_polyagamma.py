@@ -48,6 +48,7 @@ def test_polyagamma():
     out = rng_polyagamma(h, z)
     assert out.shape == (6,)
     out = np.zeros(6)
+    h = (1, 1, 1, 1, 1, 1)
     rng_polyagamma(h, z, out=out)
     assert not np.allclose(out, 0)
     with pytest.raises(IndexError, match="must have the same length as parameters"):

@@ -247,7 +247,7 @@ def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
 
             arr_ptr = <double*>np.PyArray_DATA(arr)
             with bitgenerator.lock, nogil:
-                random_polyagamma_fill(bitgen, ch, cz, stype, arr_len, arr_ptr)
+                pgm_random_polyagamma_fill(bitgen, ch, cz, stype, arr_len, arr_ptr)
             return arr
 
     h = np.PyArray_FROM_OT(h, np.NPY_DOUBLE)
@@ -286,7 +286,7 @@ def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
             while bcast.index < bcast.size:
                 ch = (<double*>np.PyArray_MultiIter_DATA(bcast, 0))[0]
                 cz = (<double*>np.PyArray_MultiIter_DATA(bcast, 1))[0]
-                arr_ptr[bcast.index] = random_polyagamma(bitgen, ch, cz, stype)
+                arr_ptr[bcast.index] = pgm_random_polyagamma(bitgen, ch, cz, stype)
                 np.PyArray_MultiIter_NEXT(bcast)
 
         if has_out:

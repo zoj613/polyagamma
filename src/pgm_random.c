@@ -111,10 +111,10 @@ random_polyagamma_hybrid(bitgen_t* bitgen_state, double h, double z,
     if (h > 50.) {
         random_polyagamma_normal_approx(bitgen_state, h, z, n, out);
     }
-    else if (h >= 25. || (((h > 12. && h == (size_t)h) || h >= 8.) && z < 2.)) {
+    else if (h >= 8. || (h > 4. &&  z <= 4.)) {
         random_polyagamma_saddle(bitgen_state, h, z, n, out);
     }
-    else if (h == 1. || (h == (size_t)h && z < 2.)) {
+    else if (h == 1. || (h == (size_t)h && z <= 1.)) {
         random_polyagamma_devroye(bitgen_state, h, z, n, out);
     }
     else {

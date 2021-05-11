@@ -134,7 +134,7 @@ cdef bitgen_t* bitgen = <bitgen_t*>PyCapsule_GetPointer(bitgenerator.capsule, "B
 cdef double h = 1, z = 0
 # get a memory view of the array to store samples in
 cdef double[:] out = np.empty(300)
-with nogil:  # you probably want to acquire a thread lock here as well for thread safety.
+with bitgenerator.lock, nogil:
     random_polyagamma_fill(bitgen, h, z, DEVROYE, <size_t>out.shape[0], &out[0])
 print(out.base)
 ...
@@ -174,7 +174,7 @@ $ export PYTHONPATH=$PWD:$PYTHONPATH
 Below are runtime plots of 20000 samples generated for various values of `h` 
 and `z`, using each method. We restrict `h` to integer values to accomodate the 
 `devroye` method, which cannot be used for non-integer `h`. The version of the
-package used to generate them is `v1.3.0-rc3`.
+package used to generate them is `v1.3.1`.
 
 ![](./scripts/img/perf_methods_0.0.svg) | ![](./scripts/img/perf_methods_2.5.svg)
 | --- | --- |
@@ -184,9 +184,9 @@ package used to generate them is `v1.3.0-rc3`.
 
 Generally:
 - The `gamma` method is slowest and should be avoided in cases where speed is paramount.
-- For `h > 25`, the `saddle` method is the fastest for any value of `z`.
-- For `0 <= z <= 2` and integer `h < 15`, the `devroye` method should be preferred.
-- For `z > 2` and integer/non-integer `h <= 25`, the `alternate` method is the most efficient.
+- For `h >= 8`, the `saddle` method is the fastest for any value of `z`.
+- For `0 <= z <= 1` and integer `h <= 4`, the `devroye` method should be preferred.
+- For `z > 1` and `1 < h < 8`, the `alternate` method is the most efficient.
 - For `h > 50` (or any value large enough), the normal approximation to the distribution is 
 fastest (not reported in the above plot but it is around 10 times faster than the `saddle` 
 method and also equally accurate).
@@ -194,9 +194,11 @@ method and also equally accurate).
 Therefore, we devise a "hybrid/default" sampler that picks a sampler based on the above guidelines.
 
 We also benchmark the hybrid sampler runtime with the sampler found in the `pypolyagamma` 
-package (version `1.2.3`). The version of NumPy we use is `1.19.0`. We use the `pgdrawv`
-function which takes arrays as input. Below are runtime plots of 20000 samples for each 
-value of `h` and `z`. Values of `h` range from 0.1 to 60, while `z` is set to 0, 2.5, 5, and 10.
+package (version `1.2.3`). The version of NumPy we use is `1.18.5`. We compare our
+sampler to the `pgdrawv` functions provided by the package. Below are runtime plots of 20000
+samples for each value of `h` and `z`. Values of `h` range from 0.1 to 50, while `z` is set
+to 0, 2.5, 5, and 10.
+
 ![](./scripts/img/perf_samplers_0.0.svg) | ![](./scripts/img/perf_samplers_2.5.svg)
 | --- | --- |
 
@@ -204,15 +206,15 @@ value of `h` and `z`. Values of `h` range from 0.1 to 60, while `z` is set to 0,
 | --- | --- |
 
 It can be seen that when generating many samples at once for any given combination of 
-parameters, `polyagamma` outperforms the `pypolyagamma` package. The exception is when 
-very small (e.g `h < 1`). Although not shown here, for values of `h` larger than 50, we use the normal approximation method. It is also worth noting that the `pypolygamma` package is on average faster than ours at 
-generating exactly one sample from the distribution. This is mainly due to the 
-overhead introduced by creating the bitgenerator + acquiring/releasing the thread lock + 
-doing parameter validation checks at every call to the function. This overhead can 
-somewhat be mitigated by passing in a random generator instance at every call to 
-the `polyagamma` function. To eliminate this overhead, it is best to use the Cython
-functions directly. Below is a timing example to demonstrate the benefit of passing
-a generator explicitly:
+parameters, `polyagamma` outperforms the `pypolyagamma` package by a large margin.
+The exception is when the scale parameter is very small (e.g `h < 1`). It is also worth
+noting that the `pypolygamma` package is on average faster than ours at generating exactly 1
+sample value from the distribution. This is mainly due to the overhead introduced by creating
+the bitgenerator + acquiring/releasing the thread lock + doing parameter validation checks at
+every call to the function. This overhead can somewhat be mitigated by passing in a random
+generator instance at every call to the `polyagamma` function. To eliminate this overhead,
+it is best to use the Cython functions directly. Below is a timing example to demonstrate
+the benefit of passing a generator explicitly:
 ```ipynb
 In [3]: rng = np.random.SFC64(1)
 
