@@ -2,9 +2,7 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause */
 #include "pgm_common.h"
-#include "pgm_alternate.h"
 #include "pgm_alternate_trunc_points.h"
-#include <string.h>
 
 /* a struct to store frequently used values. This avoids unnecessary
  * recalculation of these values during a single call to the sampler.
@@ -264,6 +262,8 @@ random_jacobi_star(bitgen_t* bitgen_state, parameter_t* const pr)
     }
 }
 
+void*
+memset(void* __s, int __c, size_t __n);
 /*
  * Sample from PG(h, z) using the alternate method, for h >= 1.
  *

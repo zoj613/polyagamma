@@ -1,24 +1,40 @@
 /* Copyright (c) 2020-2021, Zolisa Bleki
  *
  * SPDX-License-Identifier: BSD-3-Clause */
-#include <math.h>
-#include <string.h>
-#include "pgm_devroye.h"
-#include "pgm_alternate.h"
-#include "pgm_saddle.h"
 #include "../include/pgm_random.h"
 
 #if defined(__GNUC__) || defined(__clang__)
-    #define PGM_EXTERN extern
+    #define PGM_INLINE inline
 #else
-    #define PGM_EXTERN
+    #define PGM_INLINE
 #endif
 
 /* numpy c-api declarations */
-PGM_EXTERN double
+double
 random_standard_normal(bitgen_t* bitgen_state);
-PGM_EXTERN double
+double
 random_standard_gamma(bitgen_t* bitgen_state, double shape);
+
+/* forward declarations of supported sampling methods */
+void
+random_polyagamma_devroye(bitgen_t* bitgen_state, double h, double z,
+                          size_t n, double* out);
+void
+random_polyagamma_alternate(bitgen_t* bitgen_state, double h, double z,
+                            size_t n, double* out);
+void
+random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z,
+                         size_t n, double* out);
+
+/* libc math library forward declarations */
+double
+sinh(double __x);
+double
+tanh(double __x);
+double
+sqrt(double __x);
+double
+fabs(double __x);
 
 /*
  * Sample from a PG(h. z) using a Normal Approximation. For sufficiently large
@@ -54,6 +70,9 @@ random_polyagamma_normal_approx(bitgen_t* bitgen_state, double h, double z,
 #ifndef PGM_GAMMA_LIMIT
 #define PGM_GAMMA_LIMIT 200
 #endif
+
+void*
+memset(void* __s, int __c, size_t __n);
 /*
  * Sample from PG(h, z) using the Gamma convolution approximation method.
  *
@@ -92,10 +111,10 @@ random_polyagamma_hybrid(bitgen_t* bitgen_state, double h, double z,
     if (h > 50.) {
         random_polyagamma_normal_approx(bitgen_state, h, z, n, out);
     }
-    else if (h >= 25. || (((h > 12. && h == (size_t)h) || h >= 8.) && z < 2.)) {
+    else if (h >= 8. || (h > 4. &&  z <= 4.)) {
         random_polyagamma_saddle(bitgen_state, h, z, n, out);
     }
-    else if (h == 1. || (h == (size_t)h && z < 2.)) {
+    else if (h == 1. || (h == (size_t)h && z <= 1.)) {
         random_polyagamma_devroye(bitgen_state, h, z, n, out);
     }
     else {

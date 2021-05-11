@@ -2,8 +2,6 @@
  *
  * SPDX-License-Identifier: BSD-3-Clause */
 #include "pgm_macros.h"
-#include "pgm_devroye.h"
-#include <string.h>
 
 /* numpy random c-api forward declarations */
 PGM_EXTERN double
@@ -191,6 +189,8 @@ random_jacobi_star(bitgen_t* bitgen_state, parameter_t* const pr)
     }
 }
 
+void*
+memset(void* __s, int __c, size_t __n);
 /*
  * Sample from Polya-Gamma PG(h, z) distribution using the Devroye method.
  *

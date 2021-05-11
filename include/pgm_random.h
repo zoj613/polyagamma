@@ -3,11 +3,6 @@
 
 #include <numpy/random/bitgen.h>
 
-#if defined(__GNUC__) || defined(__clang__)
-    #define PGM_INLINE inline
-#else
-    #define PGM_INLINE
-#endif
 
 typedef enum {GAMMA, DEVROYE, ALTERNATE, SADDLE, HYBRID} sampler_t;
 

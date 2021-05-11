@@ -24,12 +24,11 @@ def set_val(arr, val):
 
 def benchmark_methods(seed, out, z_val):
     size = out.shape[0]
-    arr = np.empty(size)
     rng = np.random.default_rng(seed)
     kwargs = {'disable_checks': True, 'random_state': rng, 'out': out}
 
     res = perfplot.bench(
-        setup=lambda n: set_val(arr, n),
+        setup=lambda n: n,
         kernels=[
             lambda h: random_polyagamma(h, z_val, method='devroye', **kwargs),
             lambda h: random_polyagamma(h, z_val, method='alternate', **kwargs),
@@ -37,7 +36,7 @@ def benchmark_methods(seed, out, z_val):
             lambda h: random_polyagamma(h, z_val, method='gamma', **kwargs),
         ],
         labels=["devroye", "alternate", "saddle", "gamma"],
-        n_range=[i for i in range(1, 60)],
+        n_range=[i for i in range(1, 20)],
         xlabel="value of $h$",
         equality_check=None,
     )
@@ -45,7 +44,7 @@ def benchmark_methods(seed, out, z_val):
         f"Runtime comparison of methods, generating {size} PG(h, {z_val}) "
         f"samples per value of $h$.", fontsize=9,
     )
-    res.save(f"./scripts/perf_methods_{z_val}.svg", **save_kwargs)
+    res.save(f"./scripts/img/perf_methods_{z_val}.svg", **save_kwargs)
 
 
 def benchmark_samplers(seed, out, z_val=0):
@@ -60,11 +59,15 @@ def benchmark_samplers(seed, out, z_val=0):
     res = perfplot.bench(
         setup=lambda n: set_val(arr, n),
         kernels=[
-            lambda h: random_polyagamma(h, z_val, **kwargs),
+            # since h is an array with a constant val, we just pass the 1st
+            # element to `random_polyagamma`. The array is only needed to pass
+            # to `pgdrawv` since the function can only accept arrays.
+            lambda h: random_polyagamma(h[0], z_val, **kwargs),
             lambda h: pg.pgdrawv(h, z, out),
+            # lambda h: [pg.pgdraw(h[0], z_val) for _ in range(size)],
         ],
         labels=["polyagamma", "pypolyagamma"],
-        n_range=[i for i in np.arange(0.1, 50, 0.4)],
+        n_range=[i for i in np.arange(0.1, 40, 0.4)],
         xlabel="value of $h$",
         equality_check=None,
     )
@@ -72,7 +75,7 @@ def benchmark_samplers(seed, out, z_val=0):
         f"Comparison of runtime with $pypolyagamma$, generating {size} "
         f"PG(h, {z_val}) samples per value of $h$.", fontsize=11,
     )
-    res.save(f"./scripts/perf_samplers_{z_val}.svg", **save_kwargs)
+    res.save(f"./scripts/img/perf_samplers_{z_val}.svg", **save_kwargs)
 
 
 if __name__ == "__main__":
