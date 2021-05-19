@@ -265,13 +265,8 @@ bounding_kernel(parameter_t const* pr)
 
 /*
  * Compute the logarithm of the standard normal distribution function (cdf).
- *
- * NOTE
- * ----
- *  The switch to using erf() when x is very close to zero is done implicitly
- *  inside `pgm_erfc`.
  */
-#define log_norm_cdf(x) (log1pf(-0.5f * pgm_erfc((x) / 1.4142135623730951f)))
+#define log_norm_cdf(x) (log1pf(-0.5f * erfcf((x) / 1.4142135623730951f)))
 
 /*
  * Calculate the logarithm of the cumulative distribution function of an

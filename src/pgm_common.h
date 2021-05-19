@@ -30,91 +30,6 @@ random_standard_gamma(bitgen_t* bitgen_state, double shape);
 #define PGM_MAX_EXP 88.7228f    // maximum allowed expf() argument
 
 /*
- * Compute the complementary error function.
- *
- * This implementation uses Rational Chebyshev Approximations for as described
- * in [1]. The polynomial coefficients are obtained from [2] and some from [3].
- *
- * References
- * ----------
- * [1] Cody, W. J. Rational Chebyshev approximations for the error function.
- *     Math. Comp. 23 (1969), 631–637.
- * [2] Temme, N. (1994). A Set of Algorithms for the Incomplete Gamma Functions.
- *     Probability in the Engineering and Informational Sciences, 8(2),
- *     291-307. doi:10.1017/S0269964800003417.
- * [3] https://www.netlib.org/specfun/erf
- */
-PGM_INLINE float
-pgm_erfc(float x)
-{
-#define PGM_1_SQRTPI 0.5641895835477563f   // 1 / sqrt(pi)
-#define PGM_BIG_VAL 26.615717509251258f
-#define PGM_SMALL_VAL -6.003636680306125f
-
-    if (x < PGM_SMALL_VAL) {
-        return 2.0f;
-    }
-    else if (x < -FLT_EPSILON) {
-        return 2.0f - pgm_erfc(-x);
-    }
-    else if (x < FLT_EPSILON) {
-       return 1.0f;
-    }
-    else if (x < 0.5f) {
-        static const float
-            p0 = 3.20937758913846947e+03f,
-            p1 = 3.77485237685302021e+02f,
-            p2 = 1.13864154151050156e+02f,
-            p3 = 3.16112374387056560e+00f,
-            p4 = 1.85777706184603153e-01f,
-            q0 = 2.84423683343917062e+03f,
-            q1 = 1.28261652607737228e+03f,
-            q2 = 2.44024637934444173e+02f,
-            q3 = 2.36012909523441209e+01f;
-        float z = x * x;
-        return 1.0f - x * ((((p4 * z + p3) * z + p2) * z + p1) * z + p0) /
-                        ((((z + q3) * z + q2) * z + q1) * z + q0);
-    }
-    else if (x < 4.0f) {
-        static const float
-            p0 = 7.3738883116f,
-            p1 = 6.8650184849f,
-            p2 = 3.0317993362f,
-            p3 = 5.6316961891e-01f,
-            p4 = 4.3187787405e-05f,
-            q0 = 7.3739608908f,
-            q1 = 1.5184908190e+01f,
-            q2 = 1.2795529509e+01f,
-            q3 = 5.3542167949f;
-        return expf(-x * x) * ((((p4 * x + p3) * x + p2) * x + p1) * x + p0) /
-                              ((((x + q3) * x + q2) * x + q1) * x + q0);
-    }
-    else if (x < PGM_BIG_VAL) {
-        float z = x * x;
-        float y = expf(-z);
-
-        if (x * FLT_MIN > y * PGM_1_SQRTPI) {
-            return 0.0f;
-        }
-        static const float
-            p0 = -4.25799643553e-02f,
-            p1 = -1.96068973726e-01f,
-            p2 = -5.16882262185e-02f,
-            q0 = 1.50942070545e-01f,
-            q1 = 9.21452411694e-01f;
-        z = 1.0f / z;
-        z *= ((p2 * z + p1) * z + p0) / ((z + q1) * z + q0);
-        return y * (PGM_1_SQRTPI + z) / x;
-    }
-    else {
-        return 0.0f;
-    }
-#undef PGM_1_SQRTPI
-#undef PGM_BIG_VAL
-#undef PGM_SMALL_VAL
-}
-
-/*
  * Calculate logarithm of the gamma function of z.
  *
  * This implementation is based on an asymptotic expansion based on stirling's
@@ -474,7 +389,7 @@ upper_incomplete_gamma(float p, float x, bool normalized)
             for (r = 1.f, sum = 0.f; k < p_int + 1; ++k) {
                 sum += (r *= x / (k - 0.5f));
             }
-            return pgm_erfc(sqrt_x) + expf(-x) * one_sqrtpi * sum / sqrt_x;
+            return erfcf(sqrt_x) + expf(-x) * one_sqrtpi * sum / sqrt_x;
         }
     }
 

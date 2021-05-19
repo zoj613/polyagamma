@@ -9,9 +9,6 @@ random_standard_normal(bitgen_t* bitgen_state);
 PGM_EXTERN double
 random_standard_exponential(bitgen_t* bitgen_state);
 
-PGM_EXTERN float
-pgm_erfc(float x);
-
 // the truncation point
 #define T 0.64
 
@@ -71,7 +68,7 @@ set_sampling_parameters(parameter_t* const pr)
         float b = pr->z * t_two;
         float ez = expf(pr->z);
 
-        p = pgm_erfc(a - b) / ez + pgm_erfc(a + b) * ez;
+        p = erfcf(a - b) / ez + erfcf(a + b) * ez;
         pr->z2 = pr->z * pr->z;
         pr->k = PGM_PI2_8 + 0.5 * pr->z2;
         q = PGM_PI_2 * expf(-pr->k * T) / pr->k;
