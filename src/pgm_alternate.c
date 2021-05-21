@@ -110,7 +110,7 @@ invgauss_cdf(parameter_t const* pr)
     double b = pr->z * st * sqrt2_inv;
     float ez = expf(pr->h * pr->z);
 
-    return 0.5f * (pgm_erfc(a - b) + ez * pgm_erfc(b + a) * ez);
+    return 0.5f * (erfcf(a - b) + ez * erfcf(b + a) * ez);
 }
 
 /*
@@ -164,10 +164,10 @@ set_sampling_parameters(parameter_t* const pr, double h, bool update_params)
     else if (!update_params) {
         pr->lambda_z = PGM_PI2_8;
         pr->log_lambda_z = logf(pr->lambda_z);
-        p = expf(pr->hlog2) * pgm_erfc(h / sqrt(2. * pr->t));
+        p = expf(pr->hlog2) * erfcf(h / sqrt(2. * pr->t));
     }
     else {
-        p = expf(pr->hlog2) * pgm_erfc(h / sqrt(2. * pr->t));
+        p = expf(pr->hlog2) * erfcf(h / sqrt(2. * pr->t));
     }
     q = expf(h * (PGM_LOGPI_2 - pr->log_lambda_z)) *
         upper_incomplete_gamma(h, pr->lambda_z * pr->t, true);

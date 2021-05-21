@@ -8,12 +8,12 @@
 #include <math.h>
 #include <numpy/random/bitgen.h>
 
-#define PGM_PI      3.141592653589793   // pi
-#define PGM_PI_2    1.5707963267948966  // pi / 2
-#define PGM_PI2_8   1.233700550136169   // pi^2 / 8
-#define PGM_LOGPI_2 0.4515827052894548  // log(pi / 2)
-#define PGM_LS2PI   0.9189385332046727  // log(sqrt(2 * pi))
-#define PGM_LOG2    0.6931471805599453  // log(2)
+#define PGM_PI       3.141592653589793238462643383279503   // pi
+#define PGM_PI_2     1.570796326794896619231321691639751   // pi / 2
+#define PGM_PI2_8    1.233700550136169827354311374984519   // pi^2 / 8
+#define PGM_LOGPI_2  0.4515827052894548647261952298948821  // log(pi / 2)
+#define PGM_LS2PI    0.9189385332046727417803297364056177  // log(sqrt(2 * pi))
+#define PGM_LOG2     0.6931471805599453094172321214581766  // log(2)
 
 #if defined(__GNUC__) || defined(__clang__)
     #define PGM_INLINE inline

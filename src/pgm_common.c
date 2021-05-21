@@ -3,9 +3,6 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 #include "pgm_common.h"
 
-PGM_EXTERN PGM_INLINE float
-pgm_erfc(float x);
-
 PGM_EXTERN PGM_INLINE double
 pgm_lgamma(double z);
 
