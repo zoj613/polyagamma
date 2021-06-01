@@ -27,18 +27,13 @@
  *  where g() is the density function of an Inverse-Gaussian distribution with
  *  mean = 0.5 * (2n + h) / |z| and shape parameter (2n + h)^2 / 4.
  *
- * The coefficients of the infinite sum are eventually decreasing, and this
- * property together with the above expressions form the basis of this
- * implementation. The infinite sum is terminated once a new term is too small
- * to be significant.
- *
  * The above expressions for f(x) are central to the implementation used to
  * approximate the CDF of the Polya-Gamma distribution.
  */
+#include <stdlib.h>
 #include "pgm_macros.h"
 #include "../include/pgm_density.h"
 
-#define PGM_2PI 6.283185307179586  // 2 * PI
 // Maximum number of series terms to use when approximating the infinite sum
 // representation of the PG(h, z) distribution
 #ifndef PGM_MAX_SERIES_TERMS
@@ -52,84 +47,160 @@
 PGM_EXTERN double
 pgm_lgamma(double z);
 
+/* Parameters used as arguments to the log density functions.
+ *
+ * x: value at which the density is evaluated.
+ * h: shape parameter of the PG distribution.
+ * z: exponential tilting parameter of the PG distribution.
+ * n: n'th iteration of the alternating infinite sum used to evaluate density.
+ */
+typedef struct {
+    double x;
+    double h;
+    double z;
+    double n;
+} pdf_parameter_t;
+
 /*
- * Compute the density function of PG(h, z). PG(h, z) is written as an
- * infinite alternating-sign sum of Inverse-Gaussian densities when z > 0, or
- * a sum of Inverse-Gamma densities when z = 0. Refer to pages 5 & 6 of [1].
+ * This function implements the log-density function of an Inverse-Gamma distribution
+ * with shape parameter 0.5 and scale parameter 0.125 * (2n + h)^2. This is
+ * equivalent to a scaled-Inverse-Chi-Squared distribution with degrees of
+ * freedom 1 and scale parameter rho^2 = 0.25 * (2n + h)^2. This is also
+ * equivalent to a Levy distribution with location parameter equal to 0 and a
+ * scale parameter equal to 0.25 * (2n + h)^2.
+ *
+ * To summarize, the following are all equivalent:
+ * - Inverse-Gamma(shape=0.5, scale=0.125 * (2n + h)^2)
+ * - Scaled-Inv-Chi2(df=1, scale=0.25 * (2n + h)^2)
+ * - Levy(loc=0, scale=0.25 * (2n + h)^2)
+ *
+ * We use the Levy distribution parametrization. We also scale the distribution
+ * using the relation:
+ *      f(x; loc, scale) = f(x/scale; loc, 1) / scale
+ * leading to a log density of the form:
+ *      logf = log(f(x/scale; loc, 1)) - log(scale).
+ * This form is more stable and avoids overflow/underflow when scale parameter
+ * is large.
  *
  * References
  * ----------
- * [1] Polson, Nicholas G., James G. Scott, and Jesse Windle.
- *     "Bayesian inference for logistic models using Pólya–Gamma latent
- *     variables." Journal of the American statistical Association
- *     108.504 (2013): 1339-1349.
+ *  [1] https://en.wikipedia.org/wiki/Inverse-gamma_distribution
+ *  [2] https://en.wikipedia.org/wiki/Scaled-inverse-chi-squared_distribution
+ *  [3] https://en.wikipedia.org/wiki/L%C3%A9vy_distribution
  */
-double
-pgm_polyagamma_pdf(double x, double h, double z)
+static PGM_INLINE double
+invgamma_logpdf(const pdf_parameter_t* pr)
 {
-    if (islessequal(x, 0.) || isinf(x)) {
-        return 0.;
-    }
+    double scale = pr->n * pr->n + pr->n * pr->h + (0.5 * pr->h) * (0.5 * pr->h);
+    double y = pr->x / scale;
 
-    double a = (fabs(z) > 0. ? h * log(cosh(0.5 * z)) - 0.5 * z * z * x : 0.) +
-               (h - 1.) * PGM_LOG2;
-    double sum = exp(a - 0.125 * h * h / x) * h;
-    double sign = -1.;
-
-    a -= pgm_lgamma(h);
-    for (unsigned int n = 1; n < PGM_MAX_SERIES_TERMS; n++, sign = -sign) {
-        double twonh = 2 * n + h;
-        double term = exp(a + pgm_lgamma(n + h) - 0.125 * twonh * twonh / x -
-                          pgm_lgamma(n + 1)) * twonh;
-        double prev_sum = sum;
-        sum += sign * term;
-
-        if (PGM_ISCLOSE(sum, prev_sum, 0., DBL_EPSILON)) {
-            break;
-        }
-    }
-    return sum / sqrt(PGM_2PI * x * x * x);
+    return -PGM_LS2PI - 1.5 * log(y) - 0.5 / y - log(scale);
 }
 
 /*
- * Approximate the logarithm of the density function of PG(h, z).
+ * This function implements the log-density function of an Inverse-Gaussian
+ * distribution with mean = 0.5 * (2n + h) / |z| and shape 0.25 * (2n + h)^2.
+ * As outlined in [1], the mean can act as a scale parameter of the
+ * distribution. Therefore to avoid instability at extreme values, we re-scale
+ * so that we end up with a mean of 1 and a shape of 0.5 * (2n + h) * |z|,
+ * using:
+ *      f(x; mean, shape) = f(x/mean; 1, shape/mean) / mean.
  *
- * logsumexp is applied as an attempt to prevent underflow. The sum of terms
- * is truncated at `PGM_MAX_SERIES_TERMS` terms.
+ * References
+ * ----------
+ * [1] Giner, G., & Smyth, G. K. (2016). statmod: probability calculations for
+ *     the inverse Gaussian distribution. In R Journal (Vol. 8, Issue 1, pp. 339-351).
  */
+static PGM_INLINE double
+invgauss_logpdf(const pdf_parameter_t* pr)
+{
+    double mean = pr->n / pr->z + 0.5 * pr->h / pr->z;
+    double shape = pr->n * pr->z + 0.5 * pr->h * pr->z;
+    double y = pr->x / mean;
+
+    return -PGM_LS2PI - 1.5 * log(y) + 0.5 * log(shape) -
+            (0.5 * shape) * (y - 2. + 1. / y) - log(mean);
+}
+
+
+typedef double (*logpdf_func_t)(const pdf_parameter_t*);
+
+
+static PGM_INLINE double
+logsumexp(size_t n, double array[const n], double max_val, double scale[const n])
+{
+    double out = 0;
+
+    for (size_t i = 0; i < n; ++i) {
+        out += scale[i] * exp(array[i] - max_val);
+    }
+
+    return max_val + log(fabs(out));
+}
+
+
 double
 pgm_polyagamma_logpdf(double x, double h, double z)
 {
-    if (islessequal(x, 0.) || isinf(x)) {
+    if (islessequal(x, 0.) || isinf(x) || isinf(h)) {
         return -INFINITY;
     }
 
+    z = fabs(z);
+    double c;
+    logpdf_func_t logpdf;
     double lg = pgm_lgamma(h);
-    double a = (fabs(z) > 0. ? h * log(cosh(0.5 * z)) - 0.5 * z * z * x : 0.) +
-               (h - 1.) * PGM_LOG2 - PGM_LS2PI - 1.5 * log(x) - lg;
-    double first = lg - 0.125 * h * h / x;
-    double sum = 1.;
-    double sign = -1.;
+    pdf_parameter_t pr = {.x = x, .z = z, .h = h, .n = 0};
+    double* sign = malloc(PGM_MAX_SERIES_TERMS * sizeof(*sign));
+    double* elems = malloc(PGM_MAX_SERIES_TERMS * sizeof(*elems));
 
-    for (unsigned int n = 1; n < PGM_MAX_SERIES_TERMS; n++, sign = -sign) {
-        double t = 2 * n + h;
-        double curr = pgm_lgamma(n + h) - 0.125 * t * t / x - pgm_lgamma(n + 1);
-        sum += sign * exp(curr - first) * t / h;
+    if (z > 0.) {
+        logpdf = invgauss_logpdf;
+        c = h * log1p(exp(-z)) - lg;
+    }
+    else {
+        logpdf = invgamma_logpdf;
+        c = h * PGM_LOG2 - lg;
     }
 
-    return a + (log(h) + first + log(sum));
+    sign[0] = 1;
+    elems[0] = lg + logpdf(&pr);
+    double max_elem = elems[0];
+    size_t n = 1;
+
+    /* TODO: Compute the loggamma difference using a numerically stable way.
+     * something like: log(pochhammer(n + 1, h - 1)) */
+    do {
+        pr.n = n;
+        elems[n] = pgm_lgamma(n + h) - pgm_lgamma(n + 1) + logpdf(&pr) - z * n;
+        sign[n] = -sign[n - 1];
+        max_elem = elems[n] > max_elem ? elems[n] : max_elem;
+    } while (++n < PGM_MAX_SERIES_TERMS);
+
+    double out = c + logsumexp(n, elems, max_elem, sign);
+    free(sign);
+    free(elems);
+
+    return out;
+}
+
+
+PGM_INLINE double
+pgm_polyagamma_pdf(double x, double h, double z)
+{
+    return exp(pgm_polyagamma_logpdf(x, h, z));
 }
 
 /*
  * Struct to store arguments passed to the cdf functions.
  * `s2x` is sqrt(2x) if z == 0, else sqrt(x). `a` is (2n + h)
  */
-struct cdf_args {
+typedef struct {
     double s2x;
     double a;
     double x;
     double z;
-};
+} cdf_parameter_t;
 
 /*
  * CDF of the Inverse-Gamma(0.5, 0.125 * a^2) distribution, where `a` is the (2n + h).
@@ -147,9 +218,9 @@ struct cdf_args {
  *      pp.
  */
 static PGM_INLINE double
-invgamma_logcdf(struct cdf_args* const arg)
+invgamma_logcdf(const cdf_parameter_t* pr)
 {
-    double x = 0.5 * arg->a / arg->s2x;
+    double x = 0.5 * pr->a / pr->s2x;
 
     if (isgreater(x, 26.55)) {
         static const double p0 = 0.3275911;
@@ -214,70 +285,18 @@ norm_logcdf(double x)
  * underflow/overflow when parameter values are either very small or large.
  */
 static PGM_INLINE double
-invgauss_logcdf(struct cdf_args* const arg)
+invgauss_logcdf(const cdf_parameter_t* pr)
 {
-    double qm = 2. * arg->x * arg->z / arg->a;
-    double r = 2. * arg->s2x / arg->a;
+    double qm = 2. * pr->x * pr->z / pr->a;
+    double r = 2. * pr->s2x / pr->a;
     double a = norm_logcdf((qm - 1.) / r);
-    double b = arg->z * arg->a + norm_logcdf(-(qm + 1.) / r);
+    double b = pr->z * pr->a + norm_logcdf(-(qm + 1.) / r);
 
     return a + log1p(exp(b - a));
 }
 
 
-typedef double (*logcdf_func_t)(struct cdf_args*);
-
-/*
- * Approximate the distribution function of PG(h, z).
- *
- * Note: The first term of the sum is evaluated before the loop to avoid
- * redundancy.
- */
-double
-pgm_polyagamma_cdf(double x, double h, double z)
-{
-    if (islessequal(x, 0.)) {
-        return 0.;
-    }
-    else if (isinf(x)) {
-        return 1.;
-    }
-
-    z = fabs(z);
-    double c, zn;
-    logcdf_func_t logcdf;
-    struct cdf_args arg = {.a = h, .x = x, .z = z};
-
-    if (z > 0.) {
-        logcdf = invgauss_logcdf;
-        c = h * log1p(exp(-z));
-        arg.s2x = sqrt(x);
-        zn = z;
-    }
-    else {
-        logcdf = invgamma_logcdf;
-        c = h * PGM_LOG2;
-        arg.s2x = sqrt(2. * x);
-        zn = 0.;
-    }
-
-    double sum = exp(c + logcdf(&arg));
-    double sign = -1.;
-
-    c -= pgm_lgamma(h);
-    for (unsigned int n = 1; n < PGM_MAX_SERIES_TERMS; n++, sign = -sign, zn = z * n) {
-        arg.a = 2 * n + h;
-        double term = exp(c + pgm_lgamma(n + h) + logcdf(&arg) - pgm_lgamma(n + 1) - zn);
-        double prev_sum = sum;
-        sum += sign * term;
-
-        if (PGM_ISCLOSE(sum, prev_sum, 0., DBL_EPSILON)) {
-            break;
-        }
-    }
-
-    return sum;
-}
+typedef double (*logcdf_func_t)(const cdf_parameter_t*);
 
 /*
  * Approximate the logarithm of the distribution function of PG(h, z).
@@ -299,33 +318,48 @@ pgm_polyagamma_logcdf(double x, double h, double z)
     }
 
     z = fabs(z);
-    double c, zn;
+    double c;
     logcdf_func_t logcdf;
     double lg = pgm_lgamma(h);
-    struct cdf_args arg = {.a = h, .x = x, .z = z};
+    cdf_parameter_t pr = {.a = h, .x = x, .z = z};
+    double* sign = malloc(PGM_MAX_SERIES_TERMS * sizeof(*sign));
+    double* elems = malloc(PGM_MAX_SERIES_TERMS * sizeof(*elems));
 
     if (z > 0.) {
         logcdf = invgauss_logcdf;
         c = h * log1p(exp(-z)) - lg;
-        arg.s2x = sqrt(x);
-        zn = z;
+        pr.s2x = sqrt(x);
     }
     else {
         logcdf = invgamma_logcdf;
         c = h * PGM_LOG2 - lg;
-        arg.s2x = sqrt(2. * x);
-        zn = 0.;
+        pr.s2x = sqrt(2. * x);
     }
 
-    double first = lg + logcdf(&arg);
-    double sum = 1.;
-    double sign = -1.;
+    sign[0] = 1;
+    elems[0] = lg + logcdf(&pr);
+    double max_elem = elems[0];
+    size_t n = 1;
 
-    for (unsigned int n = 1; n < PGM_MAX_SERIES_TERMS; n++, sign = -sign, zn = z * n) {
-        arg.a = 2 * n + h;
-        double curr = pgm_lgamma(n + h) + logcdf(&arg) - pgm_lgamma(n + 1) - zn;
-        sum += sign * exp(curr - first);
-    }
+    /* TODO: Compute the loggamma difference using a numerically stable way.
+     * something like: log(pochhammer(n + 1, h - 1)) */
+    do {
+        pr.a = 2 * n + h;
+        elems[n] = pgm_lgamma(n + h) - pgm_lgamma(n + 1) + logcdf(&pr) - z * n;
+        sign[n] = -sign[n - 1];
+        max_elem = elems[n] > max_elem ? elems[n] : max_elem;
+    } while (++n < PGM_MAX_SERIES_TERMS);
 
-    return c + (first + log(sum));
+    double out = c + logsumexp(n, elems, max_elem, sign);
+    free(sign);
+    free(elems);
+
+    return out;
+}
+
+
+double
+pgm_polyagamma_cdf(double x, double h, double z)
+{
+    return fmax(fmin(exp(pgm_polyagamma_logcdf(x, h, z)), 1.), 0.);
 }
