@@ -104,6 +104,13 @@ def test_polyagamma():
     h = (1, 2, 3)
     rng_polyagamma(h, method="devroye")
     rng_polyagamma(h, method="alternate")
+    # test to see if numpy array input of whole numbers does not cause the
+    # sampler to fail when method="devroye" is set explicitly. This means that
+    # elements `2` and `2.0` get treated the same when parameter validation
+    # checks are performed for this method to ensure all h elements are integers.
+    # See GH-issue #84
+    random_polyagamma(np.ones(1), method="devroye")
+    random_polyagamma(np.array([1., 2, 3.0]), method="devroye")
 
     # raise an error when using devroye with non-integer values of h
     with pytest.raises(ValueError):

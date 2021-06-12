@@ -79,7 +79,7 @@ cdef inline int check_method(object h, str method, bint disable_checks,
         if is_a_number(h):
             raise_error = PyObject_RichCompareBool(PyNumber_Long(h), h, Py_NE)
         else:
-            o = np.PyArray_FROM_OT(h, np.NPY_LONG) != np.PyArray_FROM_O(h)
+            o = np.PyArray_FROM_OTF(h, np.NPY_LONG, np.NPY_ARRAY_FORCECAST) != np.PyArray_FROM_O(h)
             raise_error = any(np.PyArray_Ravel(o, np.NPY_CORDER))
         if raise_error:
             raise ValueError("devroye method must have integer values for h")
