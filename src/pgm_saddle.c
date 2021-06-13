@@ -335,7 +335,7 @@ random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z,
                 do {
                     double y = random_standard_normal(bitgen_state);
                     double w = sqrt_rho_inv + 0.5 * mu2 * y * y / h;
-                    pr.x = w - sqrt(w * w - mu2);
+                    pr.x = w - sqrt(fabs(w * w - mu2));
                     if (next_double(bitgen_state) * (1. + pr.x * sqrt_rho) > 1.) {
                         pr.x = mu2 / pr.x;
                     }
