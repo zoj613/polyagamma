@@ -247,7 +247,7 @@ All contributions, bug reports, bug fixes, documentation improvements, enhanceme
 
 To submit a PR, follow the steps below:
 1) Fork the repo.
-2) Setup the dev environment with `poetry install`. All dependencies will be installed.
+2) Install the [poetry][10] package and setup the dev environment with `poetry install --no-root`. All dependencies will be installed.
 3) Start writing your changes, including unittests.
 3) Once finished, run `make install` to build the project with the new changes.
 4) Once build is successful, run tests to make sure they all pass with `make test`.
@@ -271,3 +271,4 @@ To submit a PR, follow the steps below:
 [7]: https://img.shields.io/circleci/build/github/zoj613/polyagamma/main?style=flat-square
 [8]: https://img.shields.io/codecov/c/github/zoj613/polyagamma?style=flat-square
 [9]: https://github.com/slinderman/pypolyagamma
+[10]: https://github.com/python-poetry/poetry
