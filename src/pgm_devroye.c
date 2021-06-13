@@ -130,7 +130,10 @@ random_right_bounded_invgauss(bitgen_t* bitgen_state, parameter_t* const pr)
     do {
         double y = random_standard_normal(bitgen_state);
         double w = (pr->z + 0.5 * y * y) / pr->z2;
-        x = w - sqrt(w * w - 1 / pr->z2);
+        /* PGM_MAX is used below to ensure the sign is always positive in cases
+         * where the terms inside the sqrt are equal and the difference flips
+         * the sign of the zero. See GH-issue #83 */
+        x = w - sqrt(PGM_MAX(w * w - 1. / pr->z2, 0.));
         if (next_double(bitgen_state) * (1. + x * pr->z) > 1.) {
             x = 1. / (x * pr->z2);
         }
