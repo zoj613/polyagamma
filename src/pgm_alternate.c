@@ -210,7 +210,7 @@ random_right_bounded_invgauss(bitgen_t* bitgen_state, parameter_t* const pr)
     do {
         double y = random_standard_normal(bitgen_state);
         double w = pr->h_z + 0.5 * y * y / pr->z2;
-        pr->x = w - sqrt(w * w - pr->h_z2);
+        pr->x = w - sqrt(fabs(w * w - pr->h_z2));
         if (next_double(bitgen_state) * (pr->h_z + pr->x) > pr->h_z) {
             pr->x = pr->h_z2 / pr->x;
         }
