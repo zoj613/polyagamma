@@ -44,6 +44,8 @@
 #define DBL_EPSILON 2.22045e-16
 #endif
 
+#define LOG_DBL_EPSILON -36.0436533891172
+
 PGM_EXTERN double
 pgm_lgamma(double z);
 
@@ -138,7 +140,25 @@ logsumexp(size_t n, double array[const n], double max_val, double scale[const n]
     return max_val + log(fabs(out));
 }
 
-
+/*
+ * Compute the logarithm of the density of PG(h, z).
+ *
+ * NOTE
+ * ----
+ * - The terms of the infinite series converge to zero as n increases. Thus an
+ *   estimate of the error term of partial sum can be estimated by the absolute
+ *   value of the n'th term. Thus we terminate the partial sum if |a_n| <  DBL_EPSILON.
+ *   The maximum number of terms in the partial sum is `MAX_SERIES_TERMS`. In
+ *   practice the partial sum is terminated much sooner.
+ * - If |z| > 0, the density of PG(h,z) is obtained by exponentially tilting that
+ *   of PG(h, 0) and then renormalizing. See page 6 og Polson et al (2013).
+ *
+ * TODO:
+ * ----
+ *  - Use a series acceleration technique?
+ *  - Compute the loggamma difference using a numerically stable way.
+ *    something like: log(pochhammer(n + 1, h - 1)) ?
+ */
 double
 pgm_polyagamma_logpdf(double x, double h, double z)
 {
@@ -146,42 +166,28 @@ pgm_polyagamma_logpdf(double x, double h, double z)
         return -INFINITY;
     }
 
-    z = fabs(z);
-    double c;
-    logpdf_func_t logpdf;
     double lg = pgm_lgamma(h);
     pdf_parameter_t pr = {.x = x, .z = z, .h = h, .n = 0};
     double* sign = malloc(PGM_MAX_SERIES_TERMS * sizeof(*sign));
     double* elems = malloc(PGM_MAX_SERIES_TERMS * sizeof(*elems));
 
-    if (z > 0.) {
-        logpdf = invgauss_logpdf;
-        c = h * log1p(exp(-z)) - lg;
-    }
-    else {
-        logpdf = invgamma_logpdf;
-        c = h * PGM_LOG2 - lg;
-    }
-
-    sign[0] = 1;
-    elems[0] = lg + logpdf(&pr);
+    sign[0] = 1.;
+    elems[0] = lg + invgamma_logpdf(&pr);
     double max_elem = elems[0];
     size_t n = 1;
 
-    /* TODO: Compute the loggamma difference using a numerically stable way.
-     * something like: log(pochhammer(n + 1, h - 1)) */
     do {
         pr.n = n;
-        elems[n] = pgm_lgamma(n + h) - pgm_lgamma(n + 1) + logpdf(&pr) - z * n;
+        elems[n] = pgm_lgamma(n + h) - pgm_lgamma(n + 1) + invgamma_logpdf(&pr);
         sign[n] = -sign[n - 1];
         max_elem = elems[n] > max_elem ? elems[n] : max_elem;
-    } while (++n < PGM_MAX_SERIES_TERMS);
+    } while (elems[n] > LOG_DBL_EPSILON && ++n < PGM_MAX_SERIES_TERMS);
 
-    double out = c + logsumexp(n, elems, max_elem, sign);
+    double out = h * PGM_LOG2 - lg + logsumexp(n, elems, max_elem, sign);
     free(sign);
     free(elems);
 
-    return out;
+    return fabs(z) > 0. ? h * log(cosh(0.5 * z)) - 0.5 * z * z * x + out : out;
 }
 
 
@@ -348,7 +354,7 @@ pgm_polyagamma_logcdf(double x, double h, double z)
         elems[n] = pgm_lgamma(n + h) - pgm_lgamma(n + 1) + logcdf(&pr) - z * n;
         sign[n] = -sign[n - 1];
         max_elem = elems[n] > max_elem ? elems[n] : max_elem;
-    } while (++n < PGM_MAX_SERIES_TERMS);
+    } while (elems[n] > LOG_DBL_EPSILON && ++n < PGM_MAX_SERIES_TERMS);
 
     double out = c + logsumexp(n, elems, max_elem, sign);
     free(sign);
