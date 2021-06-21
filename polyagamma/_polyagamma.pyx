@@ -67,8 +67,7 @@ cdef inline bint params_are_scalars(object a, object b):
     return is_a_number(a) and is_a_number(b)
 
 
-cdef inline int check_method(object h, str method, bint disable_checks,
-                             sampler_t* sampler) except -1:
+cdef inline int check_method(object h, str method, bint disable_checks) except -1:
     cdef bint raise_error
     cdef object o
 
@@ -83,12 +82,20 @@ cdef inline int check_method(object h, str method, bint disable_checks,
             raise_error = any(np.PyArray_Ravel(o, np.NPY_CORDER))
         if raise_error:
             raise ValueError("devroye method must have integer values for h")
-        sampler[0] = DEVROYE
-        return 1
+        return DEVROYE
 
-    sampler[0] = METHODS[method]
-    return 1
+    return METHODS[method]
 
+
+cdef inline void _random_polyagamma_broadcasted(bitgen_t* bitgen, np.broadcast bcast,
+                                                sampler_t stype, double* out) nogil:
+    cdef double ch, cz
+
+    while bcast.index < bcast.size:
+        ch = (<double*>np.PyArray_MultiIter_DATA(bcast, 0))[0]
+        cz = (<double*>np.PyArray_MultiIter_DATA(bcast, 1))[0]
+        out[bcast.index] = pgm_random_polyagamma(bitgen, ch, cz, stype)
+        np.PyArray_MultiIter_NEXT(bcast)
 
 # intentionally named `polyagamma` instead of `random_polyagamma` in this file
 # to avoid name clashing with the cython function of the same name.
@@ -217,7 +224,7 @@ def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
     bitgen = <bitgen_t*>PyCapsule_GetPointer(bitgenerator.capsule, BITGEN_NAME)
 
     if method is not None:
-        check_method(h, method, disable_checks, &stype)
+        stype = <sampler_t>check_method(h, method, disable_checks)
 
     if params_are_scalars(h, z):
         if not disable_checks and PyObject_RichCompareBool(h, zero, Py_LE):
@@ -256,7 +263,7 @@ def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
         raise ValueError("values of `h` must be positive")
     z = np.PyArray_FROM_OT(z, np.NPY_DOUBLE)
 
-    if np.PyArray_NDIM(h) == np.PyArray_NDIM(z) == 1:
+    if np.PyArray_NDIM(<np.ndarray>h) == np.PyArray_NDIM(<np.ndarray>z) == 1:
         ah, az = h, z
         if has_out and not (out.shape[0] == ah.shape[0] == az.shape[0]):
             raise IndexError("`out` must have the same length as parameters")
@@ -283,11 +290,7 @@ def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
             arr_ptr = <double*>np.PyArray_DATA(arr)
 
         with bitgenerator.lock, nogil:
-            while bcast.index < bcast.size:
-                ch = (<double*>np.PyArray_MultiIter_DATA(bcast, 0))[0]
-                cz = (<double*>np.PyArray_MultiIter_DATA(bcast, 1))[0]
-                arr_ptr[bcast.index] = pgm_random_polyagamma(bitgen, ch, cz, stype)
-                np.PyArray_MultiIter_NEXT(bcast)
+            _random_polyagamma_broadcasted(bitgen, bcast, stype, arr_ptr)
 
         if has_out:
             return
