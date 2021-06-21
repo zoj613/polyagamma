@@ -8,12 +8,13 @@ Copyright (c) 2020-2021, Zolisa Bleki
 
 SPDX-License-Identifier: BSD-3-Clause
 """
+from cpython.exc cimport PyErr_Clear
 from cpython.float cimport PyFloat_Check
 from cpython.long cimport PyLong_Check
 from cpython.number cimport PyNumber_Long
 from cpython.object cimport PyObject_RichCompareBool, Py_LE, Py_LT, Py_NE
 from cpython.pycapsule cimport PyCapsule_GetPointer
-from cpython.tuple cimport PyTuple_CheckExact, PyTuple_GET_SIZE
+from libc.stdlib cimport free
 from numpy.random.bit_generator cimport BitGenerator, bitgen_t
 cimport numpy as np
 from numpy.random import default_rng
@@ -87,15 +88,27 @@ cdef inline int check_method(object h, str method, bint disable_checks) except -
     return METHODS[method]
 
 
-cdef inline void _random_polyagamma_broadcasted(bitgen_t* bitgen, np.broadcast bcast,
-                                                sampler_t stype, double* out) nogil:
-    cdef double ch, cz
+cdef inline object _polyagamma_shape_broadcasted(bitgen_t* bitgen, object h, object z,
+                                                 sampler_t stype, np.PyArray_Dims shape,
+                                                 object lock):
+        cdef np.flatiter h_iter, z_iter
+        cdef Py_ssize_t index = 0
 
-    while bcast.index < bcast.size:
-        ch = (<double*>np.PyArray_MultiIter_DATA(bcast, 0))[0]
-        cz = (<double*>np.PyArray_MultiIter_DATA(bcast, 1))[0]
-        out[bcast.index] = pgm_random_polyagamma(bitgen, ch, cz, stype)
-        np.PyArray_MultiIter_NEXT(bcast)
+        h_iter = np.PyArray_BroadcastToShape(h, shape.ptr, shape.len)
+        z_iter = np.PyArray_BroadcastToShape(z, shape.ptr, shape.len)
+        arr = np.PyArray_EMPTY(shape.len, shape.ptr, np.NPY_DOUBLE, 0)
+        arr_ptr = <double*>np.PyArray_DATA(arr)
+        free(shape.ptr)
+
+        with lock, nogil:
+            while np.PyArray_ITER_NOTDONE(h_iter):
+                ch = (<double*>np.PyArray_ITER_DATA(h_iter))[0]
+                cz = (<double*>np.PyArray_ITER_DATA(z_iter))[0]
+                arr_ptr[index] = pgm_random_polyagamma(bitgen, ch, cz, stype)
+                np.PyArray_ITER_NEXT(h_iter)
+                np.PyArray_ITER_NEXT(z_iter)
+                index += 1
+        return arr
 
 # intentionally named `polyagamma` instead of `random_polyagamma` in this file
 # to avoid name clashing with the cython function of the same name.
@@ -119,19 +132,29 @@ def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
         The exponential tilting parameter as described in [1]_. The value(s)
         must be finite. Defaults to 0.
     size : int or tuple of ints, optional
-        The number of elements to draw from the distribution. If size is
-        ``None`` (default) then a single value is returned. If a tuple of
-        integers is passed, the returned array will have the same shape.
-        If the element(s) of size is not an integer type, it will be truncated
-        to the largest integer smaller than its value (e.g (2.1, 1) -> (2, 1)).
-        This parameter only applies if `h` and `z` are scalars.
+        Output shape.  If the given shape is, e.g., ``(m, n, k)``, then
+        ``m * n * k`` samples are drawn.  If size is ``None`` (default),
+        a single value is returned if ``h`` and ``z`` are both scalars.
+        Otherwise, ``np.broadcast(h, z).size`` samples are drawn.
+
+        .. versionchanged:: 1.3.2
+           Can now handle a `size` argument when `h` and `z` are not both scalars.
+           Also raises an exception when it contains non-integer values.
+
     out : array_like, optional
         1d array_like object in which to store samples. This object must
         implement the buffer protocol as described in [4]_ or the array
         protocol as described in [5]_. This object's elements must be of 64bit
         float type, C-contiguous and aligned. If given, then no value is
         returned. when `h` and/or `z` is a sequence, then `out` needs to have
-        the same total size as the broadcasted result of the parameters.
+        the same total size as the broadcasted result of the parameters. If
+        both this and the `size` parameter are set when `h` and `z` are not
+        both scalars, `size` is preferred while this parameter is ignored.
+
+        .. versionchanged:: 1.3.2
+           If set with `size` when `h` and `z` are not both scalars, this input
+           is ignored in favor of `size`.
+
     method : str or None, optional
         The method to use when sampling. If None (default) then a hybrid
         sampler is used that picks the most efficient method based on the value
@@ -214,6 +237,7 @@ def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
     cdef double ch, cz
     cdef double[:] ah, az
     cdef double* arr_ptr
+    cdef np.PyArray_Dims shape
     cdef np.npy_intp arr_len
     cdef BitGenerator bitgenerator
     cdef bitgen_t* bitgen
@@ -238,20 +262,15 @@ def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
             with bitgenerator.lock, nogil:
                 random_polyagamma_fill(bitgen, ch, cz, stype, out.shape[0], &out[0])
             return
+        elif not np.PyArray_IntpConverter(size, &shape):
+            # clear other exceptions silently set by PyArray_IntpConverter.
+            # See: https://github.com/numpy/numpy/issues/19291
+            PyErr_Clear()
+            raise ValueError("`size` is not a valid argument. See func docstring")
         else:
-            if PyTuple_CheckExact(size):
-                shape = np.PyArray_FROM_OT(size, np.NPY_INTP)
-                arr = np.PyArray_EMPTY(
-                    PyTuple_GET_SIZE(size),
-                    <np.npy_intp*>np.PyArray_DATA(shape),
-                    np.NPY_DOUBLE,
-                    0
-                )
-                arr_len = np.PyArray_SIZE(arr)
-            else:
-                arr_len = <np.npy_intp>size
-                arr = np.PyArray_EMPTY(1, &arr_len, np.NPY_DOUBLE, 0)
-
+            arr = np.PyArray_EMPTY(shape.len, shape.ptr, np.NPY_DOUBLE, 0)
+            free(shape.ptr)
+            arr_len = np.PyArray_SIZE(arr)
             arr_ptr = <double*>np.PyArray_DATA(arr)
             with bitgenerator.lock, nogil:
                 pgm_random_polyagamma_fill(bitgen, ch, cz, stype, arr_len, arr_ptr)
@@ -263,7 +282,14 @@ def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
         raise ValueError("values of `h` must be positive")
     z = np.PyArray_FROM_OT(z, np.NPY_DOUBLE)
 
-    if np.PyArray_NDIM(<np.ndarray>h) == np.PyArray_NDIM(<np.ndarray>z) == 1:
+    # handle cases where the user also passes a size argument value
+    if size is not None and not np.PyArray_IntpConverter(size, &shape):
+        PyErr_Clear()
+        raise ValueError("`size` is not a valid argument. See func docstring")
+    elif size is not None:
+        return _polyagamma_shape_broadcasted(bitgen, h, z, stype, shape, bitgenerator.lock)
+
+    elif np.PyArray_NDIM(<np.ndarray>h) == np.PyArray_NDIM(<np.ndarray>z) == 1:
         ah, az = h, z
         if has_out and not (out.shape[0] == ah.shape[0] == az.shape[0]):
             raise IndexError("`out` must have the same length as parameters")
@@ -290,7 +316,11 @@ def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
             arr_ptr = <double*>np.PyArray_DATA(arr)
 
         with bitgenerator.lock, nogil:
-            _random_polyagamma_broadcasted(bitgen, bcast, stype, arr_ptr)
+            while bcast.index < bcast.size:
+                ch = (<double*>np.PyArray_MultiIter_DATA(bcast, 0))[0]
+                cz = (<double*>np.PyArray_MultiIter_DATA(bcast, 1))[0]
+                arr_ptr[bcast.index] = pgm_random_polyagamma(bitgen, ch, cz, stype)
+                np.PyArray_MultiIter_NEXT(bcast)
 
         if has_out:
             return
