@@ -60,7 +60,9 @@ o = random_polyagamma()
 # Get a 5 by 10 array of PG(1, 2) variates.
 o = random_polyagamma(z=2, size=(5, 10))
 
-# Pass sequences as input. Numpy's broadcasting rules apply here.
+# We can pass sequences as input. Numpy's broadcasting rules apply here.
+# Get a 10 by 2 array where column 1 is PG(2, -10) and column 2 is PG(1, 10)
+o = random_polyagamma([2, 1], [-10, 10], size=(10, 2))
 z = [[1.5, 2, -0.75, 4, 5],
      [9.5, -8, 7, 6, -0.9]]
 o = random_polyagamma(1, z)

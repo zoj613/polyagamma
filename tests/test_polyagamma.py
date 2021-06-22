@@ -17,9 +17,11 @@ def test_polyagamma():
 
     assert len(rng_polyagamma(size=5)) == 5
     assert rng_polyagamma(size=(5, 2)).shape == (5, 2)
-    # test if non-integer elements of size get truncated to ints
-    assert rng_polyagamma(size=(5.1, 2.9)).shape == (5, 2)
-    assert rng_polyagamma(size=10.4).shape == (10,)
+    # test if non-integer elements of size raise exception
+    with pytest.raises(ValueError, match="`size` is not a valid argument"):
+        assert rng_polyagamma(size=(5.1, 2.9))
+    with pytest.raises(ValueError, match="`size` is not a valid argument"):
+        assert rng_polyagamma(size=10.4)
 
     h = [[[0.59103028], [0.15228518], [0.53494081], [0.85875483], [0.05796053]],
          [[0.63934113], [0.1341983 ], [0.73854957], [0.76351291], [0.38431413]],
@@ -31,6 +33,16 @@ def test_polyagamma():
     z = np.array([1, 2, 3, 4, 6])
     assert rng_polyagamma(h, z).shape == (4, 5, 5)
     assert rng_polyagamma(h, 0.12345).shape == (4, 5, 1)
+
+    # test output of passing `size` when h and z are not both scalars
+    assert rng_polyagamma(z, size=(10, 1, 5)).shape == (10, 1, 5)
+    assert rng_polyagamma(h, z, size=(2, 4, 5, 5)).shape == (2, 4, 5, 5)
+    with pytest.raises(ValueError, match="array is not broadcastable"):
+        rng_polyagamma(z, size=(10, 1, 4))
+    # test if the expected exception is returned when `size` is the wrong object
+    with pytest.raises(ValueError, match="`size` is not a valid argument"):
+        rng_polyagamma(z, size={10, 1, 4})
+
 
     # should work on list/tuple input
     h = [[1000, 2, 3], [3, 3, 1]]
