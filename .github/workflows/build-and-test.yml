@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ ubuntu-20.04, macOS-10.15 ]
+        python-version: [ '3.6', '3.7', '3.8', '3.9' ]
+
+    name: Python version - ${{ matrix.python-version }} - ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache/restor poetry lockfile
+        uses: actions/cache@v2
+        with:
+          path: .
+          key: deps-${{ hashFiles('poetry.lock') }}
+          restore-keys: deps-
+
+      - name: Install Dependencies
+        run: |
+          python3 -m pip install --upgrade pip setuptools wheel
+          pip install poetry
+          poetry install --no-root
+
+      - name: Ensure openblas is installed on macOS for numpy
+        if: ${{ matrix.os == 'macOS-10.15' }}
+        run: |
+          poetry cache clear --all numpy
+          brew install openblas
+          OPENBLAS="$(brew --prefix openblas)" poetry run pip install --force-reinstall numpy==1.19.0
+
+      - name: Run Pytest, report coverage
+        run: |
+          poetry run cythonize polyagamma/*.pyx -X linetrace=True
+          BUILD_WITH_COVERAGE=1 poetry install
+          poetry run pytest -v --cov-branch --cov=polyagamma tests/ --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v1
+        with:
+          files: ./coverage.xml
+          fail_ci_if_error: true
