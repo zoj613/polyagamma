@@ -14,7 +14,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ ubuntu-20.04, macOS-10.15 ]
+        os: [ ubuntu-20.04, macOS-10.15, windows-2019 ]
         python-version: [ '3.6', '3.7', '3.8', '3.9' ]
 
     name: Python version - ${{ matrix.python-version }} - ${{ matrix.os }}
@@ -46,10 +46,23 @@ jobs:
           brew install openblas
           OPENBLAS="$(brew --prefix openblas)" poetry run pip install --force-reinstall numpy==1.19.0
 
-      - name: Run Pytest, report coverage
+      - name: Cythonize extension and add linetracing
         run: |
           poetry run cythonize polyagamma/*.pyx -X linetrace=True
+
+      - name: Build and install with Coverage support on Windows
+        if: ${{ matrix.os == 'windows-2019' }}
+        run: |
+          setx BUILD_WITH_COVERAGE "1"
+          poetry install
+
+      - name: Build and install with Coverage support on Unix OS's
+        if: ${{ matrix.os != 'windows-2019' }}
+        run: |
           BUILD_WITH_COVERAGE=1 poetry install
+
+      - name: Run Pytest, report coverage
+        run: |
           poetry run pytest -v --cov-branch --cov=polyagamma tests/ --cov-report=xml
 
       - name: Upload coverage to Codecov

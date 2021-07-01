@@ -74,8 +74,7 @@ tanh_x(double x)
 }
 
 
-static inline float
-__attribute__((always_inline))
+PGM_FORCEINLINE float
 tan_x(float x)
 {
     return tanf(x) / x;

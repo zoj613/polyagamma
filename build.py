@@ -33,7 +33,7 @@ extensions = [
         source_files,
         include_dirs=[include_path, "./include"],
         library_dirs=[join(include_path, '..', '..', 'random', 'lib')],
-        libraries=['npyrandom', 'm'],
+        libraries=['npyrandom'],
         define_macros=macros,
         extra_compile_args=compile_args,
     ),
