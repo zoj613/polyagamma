@@ -15,12 +15,23 @@
 #define PGM_LS2PI    0.9189385332046727417803297364056177  // log(sqrt(2 * pi))
 #define PGM_LOG2     0.6931471805599453094172321214581766  // log(2)
 
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(_MSC_VER)
+    #define PGM_INLINE __inline
+    #define PGM_EXTERN extern
+#elif defined(__GNUC__) || defined(__clang__)
     #define PGM_INLINE inline
     #define PGM_EXTERN extern
 #else
     #define PGM_INLINE 
     #define PGM_EXTERN
+#endif
+
+#if defined(_MSC_VER)
+    #define PGM_FORCEINLINE static __forceinline
+#elif defined(__GNUC__) || defined(__clang__)
+    #define PGM_FORCEINLINE static PGM_INLINE __attribute__((always_inline))
+#else
+    #define PGM_FORCEINLINE static
 #endif
 
 #define PGM_MAX(x, y) (((x) > (y)) ? (x) : (y))
