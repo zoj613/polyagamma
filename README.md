@@ -42,7 +42,7 @@ of multi-dimensional samples without specifying the size.
 existing libraries.
 - `polyagamma` is optimized for performance and tests show that it is faster
   than other implementations.
-- Pre-built wheels are provided for easy installation on `x86_64` linux systems.
+- Pre-built wheels are provided for easy installation on Linux, MacOS and Windows.
 
 
 ## Examples
@@ -165,7 +165,9 @@ and the following shell commands:
 ```shell
 $ git clone https://github.com/zoj613/polya-gamma.git
 $ cd polya-gamma/
-$ poetry install
+# install dependencies
+$ poetry install --no-root
+$ make install
 # add package to python's path
 $ export PYTHONPATH=$PWD:$PYTHONPATH 
 ```
@@ -196,7 +198,7 @@ method and also equally accurate).
 Therefore, we devise a "hybrid/default" sampler that picks a sampler based on the above guidelines.
 
 We also benchmark the hybrid sampler runtime with the sampler found in the `pypolyagamma` 
-package (version `1.2.3`). The version of NumPy we use is `1.18.5`. We compare our
+package (version `1.2.3`). The version of NumPy we use is `1.19.0`. We compare our
 sampler to the `pgdrawv` functions provided by the package. Below are runtime plots of 20000
 samples for each value of `h` and `z`. Values of `h` range from 0.1 to 50, while `z` is set
 to 0, 2.5, 5, and 10.
