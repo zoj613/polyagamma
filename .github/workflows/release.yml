@@ -1,0 +1,90 @@
+# adapted from: https://github.com/pypa/cibuildwheel/tree/main/examples
+name: Release
+
+on:
+  release:
+    types: [ published ]
+
+  workflow_dispatch:
+
+jobs:
+  build_wheels_and_sdist:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ ubuntu-20.04, macOS-10.15, windows-2019 ]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache/restore poetry lockfile
+        uses: actions/cache@v2
+        with:
+          path: .
+          key: deps-${{ hashFiles('poetry.lock') }}
+          restore-keys: deps-
+
+      - name: Install Dependencies and Cythonize extension
+        run: |
+          python3 -m pip install --upgrade pip setuptools wheel
+          pip install poetry
+          poetry install --no-root
+          poetry run cythonize polyagamma/*.pyx
+
+      - name: Ensure openblas is installed on macOS for numpy
+        if: ${{ matrix.os == 'macOS-10.15' }}
+        run: |
+          poetry cache clear --all numpy
+          brew install openblas
+          OPENBLAS="$(brew --prefix openblas)" poetry run pip install --force-reinstall numpy==1.19.0
+
+      - name: Build wheels
+        env:
+          CIBW_ARCHS_LINUX: "auto64"
+          CIBW_ARCHS_MACOS: "x86_64"
+          CIBW_ARCHS_WINDOWS: "auto64"
+          CIBW_TEST_COMMAND: 'python -c "from polyagamma import random_polyagamma; print(random_polyagamma());"'
+          BUILD_WHEEL: true
+          # skip pypy builds
+          CIBW_SKIP: pp*
+        uses: pypa/cibuildwheel@v2.0.0a4
+
+      - name: Build source distribution
+        if: ${{ matrix.os == 'ubuntu-20.04' }}
+        run: |
+          poetry build -f sdist
+          mv dist/*.gz wheelhouse
+
+      - name: Store the wheelhouse directory
+        uses: actions/upload-artifact@v2
+        with:
+          name: wheels_and_sdist
+          path: wheelhouse
+          if-no-files-found: error
+
+
+  upload_pypi:
+    needs: [ build_wheels_and_sdist ]
+    runs-on: ubuntu-20.04
+    # upload to PyPI on every tag starting with 'v'
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/v')
+    steps:
+      - name: Pull built wheels and sdist
+        uses: actions/download-artifact@v2
+        with:
+          name: wheels_and_sdist
+          path: wheelhouse
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@v1.4.2
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_TOKEN }}
+          packages_dir: wheelhouse

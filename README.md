@@ -2,7 +2,7 @@
 [![PyPI - Wheel][4]](https://pypi.org/project/polyagamma/#files)
 [![PyPI][5]](https://pypi.org/project/polyagamma/#history)
 [![PyPI - License][6]](https://github.com/zoj613/polyagamma/blob/main/LICENSE)
-[![CircleCI][7]](https://circleci.com/gh/zoj613/polyagamma/)
+[![CI][7]](https://github.com/zoj613/polyagamma/actions/workflows/build-and-test.yml)
 [![Codecov][8]](https://codecov.io/gh/zoj613/polyagamma/)
 
 
@@ -270,7 +270,7 @@ To submit a PR, follow the steps below:
 [4]: https://img.shields.io/pypi/wheel/polyagamma?style=flat-square
 [5]: https://img.shields.io/github/v/release/zoj613/polyagamma?include_prereleases&style=flat-square
 [6]: https://img.shields.io/pypi/l/polyagamma?style=flat-square
-[7]: https://img.shields.io/circleci/build/github/zoj613/polyagamma/main?style=flat-square
+[7]: https://img.shields.io/github/workflow/status/zoj613/polyagamma/CI/main?style=flat-square
 [8]: https://img.shields.io/codecov/c/github/zoj613/polyagamma?style=flat-square
 [9]: https://github.com/slinderman/pypolyagamma
 [10]: https://github.com/python-poetry/poetry
