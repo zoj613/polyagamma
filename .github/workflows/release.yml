@@ -73,8 +73,6 @@ jobs:
   upload_pypi:
     needs: [ build_wheels_and_sdist ]
     runs-on: ubuntu-20.04
-    # upload to PyPI on every tag starting with 'v'
-    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/tags/v')
     steps:
       - name: Pull built wheels and sdist
         uses: actions/download-artifact@v2
