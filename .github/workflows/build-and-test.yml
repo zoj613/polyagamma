@@ -5,6 +5,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+    types: [ labeled ]
 
   workflow_dispatch:
 
@@ -46,23 +47,12 @@ jobs:
           brew install openblas
           OPENBLAS="$(brew --prefix openblas)" poetry run pip install --force-reinstall numpy==1.19.0
 
-      - name: Cythonize extension and add linetracing
+      - name: Run Pytest, report coverage
+        env:
+          BUILD_WITH_COVERAGE: true
         run: |
           poetry run cythonize polyagamma/*.pyx -X linetrace=True
-
-      - name: Build and install with Coverage support on Windows
-        if: ${{ matrix.os == 'windows-2019' }}
-        run: |
-          setx BUILD_WITH_COVERAGE "1"
           poetry install
-
-      - name: Build and install with Coverage support on Unix OS's
-        if: ${{ matrix.os != 'windows-2019' }}
-        run: |
-          BUILD_WITH_COVERAGE=1 poetry install
-
-      - name: Run Pytest, report coverage
-        run: |
           poetry run pytest -v --cov-branch --cov=polyagamma tests/ --cov-report=xml
 
       - name: Upload coverage to Codecov
