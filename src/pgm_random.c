@@ -3,7 +3,9 @@
  * SPDX-License-Identifier: BSD-3-Clause */
 #include "../include/pgm_random.h"
 
-#if defined(__GNUC__) || defined(__clang__)
+#if defined(_MSC_VER)
+    #define PGM_INLINE __inline
+#elif defined(__GNUC__) || defined(__clang__)
     #define PGM_INLINE inline
 #else
     #define PGM_INLINE
@@ -28,13 +30,13 @@ random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z,
 
 /* libc math library forward declarations */
 double
-sinh(double __x);
+sinh(double x);
 double
-tanh(double __x);
+tanh(double x);
 double
-sqrt(double __x);
+sqrt(double x);
 double
-fabs(double __x);
+fabs(double x);
 
 /*
  * Sample from a PG(h. z) using a Normal Approximation. For sufficiently large
@@ -72,7 +74,7 @@ random_polyagamma_normal_approx(bitgen_t* bitgen_state, double h, double z,
 #endif
 
 void*
-memset(void* __s, int __c, size_t __n);
+memset(void* s, int c, size_t n);
 /*
  * Sample from PG(h, z) using the Gamma convolution approximation method.
  *
@@ -126,7 +128,7 @@ random_polyagamma_hybrid(bitgen_t* bitgen_state, double h, double z,
 typedef void
 (*pgm_func_t)(bitgen_t* bitgen_state, double h, double z, size_t n, double* out);
 
-const pgm_func_t sampling_method_table[] = {
+static const pgm_func_t sampling_method_table[] = {
     [ALTERNATE] = random_polyagamma_alternate,
     [DEVROYE] = random_polyagamma_devroye,
     [SADDLE] = random_polyagamma_saddle,
@@ -135,7 +137,7 @@ const pgm_func_t sampling_method_table[] = {
 };
 
 
-PGM_INLINE double
+double
 pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z, sampler_t method)
 {
     double out;
@@ -145,7 +147,7 @@ pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z, sampler_t meth
 }
 
 
-PGM_INLINE void
+void
 pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
                            sampler_t method, size_t n, double* out)
 {
@@ -153,7 +155,7 @@ pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
 }
 
 
-PGM_INLINE void
+void
 pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h, const double* z,
                             sampler_t method, size_t n, double* restrict out)
 {
