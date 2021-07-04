@@ -87,28 +87,34 @@ cdef inline int check_method(object h, str method, bint disable_checks) except -
 
     return METHODS[method]
 
+# This has to be included seperately to function as expected.
+# See: https://github.com/numpy/numpy/issues/19291
+cdef extern from "numpy/ndarrayobject.h":
+    int PyArray_IntpConverter(object size, np.PyArray_Dims* shape) except 0
+
 
 cdef inline object _polyagamma_shape_broadcasted(bitgen_t* bitgen, object h, object z,
                                                  sampler_t stype, np.PyArray_Dims shape,
                                                  object lock):
-        cdef np.flatiter h_iter, z_iter
-        cdef Py_ssize_t index = 0
+    cdef np.flatiter h_iter, z_iter
+    cdef double* arr_ptr
+    cdef double ch, cz
 
-        h_iter = np.PyArray_BroadcastToShape(h, shape.ptr, shape.len)
-        z_iter = np.PyArray_BroadcastToShape(z, shape.ptr, shape.len)
-        arr = np.PyArray_EMPTY(shape.len, shape.ptr, np.NPY_DOUBLE, 0)
-        arr_ptr = <double*>np.PyArray_DATA(arr)
-        free(shape.ptr)
+    h_iter = np.PyArray_BroadcastToShape(h, shape.ptr, shape.len)
+    z_iter = np.PyArray_BroadcastToShape(z, shape.ptr, shape.len)
+    arr = np.PyArray_EMPTY(shape.len, shape.ptr, np.NPY_DOUBLE, 0)
+    arr_ptr = <double*>np.PyArray_DATA(arr)
+    free(shape.ptr)
 
-        with lock, nogil:
-            while np.PyArray_ITER_NOTDONE(h_iter):
-                ch = (<double*>np.PyArray_ITER_DATA(h_iter))[0]
-                cz = (<double*>np.PyArray_ITER_DATA(z_iter))[0]
-                arr_ptr[index] = pgm_random_polyagamma(bitgen, ch, cz, stype)
-                np.PyArray_ITER_NEXT(h_iter)
-                np.PyArray_ITER_NEXT(z_iter)
-                index += 1
-        return arr
+    with lock, nogil:
+        while np.PyArray_ITER_NOTDONE(h_iter):
+            ch = (<double*>np.PyArray_ITER_DATA(h_iter))[0]
+            cz = (<double*>np.PyArray_ITER_DATA(z_iter))[0]
+            arr_ptr[0] = pgm_random_polyagamma(bitgen, ch, cz, stype)
+            np.PyArray_ITER_NEXT(h_iter)
+            np.PyArray_ITER_NEXT(z_iter)
+            arr_ptr += 1
+    return arr
 
 # intentionally named `polyagamma` instead of `random_polyagamma` in this file
 # to avoid name clashing with the cython function of the same name.
@@ -262,12 +268,8 @@ def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
             with bitgenerator.lock, nogil:
                 random_polyagamma_fill(bitgen, ch, cz, stype, out.shape[0], &out[0])
             return
-        elif not np.PyArray_IntpConverter(size, &shape):
-            # clear other exceptions silently set by PyArray_IntpConverter.
-            # See: https://github.com/numpy/numpy/issues/19291
-            PyErr_Clear()
-            raise ValueError("`size` is not a valid argument. See func docstring")
         else:
+            PyArray_IntpConverter(size, &shape)
             arr = np.PyArray_EMPTY(shape.len, shape.ptr, np.NPY_DOUBLE, 0)
             free(shape.ptr)
             arr_len = np.PyArray_SIZE(arr)
@@ -283,10 +285,8 @@ def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
     z = np.PyArray_FROM_OT(z, np.NPY_DOUBLE)
 
     # handle cases where the user also passes a size argument value
-    if size is not None and not np.PyArray_IntpConverter(size, &shape):
-        PyErr_Clear()
-        raise ValueError("`size` is not a valid argument. See func docstring")
-    elif size is not None:
+    if size is not None:
+        PyArray_IntpConverter(size, &shape)
         return _polyagamma_shape_broadcasted(bitgen, h, z, stype, shape, bitgenerator.lock)
 
     elif np.PyArray_NDIM(<np.ndarray>h) == np.PyArray_NDIM(<np.ndarray>z) == 1:

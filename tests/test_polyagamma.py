@@ -18,9 +18,9 @@ def test_polyagamma():
     assert len(rng_polyagamma(size=5)) == 5
     assert rng_polyagamma(size=(5, 2)).shape == (5, 2)
     # test if non-integer elements of size raise exception
-    with pytest.raises(ValueError, match="`size` is not a valid argument"):
+    with pytest.raises(TypeError, match="object cannot be interpreted as an integer"):
         assert rng_polyagamma(size=(5.1, 2.9))
-    with pytest.raises(ValueError, match="`size` is not a valid argument"):
+    with pytest.raises(TypeError, match="object cannot be interpreted as an integer"):
         assert rng_polyagamma(size=10.4)
 
     h = [[[0.59103028], [0.15228518], [0.53494081], [0.85875483], [0.05796053]],
@@ -40,7 +40,7 @@ def test_polyagamma():
     with pytest.raises(ValueError, match="array is not broadcastable"):
         rng_polyagamma(z, size=(10, 1, 4))
     # test if the expected exception is returned when `size` is the wrong object
-    with pytest.raises(ValueError, match="`size` is not a valid argument"):
+    with pytest.raises(TypeError, match="object does not support indexing"):
         rng_polyagamma(z, size={10, 1, 4})
 
 
