@@ -172,18 +172,18 @@ pgm_polyagamma_logpdf(double x, double h, double z)
     double* elems = malloc(PGM_MAX_SERIES_TERMS * sizeof(*elems));
 
     sign[0] = 1.;
-    elems[0] = lg + invgamma_logpdf(&pr);
+    elems[0] = h * PGM_LOG2 + invgamma_logpdf(&pr);
     double max_elem = elems[0];
     size_t n = 1;
 
     do {
         pr.n = n;
-        elems[n] = pgm_lgamma(n + h) - pgm_lgamma(n + 1) + invgamma_logpdf(&pr);
+        elems[n] = h * PGM_LOG2 - lg + pgm_lgamma(n + h) - pgm_lgamma(n + 1) + invgamma_logpdf(&pr);
         sign[n] = -sign[n - 1];
         max_elem = elems[n] > max_elem ? elems[n] : max_elem;
     } while (elems[n] > LOG_DBL_EPSILON && ++n < PGM_MAX_SERIES_TERMS);
 
-    double out = h * PGM_LOG2 - lg + logsumexp(n, elems, max_elem, sign);
+    double out = logsumexp(n, elems, max_elem, sign);
     free(sign);
     free(elems);
 
