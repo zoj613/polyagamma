@@ -3,6 +3,12 @@
 
 #include <numpy/random/bitgen.h>
 
+#if !defined(_MSC_VER)
+    #define PGM_RESTRICT restrict
+#else
+    #define PGM_RESTRICT
+#endif
+
 
 typedef enum {GAMMA, DEVROYE, ALTERNATE, SADDLE, HYBRID} sampler_t;
 
@@ -65,6 +71,6 @@ pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
  */
 void
 pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h, const double* z,
-                            sampler_t method, size_t n, double* restrict out);
+                            sampler_t method, size_t n, double* PGM_RESTRICT out);
 
 #endif

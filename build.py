@@ -1,4 +1,5 @@
 from distutils.core import Extension
+import platform
 import os
 from os.path import join
 
@@ -20,10 +21,12 @@ macros = [('NPY_NO_DEPRECATED_API', 0)]
 if os.getenv("BUILD_WITH_COVERAGE", None):
     macros.append(('CYTHON_TRACE_NOGIL', 1))
 
-
-compile_args = ['-O2', '-std=c99', '-march=native']
-if os.getenv("BUILD_WHEEL", None):
-    compile_args.pop()
+if platform.system() == 'Windows':
+    compile_args = ['/O2']
+else:
+    compile_args = ['-O2', '-std=c99', '-march=native']
+    if os.getenv("BUILD_WHEEL", None):
+        compile_args.pop()
 
 # https://numpy.org/devdocs/reference/random/examples/cython/setup.py.html
 include_path = np.get_include()
