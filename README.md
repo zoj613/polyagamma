@@ -1,9 +1,10 @@
 # Polya-Gamma
 [![PyPI - Wheel][4]](https://pypi.org/project/polyagamma/#files)
-[![PyPI][5]](https://pypi.org/project/polyagamma/#history)
-[![PyPI - License][6]](https://github.com/zoj613/polyagamma/blob/main/LICENSE)
 [![CI][7]](https://github.com/zoj613/polyagamma/actions/workflows/build-and-test.yml)
 [![Codecov][8]](https://codecov.io/gh/zoj613/polyagamma/)
+[![PyPI - License][6]](https://github.com/zoj613/polyagamma/blob/main/LICENSE)
+[![PyPI][5]](https://pypi.org/project/polyagamma/#history)
+[![Conda][11]](https://anaconda.org/conda-forge/polyagamma)
 
 
 Efficiently generate samples from the Polya-Gamma distribution using a NumPy/SciPy compatible interface.
@@ -89,7 +90,7 @@ o = random_polyagamma(random_state=rng)
 
 # If one is using a `numpy.random.RandomState` instance instead of the `Generator`
 # class, the object's underlying bitgenerator can be passed as the value of random_state
-bit_gen = np.random.RandomState(12345)._bit_generator
+bit_gen = np.random.RandomState(12345).bit_generator
 o = random_polyagamma(random_state=bit_gen)
 
 # When passing a large input array for the shape parameter `h`, parameter value
@@ -147,6 +148,7 @@ For an example of how to use `polyagamma` in a C program, see [here][1].
 
 
 ## Dependencies
+- Python >= 3.6
 - Numpy >= 1.19.0
 
 
@@ -154,16 +156,16 @@ For an example of how to use `polyagamma` in a C program, see [here][1].
 To get the latest version of the package, one can install it by downloading the wheel/source distribution 
 from the [releases][3] page, or using `pip` with the following shell command:
 ```shell
-$ pip install polyagamma
-```
-To install the latest pre-release version, use:
-```shell
 $ pip install --pre -U polyagamma
+```
+or using `conda` with the following command:
+```shell
+$ conda install -c conda-forge polyagamma
 ```
 Alternatively, once can install from source by cloning the repo. This requires an installation of [poetry][2]
 and the following shell commands:
 ```shell
-$ git clone https://github.com/zoj613/polya-gamma.git
+$ git clone https://github.com/zoj613/polyagamma.git
 $ cd polya-gamma/
 # install dependencies
 $ poetry install --no-root
@@ -270,9 +272,10 @@ To submit a PR, follow the steps below:
 [2]: https://python-poetry.org/docs/pyproject/
 [3]: https://github.com/zoj613/polyagamma/releases
 [4]: https://img.shields.io/pypi/wheel/polyagamma?style=flat-square
-[5]: https://img.shields.io/github/v/release/zoj613/polyagamma?include_prereleases&style=flat-square
+[5]: https://img.shields.io/github/v/release/zoj613/polyagamma?include_prereleases&label=pypi&style=flat-square
 [6]: https://img.shields.io/pypi/l/polyagamma?style=flat-square
 [7]: https://img.shields.io/github/workflow/status/zoj613/polyagamma/CI/main?style=flat-square
 [8]: https://img.shields.io/codecov/c/github/zoj613/polyagamma?style=flat-square
 [9]: https://github.com/slinderman/pypolyagamma
 [10]: https://github.com/python-poetry/poetry
+[11]: https://img.shields.io/conda/vn/conda-forge/polyagamma?style=flat-square
