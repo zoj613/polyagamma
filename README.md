@@ -58,8 +58,8 @@ from polyagamma import random_polyagamma
 # generate a PG(1, 0) sample
 o = random_polyagamma()
 
-# Get a 5 by 10 array of PG(1, 2) variates.
-o = random_polyagamma(z=2, size=(5, 10))
+# Get a 5 by 1 array of PG(1, 2) variates.
+o = random_polyagamma(z=2, size=5)
 
 # We can pass sequences as input. Numpy's broadcasting rules apply here.
 # Get a 10 by 2 array where column 1 is PG(2, -10) and column 2 is PG(1, 10)
@@ -90,7 +90,7 @@ o = random_polyagamma(random_state=rng)
 
 # If one is using a `numpy.random.RandomState` instance instead of the `Generator`
 # class, the object's underlying bitgenerator can be passed as the value of random_state
-bit_gen = np.random.RandomState(12345).bit_generator
+bit_gen = np.random.RandomState(12345)._bit_generator
 o = random_polyagamma(random_state=bit_gen)
 
 # When passing a large input array for the shape parameter `h`, parameter value
@@ -148,7 +148,6 @@ For an example of how to use `polyagamma` in a C program, see [here][1].
 
 
 ## Dependencies
-- Python >= 3.6
 - Numpy >= 1.19.0
 
 
@@ -182,10 +181,10 @@ and `z`, using each method. We restrict `h` to integer values to accomodate the
 `devroye` method, which cannot be used for non-integer `h`. The version of the
 package used to generate them is `v1.3.1`.
 
-![](./scripts/img/perf_methods_0.0.svg) | ![](./scripts/img/perf_methods_2.5.svg)
+|![](./scripts/img/perf_methods_0.0.svg) | ![](./scripts/img/perf_methods_2.5.svg)|
 | --- | --- |
 
-![](./scripts/img/perf_methods_5.0.svg) | ![](./scripts/img/perf_methods_10.0.svg)
+|![](./scripts/img/perf_methods_5.0.svg) | ![](./scripts/img/perf_methods_10.0.svg)|
 | --- | --- |
 
 Generally:
@@ -205,10 +204,10 @@ sampler to the `pgdrawv` functions provided by the package. Below are runtime pl
 samples for each value of `h` and `z`. Values of `h` range from 0.1 to 50, while `z` is set
 to 0, 2.5, 5, and 10.
 
-![](./scripts/img/perf_samplers_0.0.svg) | ![](./scripts/img/perf_samplers_2.5.svg)
+|![](./scripts/img/perf_samplers_0.0.svg) | ![](./scripts/img/perf_samplers_2.5.svg)|
 | --- | --- |
 
-![](./scripts/img/perf_samplers_5.0.svg) | ![](./scripts/img/perf_samplers_10.0.svg)
+|![](./scripts/img/perf_samplers_5.0.svg) | ![](./scripts/img/perf_samplers_10.0.svg)|
 | --- | --- |
 
 It can be seen that when generating many samples at once for any given combination of 
@@ -239,12 +238,12 @@ is ran on.
 ## Distribution Plots
 Below is a visualization of the Cumulative distribution and density functions for
 various values of the parameters.
-![](./scripts/img/pdf.svg) | ![](./scripts/img/cdf.svg)
+|![](./scripts/img/pdf.svg) | ![](./scripts/img/cdf.svg)|
 | --- | --- |
 
 We can compare these plots to the Kernel density estimate and empirical CDF plots
 generated from 20000 random samples using each of the available methods.
-![](./scripts/img/kde.svg) | ![](./scripts/img/ecdf.svg)
+|![](./scripts/img/kde.svg) | ![](./scripts/img/ecdf.svg)|
 | --- | --- |
 
 
