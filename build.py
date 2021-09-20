@@ -24,9 +24,7 @@ if os.getenv("BUILD_WITH_COVERAGE", None):
 if platform.system() == 'Windows':
     compile_args = ['/O2']
 else:
-    compile_args = ['-O2', '-std=c99', '-march=native']
-    if os.getenv("BUILD_WHEEL", None):
-        compile_args.pop()
+    compile_args = ['-O2', '-std=c99']
 
 # https://numpy.org/devdocs/reference/random/examples/cython/setup.py.html
 include_path = np.get_include()
