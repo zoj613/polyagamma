@@ -33,8 +33,7 @@ jobs:
 
       - name: Install Dependencies and Cythonize extension
         run: |
-          python3 -m pip install --upgrade pip setuptools wheel
-          pip install poetry
+          python3 -m pip install --upgrade pip setuptools wheel poetry
           poetry install --no-root
           poetry run cythonize polyagamma/*.pyx
 
