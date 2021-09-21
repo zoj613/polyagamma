@@ -22,7 +22,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: '3.6'
 
       - name: Cache/restore poetry lockfile
         uses: actions/cache@v2
