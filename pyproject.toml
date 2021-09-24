@@ -35,11 +35,11 @@ numpy = "^1.19.0"
 
 [tool.poetry.dev-dependencies]
 Cython = "^0.29.21"
-numpy = "1.19.0"
+numpy = "1.19.*"
 pytest = "^6.2.1"
 toml = "^0.10.2"
-pytest-cov = "^2.11.1"
-codecov = "^2.1.11"
+pytest-cov = "^2.*"
+codecov = "^2.*"
 
 [tool.poetry.build]
 script = "build.py"

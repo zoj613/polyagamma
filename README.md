@@ -166,7 +166,7 @@ and the following shell commands:
 ```shell
 $ git clone https://github.com/zoj613/polyagamma.git
 $ cd polya-gamma/
-# install dependencies
+# install dependencies (make sure pip is up to date before hand)
 $ poetry install --no-root
 $ make install
 # add package to python's path
