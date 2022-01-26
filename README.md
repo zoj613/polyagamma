@@ -115,7 +115,7 @@ from polyagamma import polyagamma_pdf, polyagamma_cdf
 ```
 
 ### Cython
-The package also provides functions that can be imported in cython modules. They are:
+The package also provides low-level functions that can be imported in cython modules. They are:
 - `random_polyagamma`
 - `random_polyagamma_fill`
 - `random_polyagamma_fill2`
@@ -142,6 +142,10 @@ with bitgenerator.lock, nogil:
 print(out.base)
 ...
 ```
+
+### PyMC
+As of `pymc>=4.0.0b1`, this distribution can be accessed as a PyMC distribution object. See the
+pymc documentation for more details.
 
 ### C
 For an example of how to use `polyagamma` in a C program, see [here][1].
