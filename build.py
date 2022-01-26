@@ -4,6 +4,7 @@ import os
 from os.path import join
 
 import numpy as np
+from numpy.distutils.misc_util import get_info
 
 
 source_files = [
@@ -28,13 +29,17 @@ else:
 
 # https://numpy.org/devdocs/reference/random/examples/cython/setup.py.html
 include_path = np.get_include()
+lib_dirs = [
+    join(include_path, '..', '..', 'random', 'lib'),
+    *get_info('npymath')['library_dirs']
+]
 extensions = [
     Extension(
         "_polyagamma",
         source_files,
         include_dirs=[include_path, "./include"],
-        library_dirs=[join(include_path, '..', '..', 'random', 'lib')],
-        libraries=['npyrandom'],
+        library_dirs=lib_dirs,
+        libraries=['npyrandom', 'npymath'],
         define_macros=macros,
         extra_compile_args=compile_args,
     ),
