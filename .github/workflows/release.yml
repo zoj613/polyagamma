@@ -52,7 +52,7 @@ jobs:
           CIBW_TEST_COMMAND: 'python -c "from polyagamma import random_polyagamma; print(random_polyagamma());"'
           BUILD_WHEEL: true
           # skip pypy builds
-          CIBW_SKIP: pp*
+          CIBW_SKIP: pp* cp36-*
         uses: pypa/cibuildwheel@v2.4.0
 
       - name: Build source distribution
