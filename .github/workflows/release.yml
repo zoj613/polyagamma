@@ -49,7 +49,7 @@ jobs:
           CIBW_ARCHS_LINUX: "auto64"
           CIBW_ARCHS_MACOS: "x86_64"
           CIBW_ARCHS_WINDOWS: "auto64"
-          CIBW_TEST_COMMAND: 'python -c import polyagamma; print(polyagamma.random_polyagamma());"'
+          CIBW_TEST_COMMAND: 'python -c "import polyagamma; print(polyagamma.random_polyagamma());"'
           BUILD_WHEEL: true
           # skip pypy builds
           CIBW_SKIP: pp* cp36-*
