@@ -53,7 +53,7 @@ jobs:
           BUILD_WHEEL: true
           # skip pypy builds
           CIBW_SKIP: pp* cp36-*
-        uses: pypa/cibuildwheel@v2.4.0
+        uses: pypa/cibuildwheel@v2.3.1
 
       - name: Build source distribution
         if: ${{ matrix.os == 'ubuntu-20.04' }}
