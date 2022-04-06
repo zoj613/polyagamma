@@ -33,7 +33,7 @@ jobs:
 
       - name: Install Dependencies and Cythonize extension
         run: |
-          python3 -m pip install --upgrade pip setuptools wheel poetry
+          python3 -m pip install --upgrade pip setuptools wheel poetry cibuildwheel==2.4.0
           poetry install --no-root
           poetry run cythonize polyagamma/*.pyx
 
@@ -46,14 +46,14 @@ jobs:
 
       - name: Build wheels
         env:
+          # skip pypy builds
+          CIBW_SKIP: pp* cp36-*
           CIBW_ARCHS_LINUX: "auto64"
           CIBW_ARCHS_MACOS: "x86_64"
           CIBW_ARCHS_WINDOWS: "auto64"
           CIBW_TEST_COMMAND: 'python -c "import polyagamma; print(polyagamma.random_polyagamma());"'
           BUILD_WHEEL: true
-          # skip pypy builds
-          CIBW_SKIP: pp* cp36-*
-        uses: pypa/cibuildwheel@v2.3.1
+        run: poetry run cibuildwheel --output-dir wheelhouse
 
       - name: Build source distribution
         if: ${{ matrix.os == 'ubuntu-20.04' }}
