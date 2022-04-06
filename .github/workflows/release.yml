@@ -15,12 +15,15 @@ jobs:
     strategy:
       matrix:
         os: [ ubuntu-20.04, macOS-10.15, windows-2019 ]
+        python-version: [ '3.7' ]
 
     steps:
       - uses: actions/checkout@v2
 
       - name: Set up Python
         uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python-version }}
 
       - name: Cache/restore poetry lockfile
         uses: actions/cache@v2
@@ -45,7 +48,7 @@ jobs:
       - name: Build wheels
         env:
           # skip pypy builds
-          CIBW_SKIP: pp* cp36-* cp38-win*
+          CIBW_SKIP: "pp* *-musllinux_x86_64 cp36-* cp38-win* cp39-win* cp310-win* cp310-manylinux* cp39-macosx* cp310-macosx*"
           CIBW_ARCHS_LINUX: "auto64"
           CIBW_ARCHS_MACOS: "x86_64"
           CIBW_ARCHS_WINDOWS: "auto64"
