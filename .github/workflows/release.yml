@@ -21,8 +21,6 @@ jobs:
 
       - name: Set up Python
         uses: actions/setup-python@v2
-        with:
-          python-version: '3.7'
 
       - name: Cache/restore poetry lockfile
         uses: actions/cache@v2
@@ -47,7 +45,7 @@ jobs:
       - name: Build wheels
         env:
           # skip pypy builds
-          CIBW_SKIP: pp* cp36-*
+          CIBW_SKIP: pp* cp36-* cp38-win*
           CIBW_ARCHS_LINUX: "auto64"
           CIBW_ARCHS_MACOS: "x86_64"
           CIBW_ARCHS_WINDOWS: "auto64"
