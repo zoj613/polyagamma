@@ -165,16 +165,11 @@ or using `conda` with the following command:
 ```shell
 $ conda install -c conda-forge polyagamma
 ```
-Alternatively, once can install from source by cloning the repo. This requires an installation of [poetry][2]
-and the following shell commands:
+Alternatively, once can install from source with the following shell commands:
 ```shell
 $ git clone https://github.com/zoj613/polyagamma.git
-$ cd polya-gamma/
-# install dependencies (make sure pip is up to date before hand)
-$ poetry install --no-root
-$ make install
-# add package to python's path
-$ export PYTHONPATH=$PWD:$PYTHONPATH 
+$ cd polyagamma/
+$ pip install .
 ```
 
 
@@ -224,7 +219,7 @@ every call to the function. This overhead can somewhat be mitigated by passing i
 generator instance at every call to the `polyagamma` function. To eliminate this overhead,
 it is best to use the Cython functions directly. Below is a timing example to demonstrate
 the benefit of passing a generator explicitly:
-```ipynb
+```shell
 In [3]: rng = np.random.SFC64(1)
 
 In [4]: %timeit random_polyagamma()
@@ -256,10 +251,9 @@ All contributions, bug reports, bug fixes, documentation improvements, enhanceme
 
 To submit a PR, follow the steps below:
 1) Fork the repo.
-2) Install the [poetry][10] package and setup the dev environment with `poetry install --no-root`. All dependencies will be installed.
+2) Install and setup the dev environment with `pip install -r requirements-dev.txt` or `make dev`.
 3) Start writing your changes, including unittests.
-3) Once finished, run `make install` to build the project with the new changes.
-4) Once build is successful, run tests to make sure they all pass with `make test`.
+4) Run tests to make sure they all pass with `make test`.
 5) Once finished, you can submit a PR for review.
 
 
@@ -272,7 +266,6 @@ To submit a PR, follow the steps below:
 
 
 [1]: ./examples/c_polyagamma.c
-[2]: https://python-poetry.org/docs/pyproject/
 [3]: https://github.com/zoj613/polyagamma/releases
 [4]: https://img.shields.io/pypi/wheel/polyagamma?style=flat-square
 [5]: https://img.shields.io/github/v/release/zoj613/polyagamma?include_prereleases&label=pypi&style=flat-square

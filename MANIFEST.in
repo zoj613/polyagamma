@@ -1,0 +1,4 @@
+prune .github
+prune examples
+prune scripts
+prune tests

@@ -1,11 +1,26 @@
-[tool.poetry]
+[build-system]
+requires = [
+    "wheel",
+    "cython==0.29.30",
+    "setuptools>=61.0.0",
+    "numpy==1.21.3; python_version=='3.10'",
+    "numpy==1.19.0; python_version<='3.9'",
+    "setuptools-scm",
+]
+build-backend = "setuptools.build_meta"
+
+
+[project]
 name = "polyagamma"
-version = "1.3.3"
+authors = [
+    {name = "Zolisa Bleki", email = "zolisa.bleki@gmail.com"}
+]
 description = "Efficiently generate samples from the Polya-Gamma distribution using a NumPy/SciPy compatible interface."
-authors = ["Zolisa Bleki"]
-license = "BSD-3-Clause"
 readme = "README.md"
-repository = "https://github.com/zoj613/polyagamma/"
+dynamic = ["version"]
+requires-python = ">=3.7"
+dependencies = ["numpy >= 1.19.0"]
+license = {text = "BSD 3-Clause License"}
 keywords = ['polya-gamma distribution', 'polya-gamma random sampling']
 classifiers = [
     "Intended Audience :: Science/Research",
@@ -19,41 +34,20 @@ classifiers = [
     "Operating System :: MacOS :: MacOS X",
     "Typing :: Typed",
 ]
-packages = [{include = "polyagamma/*.py"}]
-include = [
-    {path = "polyagamma/*.c", format = "sdist"},
-    {path = "include", format = "sdist"},
-    {path = "src", format = "sdist"},
-    "polyagamma/*.pxd",
-    "polyagamma/*.pyi",
-    "LICENSE",
-]
 
-[tool.poetry.dependencies]
-python = "^3.7,<3.11"
-numpy = "^1.19.0"
+[project.urls]
+source = "https://github.com/zoj613/polyagamma"
+tracker = "https://github.com/zoj613/polyagamma/issues"
 
-[tool.poetry.dev-dependencies]
-Cython = "^0.29.21"
-numpy = "1.21.3"
-pytest = "^6.2.1"
-toml = "^0.10.2"
-pytest-cov = "^2.*"
-codecov = "^2.*"
 
-[tool.poetry.build]
-script = "build.py"
+[tool.setuptools]
+packages = ["polyagamma"]
+
+[tool.setuptools.dynamic]
+version = {attr = "polyagamma.__version__"}
+
+[tool.setuptools.exclude-package-data]
+polyagamma = ["*.pyx"]
 
 [tool.coverage.run]
 plugins = ["Cython.Coverage"]
-
-
-[build-system]
-requires = [
-    "poetry-core>=1.0.0",
-    "wheel",
-    "setuptools",
-    "numpy==1.21.3; python_version=='3.10'",
-    "numpy==1.19.0; python_version<='3.9'",
-]
-build-backend = "poetry.core.masonry.api"
