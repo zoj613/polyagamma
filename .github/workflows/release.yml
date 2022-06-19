@@ -25,41 +25,39 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Cache/restore poetry lockfile
-        uses: actions/cache@v2
-        with:
-          path: .
-          key: deps-${{ hashFiles('poetry.lock') }}
-          restore-keys: deps-
-
-      - name: Install Dependencies and Cythonize extension
-        run: |
-          python3 -m pip install --upgrade pip setuptools wheel poetry cibuildwheel==2.4.0
-          poetry install --no-root
-          poetry run cythonize polyagamma/*.pyx
-
       - name: Ensure openblas is installed on macOS for numpy
-        if: matrix.os == 'macOS-10.15' && matrix.python-version != '3.10'
+        if: matrix.os == 'macOS-10.15'
         run: |
-          poetry cache clear --all numpy
           brew install openblas
-          OPENBLAS="$(brew --prefix openblas)" poetry run pip install --force-reinstall numpy==1.19.0
+          python3 -m pip install --upgrade pip setuptools wheel cibuildwheel==2.4.0
+          OPENBLAS="$(brew --prefix openblas)" pip install -r requirements-dev.txt
+
+      - name: Install Dependencies
+        if: matrix.os != 'macOS-10.15'
+        run: |
+          python3 -m pip install --upgrade pip setuptools wheel cibuildwheel==2.4.0
+          pip install -r requirements-dev.txt
 
       - name: Build wheels
         env:
           # skip pypy builds
-          CIBW_SKIP: "pp* *-musllinux_x86_64 cp36-* cp38-win* cp39-win* cp310-win* cp310-manylinux* cp39-macosx* cp310-macosx*"
+          CIBW_SKIP: "cp36-* *-musllinux_x86_64"
           CIBW_ARCHS_LINUX: "auto64"
           CIBW_ARCHS_MACOS: "x86_64"
           CIBW_ARCHS_WINDOWS: "auto64"
-          CIBW_TEST_COMMAND: 'python -c "import polyagamma; print(polyagamma.random_polyagamma());"'
+          # ensure openblas is used in macOS when building numpy
+          CIBW_BEFORE_ALL_MACOS: brew install openblas
+          CIBW_ENVIRONMENT_MACOS: OPENBLAS="$(brew --prefix openblas)"
+          CIBW_TEST_COMMAND: 'cd ~ && python -c "from polyagamma import random_polyagamma; print(random_polyagamma());"'
+          # skip the wheel build test command for windows OS
+          CIBW_TEST_SKIP: "*-win*"
           BUILD_WHEEL: true
-        run: poetry run cibuildwheel --output-dir wheelhouse
+        run: cibuildwheel --output-dir wheelhouse --config-file pyproject.toml
 
       - name: Build source distribution
         if: ${{ matrix.os == 'ubuntu-20.04' }}
         run: |
-          poetry build -f sdist
+          python -m build --sdist
           mv dist/*.gz wheelhouse
 
       - name: Store the wheelhouse directory

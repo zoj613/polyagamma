@@ -1,35 +1,25 @@
 .PHONY: clean cythonize install test sdist wheels
 
-DOCKER_IMAGES=quay.io/pypa/manylinux2010_x86_64 \
-	      quay.io/pypa/manylinux2014_x86_64
-
-define make_wheels
-	docker pull $(1)
-	docker container run -t --rm -e PLAT=$(strip $(subst quay.io/pypa/,,$(1))) \
-		-e BUILD_WHEEL=1 -v $(shell pwd):/io $(1) /io/build_wheels.sh
-endef
-
-
 clean:
 	rm -Rf build/* dist/* polyagamma/*.c polyagamma/*.so polyagamma/*.html \
-		polyagamma.egg-info **/*__pycache__ __pycache__ .coverage* \
+		./**/polyagamma.egg-info **/*__pycache__ __pycache__ .coverage* \
 
 cythonize:
 	cythonize polyagamma/*.pyx
 
-install: clean cythonize
-	poetry install
+dev:
+	pip install -r requirements-dev.txt
 
-sdist: clean cythonize
-	poetry build -f sdist
+sdist:
+	python -m build --sdist
 
-test:
+wheel:
+	python -m build --wheel
+
+test: cythonize
 	pytest tests/ -vvv
 
 test-cov: clean
-	poetry run cythonize polyagamma/*.pyx -X linetrace=True
-	BUILD_WITH_COVERAGE=1 poetry install
-	poetry run pytest -v --cov-branch --cov=polyagamma tests/ --cov-report=html
-	
-wheels: clean cythonize
-	$(foreach img, $(DOCKER_IMAGES), $(call make_wheels, $(img));)
+	cythonize polyagamma/*.pyx -X linetrace=True
+	BUILD_WITH_COVERAGE=1 pip install -e .
+	pytest -v --cov-branch --cov=polyagamma tests/ --cov-report=html

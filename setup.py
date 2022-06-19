@@ -1,14 +1,14 @@
-from distutils.core import Extension
 import platform
 import os
 from os.path import join
+from setuptools import Extension, setup
 
 import numpy as np
 from numpy.distutils.misc_util import get_info
 
 
 source_files = [
-    "polyagamma/_polyagamma.c",
+    "polyagamma/_polyagamma.pyx",
     "src/pgm_random.c",
     "src/pgm_alternate.c",
     "src/pgm_devroye.c",
@@ -16,7 +16,6 @@ source_files = [
     "src/pgm_saddle.c",
     "src/pgm_density.c",
 ]
-
 
 macros = [('NPY_NO_DEPRECATED_API', 0)]
 if os.getenv("BUILD_WITH_COVERAGE", None):
@@ -35,8 +34,8 @@ lib_dirs = [
 ]
 extensions = [
     Extension(
-        "_polyagamma",
-        source_files,
+        "polyagamma._polyagamma",
+        sources=source_files,
         include_dirs=[include_path, "./include"],
         library_dirs=lib_dirs,
         libraries=['npyrandom', 'npymath'],
@@ -46,6 +45,4 @@ extensions = [
 ]
 
 
-def build(setup_kwargs):
-    """Build extension modules."""
-    setup_kwargs.update(ext_modules=extensions, zip_safe=False)
+setup(ext_modules=extensions)
