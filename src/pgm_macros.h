@@ -52,7 +52,7 @@
  * adapted from a private <numpy/random/distributions.h> function of a similar name
  */
 #define next_float(rng) \
-    (((rng)->next_uint32((rng)->state) >> 9) * (1.0f / 8388608.0f))
+    (((rng)->next_uint32((rng)->state) >> 8) * (1.0f / 16777216.0f))
 
 /*
  * Generate a random double precision float in the range [0, 1). This macros is
