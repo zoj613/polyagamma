@@ -1,0 +1,4 @@
+polyagamma>=1.3.1
+pypolyagamma>=1.2.3
+perfplot==0.9.6
+scipy>=1.3.0
