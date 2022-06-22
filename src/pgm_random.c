@@ -1,14 +1,19 @@
 /* Copyright (c) 2020-2021, Zolisa Bleki
  *
  * SPDX-License-Identifier: BSD-3-Clause */
+#include <math.h>
+
 #include "../include/pgm_random.h"
 
 #if defined(_MSC_VER)
     #define PGM_INLINE __inline
+    #define PGM_FORCEINLINE static __forceinline
 #elif defined(__GNUC__) || defined(__clang__)
     #define PGM_INLINE inline
+    #define PGM_FORCEINLINE static PGM_INLINE __attribute__((always_inline))
 #else
     #define PGM_INLINE
+    #define PGM_FORCEINLINE static
 #endif
 
 /* numpy c-api declarations */
@@ -28,15 +33,6 @@ void
 random_polyagamma_saddle(bitgen_t* bitgen_state, double h, double z,
                          size_t n, double* out);
 
-/* libc math library forward declarations */
-double
-sinh(double x);
-double
-tanh(double x);
-double
-sqrt(double x);
-double
-fabs(double x);
 
 /*
  * Sample from a PG(h. z) using a Normal Approximation. For sufficiently large
@@ -56,7 +52,7 @@ random_polyagamma_normal_approx(bitgen_t* bitgen_state, double h, double z,
 
     if (z == 0.) {
         mean = 0.25 * h;
-        stdev = sqrt(0.041666688 * h);
+        stdev = sqrt(h / 24);
     }
     else {
         x = tanh(0.5 * z);
@@ -137,13 +133,25 @@ static const pgm_func_t sampling_method_table[] = {
 };
 
 
+/* Return the appropriate value for invalid shape parameter */
+PGM_FORCEINLINE double
+nan_or_inf(double h)
+{
+    return islessequal(h, 0.) | isnan(h) ? nan("") : INFINITY;
+}
+
+
 double
 pgm_random_polyagamma(bitgen_t* bitgen_state, double h, double z, sampler_t method)
 {
-    double out;
+    double out; 
+    
+    if (isfinite(h) & isgreater(h, 0.)) {
+        sampling_method_table[method](bitgen_state, h, z, 1., &out);
+        return out;
+    }
 
-    sampling_method_table[method](bitgen_state, h, z, 1, &out);
-    return out;
+    return nan_or_inf(h);
 }
 
 
@@ -151,6 +159,13 @@ void
 pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
                            sampler_t method, size_t n, double* out)
 {
+    if (islessequal(h, 0.) | isnan(h)) {
+        double retval = nan_or_inf(h);
+        while (n--) {
+            out[n] = retval;
+        }
+        return;
+    }
     sampling_method_table[method](bitgen_state, h, z, n, out);
 }
 
@@ -159,9 +174,7 @@ void
 pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h, const double* z,
                             sampler_t method, size_t n, double* PGM_RESTRICT out)
 {
-    pgm_func_t f = sampling_method_table[method];
-
     while (n--) {
-        f(bitgen_state, h[n], z[n], 1, out + n);
+        out[n] = pgm_random_polyagamma(bitgen_state, h[n], z[n], method);
     }
 }
