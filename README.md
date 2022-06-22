@@ -229,7 +229,11 @@ In [5]: %timeit random_polyagamma(random_state=rng)
 1.69 µs ± 6.96 ns per loop (mean ± std. dev. of 7 runs, 1000000 loops each)
 ```
 
-To generate the above plots locally, run `python scripts/benchmark.py --size=<some size> --z=<z value>`.
+To generate the above plots locally, run
+```shell
+$ pip install -r scripts/requirements.txt
+$ python scripts/benchmark.py --size=<some size> --z=<z value>
+```
 Note that the runtimes may differ  than the ones reported here, depending on the machine this script 
 is ran on.
 
