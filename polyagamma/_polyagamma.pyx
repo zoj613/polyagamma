@@ -178,9 +178,13 @@ def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
         If the "devroye" method is used, the `h` must be a positive integer.
     disable_checks : bool, optional
         Whether to check that the `h` parameter contains only positive
-        values(s). Disabling may give a performance gain, but may result
-        in problems (crashes, non-termination, wrong return values)
-        if the inputs do contain non-positive values.
+        values(s). If ``h <= 0``, then return ``NaN`` for corresponding output
+        values. Disabling _may_ give a performance gain if `h` is a very large array.
+
+        .. versionchanged:: 1.3.4
+           Now explicitly returns NaN if `disable_checks=True` and `h` is not
+           positive.
+
     random_state : {None, int, array_like[ints], SeedSequence, BitGenerator, Generator}, optional
         A seed to initialize the random number generator. If None, then fresh,
         unpredictable entropy will be pulled from the OS. If an ``int`` or

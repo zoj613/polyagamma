@@ -137,6 +137,13 @@ def test_polyagamma():
     # don't raise error when passed non-integer h values if checks are disabled
     # when using the devroye method.
     rng_polyagamma(1.5, method="devroye", disable_checks=True)
+    # test if the appropriate value is returned for out-of-bound `h` values when
+    # ``disable_checks=True``
+    assert np.isnan(rng_polyagamma(h=-np.inf, disable_checks=True))
+    assert np.isinf(rng_polyagamma(h=np.inf, disable_checks=True))
+    assert np.isnan(rng_polyagamma(h=np.nan, disable_checks=True))
+    assert np.isnan(rng_polyagamma(h=-12.5, disable_checks=True))
+    assert np.isnan(rng_polyagamma(h=0, disable_checks=True))
 
     # test for reproducibility via random_state
     rng = np.random.default_rng(12345)
