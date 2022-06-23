@@ -43,11 +43,11 @@ tracker = "https://github.com/zoj613/polyagamma/issues"
 [tool.setuptools]
 packages = ["polyagamma"]
 
-[tool.setuptools.dynamic]
-version = {attr = "polyagamma.__version__"}
-
 [tool.setuptools.exclude-package-data]
 polyagamma = ["*.pyx"]
+
+[tool.setuptools_scm]
+write_to = "polyagamma/_version.py"
 
 [tool.coverage.run]
 plugins = ["Cython.Coverage"]
