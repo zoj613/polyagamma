@@ -20,7 +20,9 @@ def test_polyagamma():
     # test if non-integer elements of size raise exception
     with pytest.raises(TypeError, match="object cannot be interpreted as an integer"):
         assert rng_polyagamma(size=(5.1, 2.9))
-    with pytest.raises(TypeError, match="object cannot be interpreted as an integer"):
+    # Later versions of numpy seem to return an updated error meesages for the
+    # following so we leave out the `match` keyword.
+    with pytest.raises(TypeError):
         assert rng_polyagamma(size=10.4)
 
     h = [[[0.59103028], [0.15228518], [0.53494081], [0.85875483], [0.05796053]],
@@ -40,7 +42,9 @@ def test_polyagamma():
     with pytest.raises(ValueError, match="array is not broadcastable"):
         rng_polyagamma(z, size=(10, 1, 4))
     # test if the expected exception is returned when `size` is the wrong object
-    with pytest.raises(TypeError, match="object does not support indexing"):
+    # Later versions of numpy seem to return an updated error meesages for the
+    # following so we leave out the `match` keyword.
+    with pytest.raises(TypeError):
         rng_polyagamma(z, size={10, 1, 4})
 
 
