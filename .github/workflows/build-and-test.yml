@@ -14,7 +14,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [ ubuntu-20.04, macOS-10.15, windows-2019 ]
+        os: [ ubuntu-20.04, macOS-11, windows-2019 ]
         python-version: [ '3.8', '3.9', '3.10', '3.11' ]
 
     name: Python version - ${{ matrix.python-version }} - ${{ matrix.os }}
@@ -26,15 +26,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Ensure openblas is installed on macOS for numpy
-        if: matrix.os == 'macOS-10.15'
-        run: |
-          brew install openblas
-          python3 -m pip install --upgrade pip setuptools wheel
-          OPENBLAS="$(brew --prefix openblas)" pip install -r requirements-dev.txt
-
-      - name: Install Dependencies for non-mac OS
-        if: matrix.os != 'macOS-10.15'
+      - name: Install Dependencies
         run: |
           python3 -m pip install --upgrade pip setuptools wheel
           pip install -r requirements-dev.txt
