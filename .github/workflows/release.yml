@@ -15,31 +15,22 @@ jobs:
     strategy:
       matrix:
         os: [ ubuntu-20.04, macOS-11, windows-2019 ]
-        python-version: [ '3.8' ]
 
     steps:
       - uses: actions/checkout@v2
 
       - name: Set up Python
         uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.python-version }}
 
       - name: Install Dependencies
         run: |
-          python3 -m pip install --upgrade pip setuptools wheel cibuildwheel==2.4.0
+          python3 -m pip install --upgrade pip cibuildwheel==2.12.3
           pip install -r requirements-dev.txt
 
       - name: Build wheels
         env:
-          # skip pypy builds
-          CIBW_SKIP: "cp36-* *-musllinux_x86_64"
           CIBW_ARCHS_LINUX: "auto64"
-          CIBW_ARCHS_MACOS: "x86_64"
           CIBW_ARCHS_WINDOWS: "auto64"
-          # ensure openblas is used in macOS when building numpy
-          CIBW_BEFORE_ALL_MACOS: brew install openblas
-          CIBW_ENVIRONMENT_MACOS: OPENBLAS="$(brew --prefix openblas)"
           CIBW_TEST_COMMAND: 'cd ~ && python -c "from polyagamma import random_polyagamma; print(random_polyagamma());"'
           # skip the wheel build test command for windows OS
           CIBW_TEST_SKIP: "*-win*"
