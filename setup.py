@@ -4,7 +4,6 @@ from os.path import join
 from setuptools import Extension, setup
 
 import numpy as np
-from numpy.distutils.misc_util import get_info
 
 
 source_files = [
@@ -27,16 +26,16 @@ else:
     compile_args = ['-O2', '-std=c99']
 
 # https://numpy.org/devdocs/reference/random/examples/cython/setup.py.html
-include_path = np.get_include()
+npy_include_path = np.get_include()
 lib_dirs = [
-    join(include_path, '..', '..', 'random', 'lib'),
-    *get_info('npymath')['library_dirs']
+    join(npy_include_path, '..', '..', 'random', 'lib'),
+    join(npy_include_path, '..', 'lib')
 ]
 extensions = [
     Extension(
         "polyagamma._polyagamma",
         sources=source_files,
-        include_dirs=[include_path, "./include"],
+        include_dirs=[npy_include_path, "./include"],
         library_dirs=lib_dirs,
         libraries=['npyrandom', 'npymath'],
         define_macros=macros,
