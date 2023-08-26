@@ -1,12 +1,19 @@
 [build-system]
 requires = [
     "wheel",
-    "cython==0.29.30",
+    "cython==0.29.36",
     "setuptools>=61.0.0",
-    "numpy==1.23.2; python_version>='3.11'",
-    "numpy==1.21.3; python_version=='3.10'",
-    "numpy==1.19.0; python_version<='3.9'",
     "setuptools-scm",
+    # Here we build the project using the earliest numpy version supported  by
+    # the used version of python. This does not affect required numpy version at
+    # installation time; `project.dependencies` is most relevant for required numpy
+    # when installtng at user level.
+    "numpy==1.26.0; python_version=='3.12' and platform_python_implementation!='PyPy'",
+    "numpy==1.23.2; python_version=='3.11' and platform_python_implementation!='PyPy'",
+    "numpy==1.21.3; python_version=='3.10' and platform_python_implementation!='PyPy'",
+    "numpy==1.19.3; python_version=='3.9' and platform_python_implementation!='PyPy'",
+    # PyPy specific requirements
+    "numpy==1.25.0; python_version=='3.9' and platform_python_implementation=='PyPy'",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -19,7 +26,7 @@ authors = [
 description = "Efficiently generate samples from the Polya-Gamma distribution using a NumPy/SciPy compatible interface."
 readme = "README.md"
 dynamic = ["version"]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 dependencies = ["numpy >= 1.19.0"]
 license = {text = "BSD 3-Clause License"}
 keywords = ['polya-gamma distribution', 'polya-gamma random sampling']
@@ -52,3 +59,28 @@ write_to = "polyagamma/_version.py"
 
 [tool.coverage.run]
 plugins = ["Cython.Coverage"]
+
+[tool.cibuildwheel]
+build-verbosity = 3
+archs = ["auto64"]
+# Numpy only supports Pypy 3.9 on x85_64 currently for the supported versions so we need to skip building wheels on Pypy for later versions
+# We also skip musllinux wheels for the aarch64 architecture because building a wheel takes hours.
+skip = ["pp31*", "pp3*_aarch64", "*-musllinux_aarch64"]
+# The test-command string is not parsed correctly on windows so we skip testing the wheel for now.
+# ARM64 wheels on MacOS currently can't be test with cibuildwheels, so we skip testing until it can be supoorted.
+test-skip = ["*-win*", "*-macosx_arm64"]
+before-test = "pip install numpy --pre"
+test-command = [
+    "python -c 'from polyagamma import random_polyagamma;print(random_polyagamma());'"
+]
+
+[tool.cibuildwheel.linux]
+archs = ["x86_64", "aarch64"]
+
+[tool.cibuildwheel.macos]
+archs = ["x86_64", "arm64"]
+
+[[tool.cibuildwheel.overrides]]
+# To avoid errors building numpy for the musllinux linux wheels, we install blas.
+select = "*-musllinux*"
+before-all = "apk add openblas-dev"

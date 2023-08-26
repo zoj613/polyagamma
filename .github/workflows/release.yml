@@ -7,63 +7,71 @@ on:
 
   workflow_dispatch:
 
+defaults:
+  run:
+    shell: bash -l {0}
+
 jobs:
   build_wheels_and_sdist:
     name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
-
     strategy:
       matrix:
         os: [ ubuntu-20.04, macOS-11, windows-2019 ]
+      fail-fast: false
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v2
-
-      - name: Install Dependencies
-        run: |
-          python3 -m pip install --upgrade pip cibuildwheel==2.12.3
-          pip install -r requirements-dev.txt
+      - name: Set up QEMU
+        if: runner.os == 'Linux'
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: all
 
       - name: Build wheels
-        env:
-          CIBW_ARCHS_LINUX: "auto64"
-          CIBW_ARCHS_WINDOWS: "auto64"
-          CIBW_TEST_COMMAND: 'cd ~ && python -c "from polyagamma import random_polyagamma; print(random_polyagamma());"'
-          # skip the wheel build test command for windows OS
-          CIBW_TEST_SKIP: "*-win*"
-          BUILD_WHEEL: true
-        run: cibuildwheel --output-dir wheelhouse --config-file pyproject.toml
+        uses: pypa/cibuildwheel@v2.15.0
+        with:
+          package-dir: .
+          output-dir: wheelhouse
+          config-file: "pyproject.toml"
+
+      - name: Set up Python
+        if: ${{ matrix.os == 'ubuntu-20.04' }}
+        uses: actions/setup-python@v4.7.0
+        with:
+          python-version: '3.9'
 
       - name: Build source distribution
         if: ${{ matrix.os == 'ubuntu-20.04' }}
         run: |
+          python -m pip install --upgrade pip build
           python -m build --sdist
           mv dist/*.gz wheelhouse
 
       - name: Store the wheelhouse directory
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: wheels_and_sdist
           path: wheelhouse
           if-no-files-found: error
 
-
   upload_pypi:
     needs: [ build_wheels_and_sdist ]
     runs-on: ubuntu-20.04
+    environment:
+      name: pypi
+      url: https://pypi.org/p/polyagamma
+    permissions:
+      id-token: write
     steps:
       - name: Pull built wheels and sdist
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         with:
           name: wheels_and_sdist
           path: wheelhouse
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.4.2
+        uses: pypa/gh-action-pypi-publish@v1.8.10
         with:
-          user: __token__
-          password: ${{ secrets.PYPI_TOKEN }}
           packages_dir: wheelhouse
