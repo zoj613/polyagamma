@@ -32,6 +32,11 @@ jobs:
           python-version: ${{ matrix.python-version }}
           allow-prereleases: true
 
+      - uses: tj-actions/changed-files@v36
+      - uses: pre-commit/action@v3.0.0
+        with:
+          extra_args: --files ${{ steps.changed-files.outputs.all_changed_files }}
+
       - name: Install Dependencies
         run: |
           python3 -m pip install --upgrade pip

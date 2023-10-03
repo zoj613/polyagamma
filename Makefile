@@ -9,6 +9,7 @@ cythonize:
 
 dev:
 	pip install -r requirements-dev.txt
+	pre-commit install --install-hooks
 
 sdist:
 	python -m build --sdist
