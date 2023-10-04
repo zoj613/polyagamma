@@ -3,6 +3,7 @@
 clean:
 	rm -Rf build/* dist/* polyagamma/*.c polyagamma/*.so polyagamma/*.html \
 		./**/polyagamma.egg-info **/*__pycache__ __pycache__ .coverage* \
+		polyagamma/_version.py \
 
 cythonize:
 	cythonize polyagamma/*.pyx

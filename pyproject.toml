@@ -55,7 +55,7 @@ packages = ["polyagamma"]
 polyagamma = ["*.pyx"]
 
 [tool.setuptools_scm]
-write_to = "polyagamma/_version.py"
+version_file = "polyagamma/_version.py"
 
 [tool.coverage.run]
 plugins = ["Cython.Coverage"]
@@ -73,6 +73,7 @@ before-test = "pip install numpy --pre"
 test-command = [
     "python -c 'from polyagamma import random_polyagamma;print(random_polyagamma());'"
 ]
+environment = { SETUPTOOLS_SCM_DEBUG = 1 }
 
 [tool.cibuildwheel.linux]
 archs = ["x86_64", "aarch64"]
