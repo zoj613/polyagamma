@@ -2,3 +2,5 @@ prune .github
 prune examples
 prune scripts
 prune tests
+exclude Makefile
+exclude polyagamma/*.pyx requirements-dev.txt .pre-commit-config.yaml .gitignore

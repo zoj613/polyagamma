@@ -1,4 +1,3 @@
--e .
 cython==0.29.36
 numpy==1.26.0
 pre-commit==3.4.0

@@ -10,15 +10,17 @@ cythonize:
 
 dev:
 	pip install -r requirements-dev.txt
+	cythonize polyagamma/*.pyx
+	pip install -e .
 	pre-commit install --install-hooks
 
-sdist:
+sdist: dev
 	python -m build --sdist
 
-wheel:
+wheel: dev
 	python -m build --wheel
 
-test: cythonize
+test: dev
 	pytest tests/ -vvv
 
 test-cov: clean
