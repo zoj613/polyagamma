@@ -7,7 +7,7 @@ import numpy as np
 
 
 source_files = [
-    "polyagamma/_polyagamma.pyx",
+    "polyagamma/_polyagamma.c",
     "src/pgm_random.c",
     "src/pgm_alternate.c",
     "src/pgm_devroye.c",

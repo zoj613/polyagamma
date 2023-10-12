@@ -1,7 +1,6 @@
 [build-system]
 requires = [
     "wheel",
-    "cython==0.29.36",
     "setuptools>=61.0.0",
     "setuptools-scm",
     # Here we build the project using the earliest numpy version supported  by
@@ -52,7 +51,11 @@ tracker = "https://github.com/zoj613/polyagamma/issues"
 packages = ["polyagamma"]
 
 [tool.setuptools.exclude-package-data]
-polyagamma = ["*.pyx"]
+# these get excluded from the wheel distribution only
+polyagamma = ["*.pyx", "_polyagamma.c"]
+
+[tool.setuptools.package-data]
+polyagamma = ["_polyagamma.c"]
 
 [tool.setuptools_scm]
 version_file = "polyagamma/_version.py"
