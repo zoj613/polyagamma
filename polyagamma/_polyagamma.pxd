@@ -1,22 +1,31 @@
 # cython: language_level=3
 from numpy.random cimport bitgen_t
 
-# this enum is duplicated from its C equivalent to avoid the need to link the
-# corresponding C header when importing this file in cython modules.
-ctypedef enum sampler_t:
-    GAMMA
-    DEVROYE
-    ALTERNATE
-    SADDLE
-    HYBRID
 
-# Cython-level declarations available to be cimported by other modules
-cdef double random_polyagamma(bitgen_t* bitgen_state, double h, double z,
-                              sampler_t method) nogil
+cdef extern from "pgm_random.h" nogil:
+    ctypedef enum sampler_t:
+        GAMMA
+        DEVROYE
+        ALTERNATE
+        SADDLE
+        HYBRID
 
-cdef void random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
-                                 sampler_t method, size_t n, double* out) nogil
+    double random_polyagamma "pgm_random_polyagamma" \
+        (bitgen_t* bitgen_state, double h, double z, sampler_t method) noexcept
 
-cdef void random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h,
-                                  const double* z, sampler_t method, size_t n,
-                                  double* out) nogil
+    void random_polyagamma_fill "pgm_random_polyagamma_fill" \
+        (bitgen_t* bitgen_state, double h, double z,
+         sampler_t method, size_t n, double* out) noexcept
+
+    void random_polyagamma_fill2 "pgm_random_polyagamma_fill2" \
+        (bitgen_t* bitgen_state, const double* h, const double* z,
+         sampler_t method, size_t n, double* out) noexcept
+
+
+cdef extern from "pgm_density.h" nogil:
+    double polyagamma_pdf "pgm_polyagamma_pdf" (double x, double h, double z) noexcept
+    double polyagamma_cdf "pgm_polyagamma_cdf" (double x, double h, double z) noexcept
+    double polyagamma_logpdf "pgm_polyagamma_logpdf" \
+        (double x, double h, double z) noexcept
+    double polyagamma_logcdf "pgm_polyagamma_logcdf" \
+        (double x, double h, double z) noexcept

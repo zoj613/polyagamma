@@ -1,5 +1,7 @@
 from ._polyagamma import (
-    polyagamma as random_polyagamma, polyagamma_pdf, polyagamma_cdf
+    rvs as random_polyagamma,
+    pdf as polyagamma_pdf,
+    cdf as polyagamma_cdf
 )
 try:
     from ._version import __version__, __version_tuple__

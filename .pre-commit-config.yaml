@@ -16,5 +16,5 @@ repos:
     hooks:
       - id: cython-lint
         args:
-          - --max-line-length=85
+          - --max-line-length=90
       - id: double-quote-cython-strings
