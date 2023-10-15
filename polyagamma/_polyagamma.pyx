@@ -3,16 +3,14 @@
 # cython: wraparound=False
 # cython: nonecheck=False
 # cython: cdivision=True
+# cython: initializedcheck=False
 """
-Copyright (c) 2020-2021, Zolisa Bleki
+Copyright (c) 2020-2023, Zolisa Bleki
 
 SPDX-License-Identifier: BSD-3-Clause
 """
-from cpython.exc cimport PyErr_Clear
 from cpython.float cimport PyFloat_Check
 from cpython.long cimport PyLong_Check
-from cpython.number cimport PyNumber_Long
-from cpython.object cimport PyObject_RichCompareBool, Py_LE, Py_LT, Py_NE
 from cpython.pycapsule cimport PyCapsule_GetPointer
 from libc.stdlib cimport free
 from numpy.random.bit_generator cimport BitGenerator, bitgen_t
@@ -21,105 +19,9 @@ from numpy.random import default_rng
 
 np.import_array()
 
-cdef extern from "pgm_random.h" nogil:
-    double pgm_random_polyagamma(bitgen_t* bitgen_state, double h,
-                                 double z, sampler_t method)
-    void pgm_random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
-                                    sampler_t method, size_t n, double* out)
-    void pgm_random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h,
-                                     const double* z, sampler_t method,
-                                     size_t n, double* out)
 
-# Cython-level function definitions to be shared with other cython modules
-cdef inline double random_polyagamma(bitgen_t* bitgen_state, double h, double z,
-                                     sampler_t method) nogil:
-    return pgm_random_polyagamma(bitgen_state, h, z, method)
-
-
-cdef inline void random_polyagamma_fill(bitgen_t* bitgen_state, double h, double z,
-                                        sampler_t method, size_t n, double* out) nogil:
-    pgm_random_polyagamma_fill(bitgen_state, h, z, method, n, out)
-
-
-cdef inline void random_polyagamma_fill2(bitgen_t* bitgen_state, const double* h,
-                                         const double* z, sampler_t method,
-                                         size_t n, double* out) nogil:
-    pgm_random_polyagamma_fill2(bitgen_state, h, z, method, n, out)
-
-
-# python-level functions and helpers below
-
-cdef dict METHODS = {
-    "gamma": GAMMA,
-    "saddle": SADDLE,
-    "devroye": DEVROYE,
-    "alternate": ALTERNATE,
-}
-
-
-cdef const char* BITGEN_NAME = "BitGenerator"
-
-
-cdef inline bint is_a_number(object o):
-    return PyFloat_Check(o) or PyLong_Check(o)
-
-
-cdef inline bint params_are_scalars(object a, object b):
-    return is_a_number(a) and is_a_number(b)
-
-
-cdef inline int check_method(object h, str method, bint disable_checks) except -1:
-    cdef bint raise_error
-    cdef object o
-
-    if method not in METHODS:
-        raise ValueError(f"`method` must be one of {set(METHODS)}")
-
-    if not disable_checks and method == "devroye":
-        if is_a_number(h):
-            raise_error = PyObject_RichCompareBool(PyNumber_Long(h), h, Py_NE)
-        else:
-            o = np.PyArray_FROM_OTF(h, np.NPY_LONG, np.NPY_ARRAY_FORCECAST) != np.PyArray_FROM_O(h)
-            raise_error = any(np.PyArray_Ravel(o, np.NPY_CORDER))
-        if raise_error:
-            raise ValueError("devroye method must have integer values for h")
-        return DEVROYE
-
-    return METHODS[method]
-
-# This has to be included seperately to function as expected.
-# See: https://github.com/numpy/numpy/issues/19291
-cdef extern from "numpy/ndarrayobject.h":
-    int PyArray_IntpConverter(object size, np.PyArray_Dims* shape) except 0
-
-
-cdef inline object _polyagamma_shape_broadcasted(bitgen_t* bitgen, object h, object z,
-                                                 sampler_t stype, np.PyArray_Dims shape,
-                                                 object lock):
-    cdef np.flatiter h_iter, z_iter
-    cdef double* arr_ptr
-    cdef double ch, cz
-
-    h_iter = np.PyArray_BroadcastToShape(h, shape.ptr, shape.len)
-    z_iter = np.PyArray_BroadcastToShape(z, shape.ptr, shape.len)
-    arr = np.PyArray_EMPTY(shape.len, shape.ptr, np.NPY_DOUBLE, 0)
-    arr_ptr = <double*>np.PyArray_DATA(arr)
-    free(shape.ptr)
-
-    with lock, nogil:
-        while np.PyArray_ITER_NOTDONE(h_iter):
-            ch = (<double*>np.PyArray_ITER_DATA(h_iter))[0]
-            cz = (<double*>np.PyArray_ITER_DATA(z_iter))[0]
-            arr_ptr[0] = pgm_random_polyagamma(bitgen, ch, cz, stype)
-            np.PyArray_ITER_NEXT(h_iter)
-            np.PyArray_ITER_NEXT(z_iter)
-            arr_ptr += 1
-    return arr
-
-# intentionally named `polyagamma` instead of `random_polyagamma` in this file
-# to avoid name clashing with the cython function of the same name.
-def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
-               bint disable_checks=False, random_state=None):
+def rvs(h=1., z=0., *, size=None, out=None, method=None,
+        bint disable_checks=False, random_state=None):
     """
     random_polyagamma(h=1., z=0., *, size=None, out=None, method=None,
                       disable_checks=False, random_state=None)
@@ -148,18 +50,21 @@ def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
            Also raises an exception when it contains non-integer values.
 
     out : array_like, optional
-        1d array_like object in which to store samples. This object must
+        An array_like object in which to store samples. This object must
         implement the buffer protocol as described in [4]_ or the array
-        protocol as described in [5]_. This object's elements must be of 64bit
-        float type, C-contiguous and aligned. If given, then no value is
-        returned. when `h` and/or `z` is a sequence, then `out` needs to have
-        the same total size as the broadcasted result of the parameters. If
-        both this and the `size` parameter are set when `h` and `z` are not
-        both scalars, `size` is preferred while this parameter is ignored.
+        protocol as described in [5]_. This object's elements must be of
+        floating type, contiguous and aligned. When `h` and/or `z` is a sequence,
+        then `out` needs to have the same total size as the broadcasted result
+        of the parameters. If both this and the `size` parameter are set, `size`
+        is preferred while this parameter is ignored.
 
         .. versionchanged:: 1.3.2
            If set with `size` when `h` and `z` are not both scalars, this input
            is ignored in favor of `size`.
+
+        .. versionchanged:: 1.3.7
+           2D or more dimensional array objects are now accepted as values for
+           this parameter.
 
     method : str or None, optional
         The method to use when sampling. If None (default) then a hybrid
@@ -185,7 +90,7 @@ def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
            Now explicitly returns NaN if `disable_checks=True` and `h` is not
            positive.
 
-    random_state : {None, int, array_like[ints], SeedSequence, BitGenerator, Generator}, optional
+    random_state : {int, array_like, SeedSequence, BitGenerator, Generator}, optional
         A seed to initialize the random number generator. If None, then fresh,
         unpredictable entropy will be pulled from the OS. If an ``int`` or
         ``array_like[ints]`` is passed, then it will be passed to
@@ -240,136 +145,118 @@ def polyagamma(h=1., z=0., *, size=None, double[:] out=None, method=None,
     >>> random_polyagamma(size=10, out=arr)
 
     """
-    # define an ``h`` value small enough to be regarded as a zero
-    DEF zero = 1e-04
+    if method not in METHODS:
+        raise ValueError(f"`method` must be one of {set(METHODS)}")
 
-    cdef np.broadcast bcast
-    cdef double ch, cz
-    cdef double[:] ah, az
-    cdef double* arr_ptr
-    cdef np.PyArray_Dims shape
-    cdef np.npy_intp arr_len
-    cdef BitGenerator bitgenerator
-    cdef bitgen_t* bitgen
-    cdef sampler_t stype = HYBRID
-    cdef bint has_out = True if out is not None else False
+    cdef:
+        void* data
+        double ch, cz
+        np.npy_intp n, ndim
+        np.PyArray_Dims shape
+        bint has_out = out is not None
+        bint has_size = size is not None
+        sampler_t sampler = <sampler_t>METHODS[method]
+        BitGenerator bitgenerator = <BitGenerator>default_rng(random_state).bit_generator
+        bitgen_t* bitgen = <bitgen_t*>PyCapsule_GetPointer(bitgenerator.capsule,
+                                                           BITGEN_NAME)
 
-    bitgenerator = <BitGenerator>(default_rng(random_state)._bit_generator)
-    bitgen = <bitgen_t*>PyCapsule_GetPointer(bitgenerator.capsule, BITGEN_NAME)
-
-    if method is not None:
-        stype = <sampler_t>check_method(h, method, disable_checks)
-
-    if params_are_scalars(h, z):
-        if not disable_checks and PyObject_RichCompareBool(h, zero, Py_LE):
-            raise ValueError("`h` must be positive")
+    # We special-case when input params are scalars for maximum efficiency
+    if is_number(h) and is_number(z):
         ch, cz = h, z
-        if not has_out and size is None:
-            with bitgenerator.lock, nogil:
-                cz = random_polyagamma(bitgen, ch, cz, stype)
-            return cz
-        elif has_out:
-            with bitgenerator.lock, nogil:
-                random_polyagamma_fill(bitgen, ch, cz, stype, out.shape[0], &out[0])
-            return
-        else:
+        if not disable_checks and (ch <= ZERO or (sampler == DEVROYE and ch != <int>ch)):
+            raise ValueError(PARAM_CHECK_ERROR_MSG)
+
+        if has_size:
             PyArray_IntpConverter(size, &shape)
-            arr = np.PyArray_EMPTY(shape.len, shape.ptr, np.NPY_DOUBLE, 0)
+            res = np.PyArray_EMPTY(shape.len, shape.ptr, np.NPY_DOUBLE, 0)
             free(shape.ptr)
-            arr_len = np.PyArray_SIZE(arr)
-            arr_ptr = <double*>np.PyArray_DATA(arr)
             with bitgenerator.lock, nogil:
-                pgm_random_polyagamma_fill(bitgen, ch, cz, stype, arr_len, arr_ptr)
-            return arr
-
-    h = np.PyArray_FROM_OT(h, np.NPY_DOUBLE)
-    if not disable_checks and any(np.PyArray_Ravel(np.PyArray_FROM_O(h <= zero),
-                                                   np.NPY_CORDER)):
-        raise ValueError("values of `h` must be positive")
-    z = np.PyArray_FROM_OT(z, np.NPY_DOUBLE)
-
-    # handle cases where the user also passes a size argument value
-    if size is not None:
-        PyArray_IntpConverter(size, &shape)
-        return _polyagamma_shape_broadcasted(bitgen, h, z, stype, shape, bitgenerator.lock)
-
-    elif np.PyArray_NDIM(<np.ndarray>h) == np.PyArray_NDIM(<np.ndarray>z) == 1:
-        ah, az = h, z
-        if has_out and not (out.shape[0] == ah.shape[0] == az.shape[0]):
-            raise IndexError("`out` must have the same length as parameters")
-        elif not has_out:
-            out = np.PyArray_EMPTY(1, <np.npy_intp*>ah.shape, np.NPY_DOUBLE, 0)
-        with bitgenerator.lock, nogil:
-            random_polyagamma_fill2(bitgen, &ah[0], &az[0], stype, out.shape[0], &out[0])
-        if has_out:
-            return
-        else:
-            return out.base
-
-    else:
-        bcast = np.PyArray_MultiIterNew2(h, z)
-        if has_out and out.shape[0] != bcast.size:
-            raise ValueError(
-                "`out` must have the same total size as the broadcasted "
-                "result of `h` and `z`"
-            )
+                ndim = shape.len
+                data = np.PyArray_DATA(<np.ndarray[np.double_t, ndim=ndim]>res)
+                n = np.PyArray_SIZE(<np.ndarray[np.double_t, ndim=ndim]>res)
+                random_polyagamma_fill(bitgen, ch, cz, sampler, <size_t>n, <double*>data)
+            return res
         elif has_out:
-            arr_ptr = &out[0]
+            # We use the WRITEBACKIFCOPY flag to wrap `out` incase the data is not
+            # double precision float. Once we are done, this flag ensures the
+            # sampled double precision data is copied back into the original data
+            # of `out` and cast to its original type.
+            res = np.PyArray_FROM_OTF(out, np.NPY_DOUBLE, np.NPY_ARRAY_WRITEBACKIFCOPY)
+            with bitgenerator.lock, nogil:
+                data = np.PyArray_DATA(<np.ndarray[np.double_t]>res)
+                n = np.PyArray_SIZE(<np.ndarray[np.double_t]>res)
+                random_polyagamma_fill(bitgen, ch, cz, sampler, <size_t>n, <double*>data)
+            PyArray_ResolveWritebackIfCopy(<np.PyArrayObject*>res)
+            return out
         else:
-            arr = np.PyArray_EMPTY(bcast.nd, bcast.dimensions, np.NPY_DOUBLE, 0)
-            arr_ptr = <double*>np.PyArray_DATA(arr)
+            with bitgenerator.lock:
+                cz = random_polyagamma(bitgen, ch, cz, sampler)
+            return cz
 
+    harray = np.PyArray_FROM_OTF(h, np.NPY_DOUBLE, np.NPY_ARRAY_CARRAY_RO)
+
+    if not disable_checks and any_nonpositive(<np.ndarray[np.double_t]>harray, sampler):
+        raise ValueError(PARAM_CHECK_ERROR_MSG)
+
+    zarray = np.PyArray_FROM_OT(z, np.NPY_DOUBLE)
+
+    cdef:
+        char** ptr
+        NpyIter* it
+        np.npy_intp* innersizeptr
+        NpyIter_IterNextFunc iternext
+        int** op_axes = [NULL, NULL, NULL]
+        np.PyArray_Descr** op_dtypes = NULL
+        np.PyArrayObject** ops = [<np.PyArrayObject*>harray,
+                                  <np.PyArrayObject*>zarray, NULL]
+        np.npy_uint32* op_flags = [NPY_ITER_READONLY | NPY_ITER_CONTIG,
+                                   NPY_ITER_READONLY | NPY_ITER_CONTIG, 0]
+        # We handle iteration of the innermost loop of the broadcasted contents
+        # manually for efficiency using the EXTERNAL_LOOP flag, and thus get
+        # an array of the loop contents instead of one-at-a-time. We use the
+        # BUFFERED flag to satisfy data type, alignment, and byte-order requirements
+        # as well as to get larger chunks of the inner loop when used with EXTERNAL_LOOP.
+        # When buffering is enabled, the GROWINNER flag allows the size of the
+        # inner loop to grow when buffering isn’t necessary, enabling a single
+        # passthrough of all the data in some cases.
+        np.npy_uint32 it_flags = (NPY_ITER_ZEROSIZE_OK | NPY_ITER_EXTERNAL_LOOP |
+                                  NPY_ITER_BUFFERED | NPY_ITER_GROWINNER)
+
+    if has_size:
+        PyArray_IntpConverter(size, &shape)
+        op_flags[2] = NPY_ITER_WRITEONLY | NPY_ITER_ALLOCATE | NPY_ITER_CONTIG
+        it = NpyIter_AdvancedNew(3, ops, it_flags, np.NPY_KEEPORDER, np.NPY_NO_CASTING,
+                                 op_flags, op_dtypes, shape.len, op_axes, shape.ptr, 0)
+        free(shape.ptr)
+    elif has_out:
+        npy_arr = np.PyArray_FROM_OTF(out, np.NPY_DOUBLE, np.NPY_ARRAY_WRITEBACKIFCOPY)
+        ops[2] = <np.PyArrayObject*>npy_arr
+        op_flags[2] = NPY_ITER_WRITEONLY | NPY_ITER_CONTIG | NPY_ITER_NO_BROADCAST
+        it = NpyIter_MultiNew(3, ops, it_flags, np.NPY_KEEPORDER,
+                              np.NPY_NO_CASTING, op_flags, op_dtypes)
+    else:
+        op_flags[2] = NPY_ITER_WRITEONLY | NPY_ITER_ALLOCATE | NPY_ITER_CONTIG
+        it = NpyIter_MultiNew(3, ops, it_flags, np.NPY_KEEPORDER,
+                              np.NPY_NO_CASTING, op_flags, op_dtypes)
+
+    try:
+        iternext = NpyIter_GetIterNext(it, NULL)
         with bitgenerator.lock, nogil:
-            while bcast.index < bcast.size:
-                ch = (<double*>np.PyArray_MultiIter_DATA(bcast, 0))[0]
-                cz = (<double*>np.PyArray_MultiIter_DATA(bcast, 1))[0]
-                arr_ptr[bcast.index] = pgm_random_polyagamma(bitgen, ch, cz, stype)
-                np.PyArray_MultiIter_NEXT(bcast)
-
+            ptr = NpyIter_GetDataPtrArray(it)
+            innersizeptr = NpyIter_GetInnerLoopSizePtr(it)
+            while True:
+                random_polyagamma_fill2(bitgen, <double*>ptr[0], <double*>ptr[1], sampler,
+                                        <size_t>innersizeptr[0], <double*>ptr[2])
+                if not iternext(it):
+                    break
         if has_out:
-            return
-        else:
-            return arr
+            PyArray_ResolveWritebackIfCopy(ops[2])
+        return <object>NpyIter_GetOperandArray(it)[2]
+    finally:
+        NpyIter_Deallocate(it)  # pragma: no cover
 
 
-cdef extern from "pgm_density.h" nogil:
-    double pgm_polyagamma_logpdf(double x, double h, double z)
-    double pgm_polyagamma_logcdf(double x, double h, double z)
-    double pgm_polyagamma_pdf(double x, double h, double z)
-    double pgm_polyagamma_cdf(double x, double h, double z)
-
-
-ctypedef double (*dist_func)(double x, double h, double z) nogil
-
-
-cdef object dispatch(dist_func f, object x, object h, object z):
-    cdef double cx, ch, cz
-
-    if is_a_number(x) and is_a_number(h) and is_a_number(z):
-        cx, ch, cz = x, h, z
-        with nogil:
-            cx = f(cx, ch, cz)
-        return cx
-
-    x = np.PyArray_FROM_OT(x, np.NPY_DOUBLE)
-    h = np.PyArray_FROM_OT(h, np.NPY_DOUBLE)
-    z = np.PyArray_FROM_OT(z, np.NPY_DOUBLE)
-    cdef np.broadcast bcast = np.PyArray_MultiIterNew3(x, h, z)
-    arr = np.PyArray_EMPTY(bcast.nd, bcast.dimensions, np.NPY_DOUBLE, 0)
-    cdef double* arr_ptr = <double*>np.PyArray_DATA(arr)
-
-    with nogil:
-        while bcast.index < bcast.size:
-            cx = (<double*>np.PyArray_MultiIter_DATA(bcast, 0))[0]
-            ch = (<double*>np.PyArray_MultiIter_DATA(bcast, 1))[0]
-            cz = (<double*>np.PyArray_MultiIter_DATA(bcast, 2))[0]
-            arr_ptr[bcast.index] = f(cx, ch, cz)
-            np.PyArray_MultiIter_NEXT(bcast)
-
-    return arr
-
-
-def polyagamma_pdf(x, h=1., z=0., bint return_log=False):
+def pdf(x, h=1., z=0., bint return_log=False):
     """
     polyagamma_pdf(x, h=1., z=0., return_log=False)
 
@@ -433,11 +320,11 @@ def polyagamma_pdf(x, h=1., z=0., bint return_log=False):
     array([ 0.07924721,  0.09733558, -1.86322458])
 
     """
-    cdef dist_func f = pgm_polyagamma_logpdf if return_log else pgm_polyagamma_pdf
+    cdef dist_func f = polyagamma_logpdf if return_log else polyagamma_pdf
     return dispatch(f, x, h, z)
 
 
-def polyagamma_cdf(x, h=1., z=0., bint return_log=False):
+def cdf(x, h=1., z=0., bint return_log=False):
     """
     polyagamma_cdf(x, h=1., z=0., return_log=False)
 
@@ -493,5 +380,134 @@ def polyagamma_cdf(x, h=1., z=0., bint return_log=False):
     array([-1.19962205, -0.55298237, -0.0319493 ])
 
     """
-    cdef dist_func f = pgm_polyagamma_logcdf if return_log else pgm_polyagamma_cdf
+    cdef dist_func f = polyagamma_logcdf if return_log else polyagamma_cdf
     return dispatch(f, x, h, z)
+
+
+ctypedef int (*NpyIter_IterNextFunc)(NpyIter* it) noexcept nogil
+
+cdef extern from "numpy/ndarrayobject.h":
+    # currently not available in numpy's cython declarations so we include manually
+    int PyArray_ResolveWritebackIfCopy(np.PyArrayObject* obj)
+    # This has to be included seperately to function as expected.
+    # See: https://github.com/numpy/numpy/issues/19291
+    int PyArray_IntpConverter(object size, np.PyArray_Dims* shape) except 0
+
+    ctypedef struct NpyIter:
+        pass
+
+    cdef enum:
+        NPY_FAIL
+        NPY_SUCCEED
+
+    cdef enum:
+        NPY_ITER_ALLOCATE
+        NPY_ITER_READONLY
+        NPY_ITER_WRITEONLY
+        NPY_ITER_ZEROSIZE_OK
+        NPY_ITER_EXTERNAL_LOOP
+        NPY_ITER_ALIGNED
+        NPY_ITER_CONTIG
+        NPY_ITER_BUFFERED
+        NPY_ITER_GROWINNER
+        NPY_ITER_NO_BROADCAST
+
+    NpyIter* NpyIter_MultiNew(np.npy_intp nop, np.PyArrayObject** op,
+                              np.npy_uint32 flags, np.NPY_ORDER order,
+                              np.NPY_CASTING casting, np.npy_uint32* op_flags,
+                              np.PyArray_Descr** op_dtypes) except NULL
+
+    NpyIter* NpyIter_AdvancedNew(np.npy_intp nop, np.PyArrayObject** op,
+                                 np.npy_uint32 flags, np.NPY_ORDER order,
+                                 np.NPY_CASTING casting, np.npy_uint32* op_flags,
+                                 np.PyArray_Descr** op_dtypes, int oa_ndim,
+                                 int** op_axes, const np.npy_intp* itershape,
+                                 np.npy_intp buffersize) except NULL
+
+    NpyIter_IterNextFunc NpyIter_GetIterNext(NpyIter* it, char** errmsg) except NULL
+    np.npy_intp* NpyIter_GetInnerLoopSizePtr(NpyIter* it) nogil
+    np.PyArrayObject** NpyIter_GetOperandArray(NpyIter* it)
+    int NpyIter_Deallocate(NpyIter* it) except NPY_FAIL
+    char** NpyIter_GetDataPtrArray(NpyIter* it) nogil
+
+
+cdef dict METHODS = {
+    None: HYBRID,
+    "gamma": GAMMA,
+    "saddle": SADDLE,
+    "devroye": DEVROYE,
+    "alternate": ALTERNATE,
+}
+cdef double ZERO = 1e-04  # h value small enough to be regarded as 0
+cdef const char* BITGEN_NAME = "BitGenerator"
+cdef const char* PARAM_CHECK_ERROR_MSG = \
+    "Values of `h` must be positive, and also integer if `method` is devroye."
+ctypedef double (*dist_func)(double x, double h, double z) noexcept nogil
+
+
+cdef inline bint is_number(object o) noexcept:
+    """Check whether an object is a python float/int."""
+    return PyFloat_Check(o) or PyLong_Check(o)
+
+
+cdef inline bint any_nonpositive(np.ndarray h, sampler_t method) noexcept:
+    """Verify if the shape paramemter is non-positive given a sampling method."""
+    cdef np.npy_intp i, size
+    cdef double* ch = <double*>np.PyArray_DATA(h)
+
+    if np.PyArray_IsZeroDim(<object>h):
+        return ch[0] <= ZERO or (method == DEVROYE and ch[0] != <size_t>ch[0])
+
+    size = np.PyArray_SIZE(h)
+
+    if method == DEVROYE:
+        for i in range(size):
+            if ch[i] <= ZERO or ch[i] != <size_t>ch[i]:
+                return True
+        return False
+
+    for i in range(size):
+        if ch[i] <= ZERO:
+            return True
+    return False
+
+
+cdef inline object dispatch(dist_func fn, object x, object h, object z):
+    """Apply any function f with signature f(x,h,z) to arguments `x`, `h` and `z`."""
+    cdef double cx, ch, cz
+
+    if is_number(x) and is_number(h) and is_number(z):
+        cx, ch, cz = x, h, z
+        with nogil:
+            cx = fn(cx, ch, cz)
+        return  cx
+
+    xarray = np.PyArray_FROM_OT(x, np.NPY_DOUBLE)
+    harray = np.PyArray_FROM_OT(h, np.NPY_DOUBLE)
+    zarray = np.PyArray_FROM_OT(z, np.NPY_DOUBLE)
+
+    cdef:
+        char** ptr
+        NpyIter_IterNextFunc iternext
+        np.PyArray_Descr** op_dtypes = NULL
+        np.npy_uint32 it_flags = NPY_ITER_ZEROSIZE_OK
+        np.npy_uint32* op_flags = [NPY_ITER_READONLY,
+                                   NPY_ITER_READONLY, NPY_ITER_READONLY,
+                                   NPY_ITER_WRITEONLY | NPY_ITER_ALLOCATE]
+        np.PyArrayObject** ops = [<np.PyArrayObject*>xarray, <np.PyArrayObject*>harray,
+                                  <np.PyArrayObject*>zarray, NULL]
+        NpyIter* it = NpyIter_MultiNew(4, ops, it_flags, np.NPY_KEEPORDER,
+                                       np.NPY_NO_CASTING, op_flags, op_dtypes)
+
+    try:
+        iternext = NpyIter_GetIterNext(it, NULL)
+        with nogil:
+            ptr = NpyIter_GetDataPtrArray(it)
+            while True:
+                (<double*>ptr[3])[0] = fn((<double*>ptr[0])[0], (<double*>ptr[1])[0],
+                                          (<double*>ptr[2])[0])
+                if not iternext(it):
+                    break
+        return <object>NpyIter_GetOperandArray(it)[3]
+    finally:
+        NpyIter_Deallocate(it)  # pragma: no cover

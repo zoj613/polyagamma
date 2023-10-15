@@ -39,7 +39,7 @@ def test_polyagamma():
     # test output of passing `size` when h and z are not both scalars
     assert rng_polyagamma(z, size=(10, 1, 5)).shape == (10, 1, 5)
     assert rng_polyagamma(h, z, size=(2, 4, 5, 5)).shape == (2, 4, 5, 5)
-    with pytest.raises(ValueError, match="array is not broadcastable"):
+    with pytest.raises(ValueError, match="operands could not be broadcast together"):
         rng_polyagamma(z, size=(10, 1, 4))
     # test if the expected exception is returned when `size` is the wrong object
     # Later versions of numpy seem to return an updated error meesages for the
@@ -63,37 +63,39 @@ def test_polyagamma():
     z = np.ones(6)
     out = rng_polyagamma(h, z)
     assert out.shape == (6,)
+
+    # test behaviour of passing the `out` parameter
     out = np.zeros(6)
     h = (1, 1, 1, 1, 1, 1)
     rng_polyagamma(h, z, out=out)
     assert not np.allclose(out, 0)
-    with pytest.raises(IndexError, match="must have the same length as parameters"):
+    with pytest.raises(ValueError, match="operands could not be broadcast together"):
         rng_polyagamma(h, z, out=out[1:])
-
-    # tests for when one of the params is a sequence and the other is not
     out = np.array([0., 0., 0., 0., 0.])
     rng_polyagamma(out=out)
     assert not np.allclose(out, 0)
+    # tests for when one of the params is a sequence and the other is not
     out2 = np.array([0., 0., 0., 0., 0., 0.])
     rng_polyagamma(h, out=out2)
     assert not np.allclose(out2, 0)
     # test size of output array when a parameter is a sequence
-    with pytest.raises(ValueError, match="`out` must have the same total"):
+    with pytest.raises(ValueError, match="operands could not be broadcast together"):
         rng_polyagamma(h, out=out)
+    # test if it works on N-dimensional out
+    out = np.zeros((2, 1))
+    rng_polyagamma(out=out)
+    assert out.all()
     # test if it works on non-numpy objects that implement the buffer/array protocols
     out3 = array.array('d', [0] * 5)
     assert not all(out3)
     rng_polyagamma(out=out3)
     assert all(out3)  # check if all elements are filled with a sample.
-    # raise error when passed output array is not 64bit float type.
-    out4 = array.array('f', [0] * 5)
-    with pytest.raises(ValueError, match="Buffer dtype mismatch,"):
-        rng_polyagamma(out=out4)
-
-
-    # raise an error when output array with dim > 1 is passed as an arg
-    with pytest.raises(ValueError):
-        rng_polyagamma(out=np.empty((2, 1)))
+    out4 = array.array('f', [0] * 2)
+    rng_polyagamma(out=out4)
+    assert all(out4)
+    # test if an error is raised when datatype is not float or double, int
+    with pytest.raises(TypeError, match="Cannot cast array data from dtype('complex64')*"):
+        rng_polyagamma(out=np.empty(2, dtype=np.complex64))
 
     # h must be greater than 0
     with pytest.raises(ValueError, match="`h` must be positive"):
@@ -103,6 +105,10 @@ def test_polyagamma():
     with pytest.raises(ValueError, match="`h` must be positive"):
         h = [1, 2, 3, 0.00001]
         rng_polyagamma(h)
+    # regressiion test for PR #123 to ensure that when method=="devroye" and when one
+    # of array `h` elements is not positive or non-integer we raise an appropriate error
+    with pytest.raises(ValueError, match="`h` must be positive"):
+        rng_polyagamma([-1, 4.0], method="devroye")
 
     # should work for negative values of z
     rng_polyagamma(z=-10.5)
@@ -129,7 +135,7 @@ def test_polyagamma():
     random_polyagamma(np.array([1., 2, 3.0]), method="devroye")
 
     # raise an error when using devroye with non-integer values of h
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="must be positive, and also integer"):
         rng_polyagamma(2.0000000001, method="devroye")
     # should work for whole numbers: 2.000000 == 2
     rng_polyagamma(2.0000000000, method="devroye")
