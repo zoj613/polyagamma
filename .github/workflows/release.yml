@@ -34,7 +34,7 @@ jobs:
 
       - name: Cythonize C-extensions
         run: |
-          python3 -m pip install --upgrade pip cython==0.29.*
+          python3 -m pip install --upgrade pip cython==3.0.*
           cythonize polyagamma/*.pyx
 
       - name: Build wheels
@@ -53,7 +53,7 @@ jobs:
       - name: Build source distribution
         if: ${{ matrix.os == 'ubuntu-20.04' }}
         run: |
-          python3 -m pip install --upgrade pip cython==0.29.* build
+          python3 -m pip install --upgrade pip cython==3.0.* build
           cythonize polyagamma/*.pyx
           python -m pip install build
           python -m build --sdist

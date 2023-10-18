@@ -16,7 +16,7 @@ source_files = [
     "src/pgm_density.c",
 ]
 
-macros = [('NPY_NO_DEPRECATED_API', 0)]
+macros = [('NPY_NO_DEPRECATED_API', 'NPY_1_7_API_VERSION')]
 if os.getenv("BUILD_WITH_COVERAGE", None):
     macros.append(('CYTHON_TRACE_NOGIL', 1))
 
