@@ -62,6 +62,7 @@ version_file = "polyagamma/_version.py"
 
 [tool.coverage.run]
 plugins = ["Cython.Coverage"]
+omit = ["polyagamma/_version.py"]
 
 [tool.cibuildwheel]
 build-verbosity = 3
