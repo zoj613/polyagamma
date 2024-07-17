@@ -17,38 +17,38 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-20.04, macOS-11, windows-2019 ]
+        os: [ ubuntu-20.04, macOS-12, windows-2019 ]
       fail-fast: false
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-tags: 'true'
           fetch-depth: 0
 
       - name: Set up QEMU
         if: runner.os == 'Linux'
-        uses: docker/setup-qemu-action@v2
+        uses: docker/setup-qemu-action@v3
         with:
           platforms: all
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
       - name: Cythonize C-extensions
         run: |
-          python3 -m pip install --upgrade pip cython==3.0.*
+          python3 -m pip install --upgrade pip cibuildwheel==2.19.2
+          python3 -m pip install -r requirements-dev.txt
           cythonize polyagamma/*.pyx
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.15.0
+        uses: pypa/cibuildwheel@v2.19.2
         with:
           package-dir: .
           output-dir: wheelhouse
           config-file: "pyproject.toml"
-
-      - name: Set up Python
-        if: ${{ matrix.os == 'ubuntu-20.04' }}
-        uses: actions/setup-python@v4.7.0
-        with:
-          python-version: '3.9'
 
       - name: Build source distribution
         if: ${{ matrix.os == 'ubuntu-20.04' }}

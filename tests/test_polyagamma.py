@@ -172,7 +172,7 @@ def test_polyagamma_pdf_cdf(method, h, z):
     x = random_polyagamma(h, z, size=5000, method=method, random_state=rng)
     x.sort()
     d = polyagamma_pdf(x, h=h, z=z)
-    area_under_curve = np.trapz(d, x)
+    area_under_curve = np.trapezoid(d, x)
     # relative tolerance is set so that 0.998 can pass the tests.
     assert np.isclose(1.0, area_under_curve, rtol=1e-2)
 
@@ -181,7 +181,7 @@ def test_polyagamma_pdf_cdf(method, h, z):
     # calculate the cdf of the distribution at the mean of the samples
     cdf = polyagamma_cdf(xx, h=h, z=z)
     # estimate empirical cdf from the sampled and corresponding density
-    ecdf = np.trapz(d[mask], x[mask])
+    ecdf = np.trapezoid(d[mask], x[mask])
     # test if the empirical cdf is equal to the distribution's to 2 decimals
     assert np.allclose(ecdf, cdf, rtol=1e-2)
 
