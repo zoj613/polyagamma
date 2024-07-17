@@ -11,7 +11,7 @@ Efficiently generate samples from the Polya-Gamma distribution using a NumPy/Sci
 
 ## Why?
 
-If you are reading this, you probably have already used the [pypolyagamma][9] package before. It is
+If you are reading this, you probably already used the [pypolyagamma][9] package before. It is
 a great package that I have also used in the past, however I encountered several issues:
 - Generating an array of samples is awkward because it requires using a list comprehension
   if parameter values are scalars or have pre-allocated arrays of a known size to pass for both
@@ -165,7 +165,7 @@ or using `conda` with the following command:
 ```shell
 $ conda install -c conda-forge polyagamma
 ```
-Alternatively, once can install from source with the following shell commands:
+Alternatively, one can install from source with the following shell commands:
 ```shell
 $ git clone https://github.com/zoj613/polyagamma.git
 $ cd polyagamma/
@@ -276,7 +276,7 @@ To submit a PR, follow the steps below:
 [4]: https://img.shields.io/pypi/wheel/polyagamma?style=flat-square
 [5]: https://img.shields.io/github/v/release/zoj613/polyagamma?include_prereleases&label=pypi&style=flat-square
 [6]: https://img.shields.io/pypi/l/polyagamma?style=flat-square
-[7]: https://img.shields.io/github/workflow/status/zoj613/polyagamma/CI/main?style=flat-square
+[7]: https://img.shields.io/github/actions/workflow/status/zoj613/polyagamma/build-and-test.yml?branch=main&style=flat-square
 [8]: https://img.shields.io/codecov/c/github/zoj613/polyagamma?style=flat-square
 [9]: https://github.com/slinderman/pypolyagamma
 [10]: https://github.com/python-poetry/poetry
