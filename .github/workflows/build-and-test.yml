@@ -19,7 +19,7 @@ jobs:
     strategy:
       matrix:
         os: [ ubuntu-20.04, macOS-12, windows-2019 ]
-        python-version: [ '3.9', 'pypy3.9', '3.10', '3.11', '3.12' ]
+        python-version: [ '3.10', 'pypy3.10', '3.11', '3.12', '3.13' ]
       fail-fast: false
 
     name: Python version - ${{ matrix.python-version }} - ${{ matrix.os }}
@@ -49,12 +49,13 @@ jobs:
         env:
           BUILD_WITH_COVERAGE: true
         run: |
-          cythonize polyagamma/*.pyx -X linetrace=${{ contains(fromJSON('["3.12", "pypy3.9"]'), matrix.python-version) && 'False' || 'True' }}
+          cythonize polyagamma/*.pyx -X linetrace=${{ contains(fromJSON('["pypy3.10"]'), matrix.python-version) && 'False' || 'True' }}
           python3 -m pip install -e .
           pytest -v --cov-branch --cov=polyagamma tests/ --cov-report=xml
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v4
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.xml
           fail_ci_if_error: false
