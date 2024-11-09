@@ -35,7 +35,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9'
+          python-version: '3.10'
 
       - name: Cythonize C-extensions
         run: |
@@ -44,7 +44,7 @@ jobs:
           cythonize polyagamma/*.pyx
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.19.2
+        uses: pypa/cibuildwheel@v2.21.3
         with:
           package-dir: .
           output-dir: wheelhouse
