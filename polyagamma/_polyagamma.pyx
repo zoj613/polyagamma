@@ -166,7 +166,7 @@ def rvs(h=1., z=0., *, size=None, out=None, method=None,
             raise ValueError(PARAM_CHECK_ERROR_MSG)
 
         if has_size:
-            PyArray_IntpConverter(size, &shape)
+            np.PyArray_IntpConverter(size, &shape)
             res = np.PyArray_EMPTY(shape.len, shape.ptr, np.NPY_DOUBLE, 0)
             free(shape.ptr)
             with bitgenerator.lock, nogil:
@@ -201,15 +201,15 @@ def rvs(h=1., z=0., *, size=None, out=None, method=None,
 
     cdef:
         char** ptr
-        NpyIter* it
+        np.NpyIter* it
         np.npy_intp* innersizeptr
-        NpyIter_IterNextFunc iternext
+        np.NpyIter_IterNextFunc iternext
         int** op_axes = [NULL, NULL, NULL]
         np.PyArray_Descr** op_dtypes = NULL
         np.PyArrayObject** ops = [<np.PyArrayObject*>harray,
                                   <np.PyArrayObject*>zarray, NULL]
-        np.npy_uint32* op_flags = [NPY_ITER_READONLY | NPY_ITER_CONTIG,
-                                   NPY_ITER_READONLY | NPY_ITER_CONTIG, 0]
+        np.npy_uint32* op_flags = [np.NPY_ITER_READONLY | np.NPY_ITER_CONTIG,
+                                   np.NPY_ITER_READONLY | np.NPY_ITER_CONTIG, 0]
         # We handle iteration of the innermost loop of the broadcasted contents
         # manually for efficiency using the EXTERNAL_LOOP flag, and thus get
         # an array of the loop contents instead of one-at-a-time. We use the
@@ -218,31 +218,32 @@ def rvs(h=1., z=0., *, size=None, out=None, method=None,
         # When buffering is enabled, the GROWINNER flag allows the size of the
         # inner loop to grow when buffering isn’t necessary, enabling a single
         # passthrough of all the data in some cases.
-        np.npy_uint32 it_flags = (NPY_ITER_ZEROSIZE_OK | NPY_ITER_EXTERNAL_LOOP |
-                                  NPY_ITER_BUFFERED | NPY_ITER_GROWINNER)
+        np.npy_uint32 it_flags = (np.NPY_ITER_ZEROSIZE_OK | np.NPY_ITER_EXTERNAL_LOOP |
+                                  np.NPY_ITER_BUFFERED | np.NPY_ITER_GROWINNER)
 
     if has_size:
-        PyArray_IntpConverter(size, &shape)
-        op_flags[2] = NPY_ITER_WRITEONLY | NPY_ITER_ALLOCATE | NPY_ITER_CONTIG
-        it = NpyIter_AdvancedNew(3, ops, it_flags, np.NPY_KEEPORDER, np.NPY_NO_CASTING,
-                                 op_flags, op_dtypes, shape.len, op_axes, shape.ptr, 0)
+        np.PyArray_IntpConverter(size, &shape)
+        op_flags[2] = np.NPY_ITER_WRITEONLY | np.NPY_ITER_ALLOCATE | np.NPY_ITER_CONTIG
+        it = np.NpyIter_AdvancedNew(3, ops, it_flags, np.NPY_KEEPORDER, np.NPY_NO_CASTING,
+                                    op_flags, op_dtypes, shape.len, op_axes, shape.ptr, 0)
         free(shape.ptr)
     elif has_out:
         npy_arr = np.PyArray_FROM_OTF(out, np.NPY_DOUBLE, np.NPY_ARRAY_WRITEBACKIFCOPY)
         ops[2] = <np.PyArrayObject*>npy_arr
-        op_flags[2] = NPY_ITER_WRITEONLY | NPY_ITER_CONTIG | NPY_ITER_NO_BROADCAST
-        it = NpyIter_MultiNew(3, ops, it_flags, np.NPY_KEEPORDER,
-                              np.NPY_NO_CASTING, op_flags, op_dtypes)
+        op_flags[2] = (np.NPY_ITER_WRITEONLY | np.NPY_ITER_CONTIG |
+                       np.NPY_ITER_NO_BROADCAST)
+        it = np.NpyIter_MultiNew(3, ops, it_flags, np.NPY_KEEPORDER,
+                                 np.NPY_NO_CASTING, op_flags, op_dtypes)
     else:
-        op_flags[2] = NPY_ITER_WRITEONLY | NPY_ITER_ALLOCATE | NPY_ITER_CONTIG
-        it = NpyIter_MultiNew(3, ops, it_flags, np.NPY_KEEPORDER,
-                              np.NPY_NO_CASTING, op_flags, op_dtypes)
+        op_flags[2] = np.NPY_ITER_WRITEONLY | np.NPY_ITER_ALLOCATE | np.NPY_ITER_CONTIG
+        it = np.NpyIter_MultiNew(3, ops, it_flags, np.NPY_KEEPORDER,
+                                 np.NPY_NO_CASTING, op_flags, op_dtypes)
 
     try:
-        iternext = NpyIter_GetIterNext(it, NULL)
+        iternext = np.NpyIter_GetIterNext(it, NULL)
         with bitgenerator.lock, nogil:
-            ptr = NpyIter_GetDataPtrArray(it)
-            innersizeptr = NpyIter_GetInnerLoopSizePtr(it)
+            ptr = np.NpyIter_GetDataPtrArray(it)
+            innersizeptr = np.NpyIter_GetInnerLoopSizePtr(it)
             while True:
                 random_polyagamma_fill2(bitgen, <double*>ptr[0], <double*>ptr[1], sampler,
                                         <size_t>innersizeptr[0], <double*>ptr[2])
@@ -250,9 +251,9 @@ def rvs(h=1., z=0., *, size=None, out=None, method=None,
                     break
         if has_out:
             PyArray_ResolveWritebackIfCopy(ops[2])
-        return <object>NpyIter_GetOperandArray(it)[2]
+        return <object>np.NpyIter_GetOperandArray(it)[2]
     finally:
-        NpyIter_Deallocate(it)  # pragma: no cover
+        np.NpyIter_Deallocate(it)  # pragma: no cover
 
 
 def pdf(x, h=1., z=0., bint return_log=False):
@@ -383,51 +384,9 @@ def cdf(x, h=1., z=0., bint return_log=False):
     return dispatch(f, x, h, z)
 
 
-ctypedef int (*NpyIter_IterNextFunc)(NpyIter* it) noexcept nogil
-
 cdef extern from "numpy/ndarrayobject.h":
     # currently not available in numpy's cython declarations so we include manually
     int PyArray_ResolveWritebackIfCopy(np.PyArrayObject* obj)
-    # This has to be included seperately to function as expected.
-    # See: https://github.com/numpy/numpy/issues/19291
-    int PyArray_IntpConverter(object size, np.PyArray_Dims* shape) except 0
-
-    ctypedef struct NpyIter:
-        pass
-
-    cdef enum:
-        NPY_FAIL
-        NPY_SUCCEED
-
-    cdef enum:
-        NPY_ITER_ALLOCATE
-        NPY_ITER_READONLY
-        NPY_ITER_WRITEONLY
-        NPY_ITER_ZEROSIZE_OK
-        NPY_ITER_EXTERNAL_LOOP
-        NPY_ITER_ALIGNED
-        NPY_ITER_CONTIG
-        NPY_ITER_BUFFERED
-        NPY_ITER_GROWINNER
-        NPY_ITER_NO_BROADCAST
-
-    NpyIter* NpyIter_MultiNew(np.npy_intp nop, np.PyArrayObject** op,
-                              np.npy_uint32 flags, np.NPY_ORDER order,
-                              np.NPY_CASTING casting, np.npy_uint32* op_flags,
-                              np.PyArray_Descr** op_dtypes) except NULL
-
-    NpyIter* NpyIter_AdvancedNew(np.npy_intp nop, np.PyArrayObject** op,
-                                 np.npy_uint32 flags, np.NPY_ORDER order,
-                                 np.NPY_CASTING casting, np.npy_uint32* op_flags,
-                                 np.PyArray_Descr** op_dtypes, int oa_ndim,
-                                 int** op_axes, const np.npy_intp* itershape,
-                                 np.npy_intp buffersize) except NULL
-
-    NpyIter_IterNextFunc NpyIter_GetIterNext(NpyIter* it, char** errmsg) except NULL
-    np.npy_intp* NpyIter_GetInnerLoopSizePtr(NpyIter* it) nogil
-    np.PyArrayObject** NpyIter_GetOperandArray(NpyIter* it)
-    int NpyIter_Deallocate(NpyIter* it) except NPY_FAIL
-    char** NpyIter_GetDataPtrArray(NpyIter* it) nogil
 
 
 cdef dict METHODS = {
@@ -487,26 +446,27 @@ cdef inline object dispatch(dist_func fn, object x, object h, object z):
 
     cdef:
         char** ptr
-        NpyIter_IterNextFunc iternext
+        np.NpyIter_IterNextFunc iternext
         np.PyArray_Descr** op_dtypes = NULL
-        np.npy_uint32 it_flags = NPY_ITER_ZEROSIZE_OK
-        np.npy_uint32* op_flags = [NPY_ITER_READONLY,
-                                   NPY_ITER_READONLY, NPY_ITER_READONLY,
-                                   NPY_ITER_WRITEONLY | NPY_ITER_ALLOCATE]
+        np.npy_uint32 it_flags = np.NPY_ITER_ZEROSIZE_OK
+        np.npy_uint32* op_flags = [np.NPY_ITER_READONLY,
+                                   np.NPY_ITER_READONLY,
+                                   np.NPY_ITER_READONLY,
+                                   np.NPY_ITER_WRITEONLY | np.NPY_ITER_ALLOCATE]
         np.PyArrayObject** ops = [<np.PyArrayObject*>xarray, <np.PyArrayObject*>harray,
                                   <np.PyArrayObject*>zarray, NULL]
-        NpyIter* it = NpyIter_MultiNew(4, ops, it_flags, np.NPY_KEEPORDER,
-                                       np.NPY_NO_CASTING, op_flags, op_dtypes)
+        np.NpyIter* it = np.NpyIter_MultiNew(4, ops, it_flags, np.NPY_KEEPORDER,
+                                             np.NPY_NO_CASTING, op_flags, op_dtypes)
 
     try:
-        iternext = NpyIter_GetIterNext(it, NULL)
+        iternext = np.NpyIter_GetIterNext(it, NULL)
         with nogil:
-            ptr = NpyIter_GetDataPtrArray(it)
+            ptr = np.NpyIter_GetDataPtrArray(it)
             while True:
                 (<double*>ptr[3])[0] = fn((<double*>ptr[0])[0], (<double*>ptr[1])[0],
                                           (<double*>ptr[2])[0])
                 if not iternext(it):
                     break
-        return <object>NpyIter_GetOperandArray(it)[3]
+        return <object>np.NpyIter_GetOperandArray(it)[3]
     finally:
-        NpyIter_Deallocate(it)  # pragma: no cover
+        np.NpyIter_Deallocate(it)  # pragma: no cover
