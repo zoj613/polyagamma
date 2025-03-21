@@ -17,7 +17,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ ubuntu-20.04, macOS-12, windows-2019 ]
+        os: [ ubuntu-20.04, macOS-13, windows-2019 ]
       fail-fast: false
 
     steps:
@@ -35,20 +35,16 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.11'
 
       - name: Cythonize C-extensions
         run: |
-          python3 -m pip install --upgrade pip cibuildwheel==2.19.2
+          python3 -m pip install --upgrade pip cibuildwheel
           python3 -m pip install -r requirements-dev.txt
           cythonize polyagamma/*.pyx
 
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.21.3
-        with:
-          package-dir: .
-          output-dir: wheelhouse
-          config-file: "pyproject.toml"
+        run: python -m cibuildwheel --output-dir wheelhouse --config-file pyproject.toml
 
       - name: Build source distribution
         if: ${{ matrix.os == 'ubuntu-20.04' }}
@@ -60,11 +56,12 @@ jobs:
           mv dist/*.gz wheelhouse
 
       - name: Store the wheelhouse directory
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: wheels_and_sdist
+          name: wheels_and_sdist-${{ matrix.os }}
           path: wheelhouse
           if-no-files-found: error
+          overwrite: true
 
   upload_pypi:
     needs: [ build_wheels_and_sdist ]
@@ -76,12 +73,16 @@ jobs:
       id-token: write
     steps:
       - name: Pull built wheels and sdist
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: wheels_and_sdist
           path: wheelhouse
+          pattern: wheels_and_sdist-*
+          merge-multiple: true
+
+      - name: Display structure of downloaded files
+        run: ls -R wheelhouse
 
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@v1.8.10
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
           packages_dir: wheelhouse
