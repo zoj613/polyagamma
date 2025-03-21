@@ -169,7 +169,7 @@ Alternatively, one can install from source with the following shell commands:
 ```shell
 $ git clone https://github.com/zoj613/polyagamma.git
 $ cd polyagamma/
-$ pip install cython==0.29.*
+$ pip install cython==3.0.*
 $ cythonize polyagamma/*.pyx
 $ pip install .
 ```

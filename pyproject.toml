@@ -3,9 +3,9 @@ requires = [
     "wheel",
     "setuptools>=61.0.0",
     "setuptools-scm",
-    "numpy==2.1.3; python_version>='3.10' and platform_python_implementation!='PyPy'",
+    "numpy>=2.2.4; python_version>='3.10' and platform_python_implementation!='PyPy'",
     # PyPy specific requirements
-    "numpy==2.1.3; python_version=='3.10' and platform_python_implementation=='PyPy'",
+    "numpy>=2.2.4; python_version=='3.10' and platform_python_implementation=='PyPy'",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -64,9 +64,8 @@ archs = ["auto64"]
 # We also skip musllinux wheels for the aarch64 architecture because building a wheel takes hours.
 skip = ["pp31*", "pp3*_aarch64", "*-musllinux_aarch64"]
 # The test-command string is not parsed correctly on windows so we skip testing the wheel for now.
-# ARM64 wheels on MacOS currently can't be test with cibuildwheels, so we skip testing until it can be supoorted.
-test-skip = ["*-win*", "*-macosx_arm64"]
-before-test = "pip install numpy --pre"
+test-skip = ["*-win*"]
+before-test = "pip install numpy"
 test-command = [
     "python -c 'from polyagamma import random_polyagamma;print(random_polyagamma());'"
 ]
@@ -76,7 +75,10 @@ environment = { SETUPTOOLS_SCM_DEBUG = 1 }
 archs = ["x86_64", "aarch64"]
 
 [tool.cibuildwheel.macos]
-archs = ["x86_64", "arm64"]
+# We skip building of ARM64 wheels because they can't be tested in the CI
+# and we follow recommendations of the cibuildwheel team by having users build
+# them natively at install time of this package via `pip install polyagamma`.
+archs = ["x86_64"]
 
 [[tool.cibuildwheel.overrides]]
 # To avoid errors building numpy for the musllinux linux wheels, we install blas.
